@@ -144,6 +144,7 @@ describe('Review security clearance status', () => {
                 historicalFileEvidenceIdentical: identical }] });
         const show = container.querySelector<HTMLButtonElement>('button[aria-label="Show findings"]');
         if (show) await act(async () => show.click());
+        await focusFindings('all');
         expect(container.textContent?.includes('Same finding and file as approved version 0.9.')).toBe(identical === true);
         if (identical) expect(container.textContent).toContain('Changes elsewhere still require review.');
         expect(container.textContent).not.toContain('Artifact Review Completed');
@@ -247,7 +248,7 @@ describe('Review security clearance status', () => {
         await act(async () => container.querySelector<HTMLButtonElement>('button[aria-label="Earlier reasoning for finding 250"]')!.click());
         expect(loadPriorFindingReasoning).toHaveBeenCalledExactlyOnceWith('project', 'version', 'baseline', 249, 'snapshot');
     });
-    it('keeps previously seen and always-review findings visible by default', async () => {
+    it('focuses on new and always-review findings while keeping prior evidence available', async () => {
         const issues = [{ ...twoFindings.issues[0], description: 'Fresh occurrence', knownIssue: false },
             { ...twoFindings.issues[1], description: 'Seen sensitive occurrence', knownIssue: true, reviewCadence: 'ALWAYS' }];
         await render({ ...twoFindings, issues }, true, 'snapshot', 2, earlierSources); await showFindings();
@@ -262,6 +263,24 @@ describe('Review security clearance status', () => {
         await focusFindings('all');
         expect(container.querySelectorAll('button[aria-label^="Earlier reasoning for finding"]')).toHaveLength(2);
     });
+    it('keeps escalated and high-severity prior findings in the attention view', async () => {
+        const issues = [
+            { ...twoFindings.issues[0], description: 'Routine prior library', severity: 'LOW', knownIssue: true, historicalFileEvidenceIdentical: true, escalated: false, reviewCadence: 'WHEN_CHANGED' },
+            { ...twoFindings.issues[0], description: 'Changed prior library', severity: 'LOW', knownIssue: true, historicalFileEvidenceIdentical: false, escalated: false, reviewCadence: 'WHEN_CHANGED' },
+            { ...twoFindings.issues[0], description: 'Escalated prior library', severity: 'LOW', knownIssue: true, historicalFileEvidenceIdentical: true, escalated: true, reviewCadence: 'WHEN_CHANGED' },
+            { ...twoFindings.issues[1], description: 'High prior capability', severity: 'HIGH', knownIssue: true, historicalFileEvidenceIdentical: true, escalated: false, reviewCadence: 'WHEN_CHANGED' }
+        ];
+        await render({ ...twoFindings, issues }, true, 'snapshot', 2, earlierSources); await showFindings();
+        expect(container.textContent).not.toContain('Routine prior library');
+        expect(container.textContent).toContain('Changed prior library');
+        expect(container.textContent).toContain('Escalated prior library');
+        expect(container.textContent).toContain('High prior capability');
+        expect(container.textContent).toContain('Showing 1–3 of 3 matching findings (4 total)');
+        expect(container.textContent).toContain('1 previously seen findings with identical file evidence are outside this view');
+        await click('Show all findings');
+        expect(container.textContent).toContain('Routine prior library');
+        expect(container.textContent).toContain('Showing 1–4 of 4 matching findings (4 total)');
+    });
     it('distinguishes empty filters from no evidence and resets them for a new snapshot', async () => {
         await render(twoFindings, true, 'snapshot', 2, earlierSources); await showFindings();
         await searchFindings('not-present'); await focusFindings('seen');
@@ -269,20 +288,24 @@ describe('Review security clearance status', () => {
         expect(container.textContent).not.toContain('No heuristic findings were emitted');
         await render(twoFindings, true, 'fresh-snapshot', 2, earlierSources);
         expect(container.querySelector<HTMLInputElement>('input[aria-label="Search findings"]')?.value).toBe('');
-        expect(container.querySelector<HTMLSelectElement>('select[aria-label="Finding focus"]')?.value).toBe('all');
+        expect(container.querySelector<HTMLSelectElement>('select[aria-label="Finding focus"]')?.value).toBe('attention');
         expect(container.querySelectorAll('button[aria-label^="Earlier reasoning for finding"]')).toHaveLength(2);
     });
 
     it('filters repeated types without losing original reasoning indices or hiding the scan summary', async () => {
         const issues = [
-            ...Array.from({ length: 120 }, (_, index) => ({ ...twoFindings.issues[0], type: 'BytecodeManipulator', severity: 'LOW', filePath: `Library${index}.class`, knownIssue: true })),
+            ...Array.from({ length: 120 }, (_, index) => ({ ...twoFindings.issues[0], type: 'BytecodeManipulator', severity: 'LOW', filePath: `Library${index}.class`, knownIssue: true, historicalFileEvidenceIdentical: true })),
             { ...twoFindings.issues[1], type: 'RuntimeExec', severity: 'HIGH', filePath: 'Runner.class', knownIssue: false, reviewCadence: 'ALWAYS' }
         ];
         vi.mocked(loadPriorFindingReasoning).mockReset().mockResolvedValue(earlierResponse('Execution evidence'));
         await render({ ...twoFindings, issues }, true, 'snapshot', 2, earlierSources); await showFindings();
         expect(container.textContent).toContain('Finding groups (2 types)');
+        expect(container.textContent).toContain('Showing 1–1 of 1 matching findings (121 total)');
+        expect(container.textContent).toContain('120 previously seen findings with identical file evidence are outside this view');
         const show = async (type: string) => act(async () => container.querySelector<HTMLButtonElement>(`button[aria-label="Show ${type} findings"]`)!.click());
         await show('BytecodeManipulator');
+        expect(container.textContent).toContain('No findings match these filters');
+        await focusFindings('all');
         expect(container.textContent).toContain('Showing 1–100 of 120 matching findings (121 total)');
         expect(container.textContent).toContain('1 high or critical findings are outside these filters');
         await click('Next findings');
@@ -298,7 +321,7 @@ describe('Review security clearance status', () => {
         await show('RuntimeExec');
         await render({ ...twoFindings, issues }, true, 'fresh-snapshot', 2, earlierSources);
         expect(container.textContent).not.toContain('Selected type:');
-        expect(container.textContent).toContain('Showing 1–100 of 121 matching findings (121 total)');
+        expect(container.textContent).toContain('Showing 1–1 of 1 matching findings (121 total)');
     });
 
 });

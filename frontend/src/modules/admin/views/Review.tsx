@@ -63,6 +63,12 @@ const WIZARD_STEPS: WizardStep[] = [
     }
 ];
 
+const isIdenticalPriorFinding = (issue: ScanIssue) => issue.knownIssue
+    && issue.historicalFileEvidenceIdentical === true
+    && !issue.escalated
+    && (issue.reviewCadence || '').toUpperCase() !== 'ALWAYS'
+    && issue.severity !== 'HIGH' && issue.severity !== 'CRITICAL';
+
 export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApprove, onReject, setStatus, canDecide = false, canRescan = false }) => {
     const [currentStep, setCurrentStep] = useState(0);
     const [checklist, setChecklist] = useState<Record<string, boolean>>({});
@@ -117,11 +123,11 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
     const isScanning = scanResult?.status === 'SCANNING';
 
     const [findingSearch, setFindingSearch] = useState('');
-    const [findingFocus, setFindingFocus] = useState('all');
+    const [findingFocus, setFindingFocus] = useState('attention');
     const [findingType, setFindingType] = useState<string | null>(null);
     const [findingPage, setFindingPage] = useState(0);
     useEffect(() => {
-        setFindingSearch(''); setFindingFocus('all'); setFindingType(null); setFindingPage(0);
+        setFindingSearch(''); setFindingFocus('attention'); setFindingType(null); setFindingPage(0);
     }, [mod.id, mod.reviewToken, pendingVersion?.id, pendingVersion?.reviewToken]);
 
     const orderedIssues = useMemo(() => {
@@ -151,6 +157,7 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
         const search = findingSearch.trim().toLowerCase();
         return orderedIssues.filter(({ issue }) => {
             if (findingType !== null && issue.type !== findingType) return false;
+            if (findingFocus === 'attention' && isIdenticalPriorFinding(issue)) return false;
             if (findingFocus === 'new' && issue.knownIssue) return false;
             if (findingFocus === 'seen' && !issue.knownIssue) return false;
             if (findingFocus === 'always' && (issue.reviewCadence || '').toUpperCase() !== 'ALWAYS') return false;
@@ -159,6 +166,7 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
     }, [orderedIssues, findingSearch, findingFocus, findingType]);
     const hiddenHighSeverity = orderedIssues.filter(({ issue }) => ['HIGH', 'CRITICAL'].includes(issue.severity)).length
         - matchingIssues.filter(({ issue }) => ['HIGH', 'CRITICAL'].includes(issue.severity)).length;
+    const identicalPriorCount = orderedIssues.filter(({ issue }) => isIdenticalPriorFinding(issue)).length;
     const findingPages = Math.max(1, Math.ceil(matchingIssues.length / 100));
     const visibleFindingPage = Math.min(findingPage, findingPages - 1);
     const visibleIssues = matchingIssues.slice(visibleFindingPage * 100, (visibleFindingPage + 1) * 100);
@@ -771,7 +779,7 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
                                                         <select aria-label="Finding focus" value={findingFocus}
                                                             onChange={event => { setFindingFocus(event.target.value); setFindingPage(0); }}
                                                             className="rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-sm dark:text-white">
-                                                            <option value="all">All findings</option><option value="new">Not previously seen</option>
+                                                            <option value="attention">Review focus</option><option value="all">All findings</option><option value="new">Not previously seen</option>
                                                             <option value="seen">Previously seen</option><option value="always">Always review</option>
                                                         </select>
                                                     </div>
@@ -779,6 +787,11 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
                                                         Showing {matchingIssues.length ? visibleFindingPage * 100 + 1 : 0}–{Math.min((visibleFindingPage + 1) * 100, matchingIssues.length)} of {matchingIssues.length} matching findings ({orderedIssues.length} total).
                                                         {' '}Filters only change this view; previously seen findings may still require review.
                                                     </p>
+                                                    {findingFocus === 'attention' && findingType === null && !findingSearch.trim() && identicalPriorCount > 0 &&
+                                                        <p className="text-xs text-slate-600 dark:text-slate-300">
+                                                            {identicalPriorCount} previously seen findings with identical file evidence are outside this view. Changes elsewhere may still affect them.{' '}
+                                                            <button type="button" className="font-bold text-indigo-600 dark:text-indigo-300" onClick={() => { setFindingFocus('all'); setFindingPage(0); }}>Show all findings</button>
+                                                        </p>}
                                                     {hiddenHighSeverity > 0 && <p className="text-xs font-semibold text-amber-700 dark:text-amber-300">{hiddenHighSeverity} high or critical findings are outside these filters.</p>}
                                                     {matchingIssues.length === 0 && <p className="text-sm text-slate-600 dark:text-slate-300">No findings match these filters.</p>}
                                                     {findingPages > 1 && <nav aria-label="Finding pages" className="flex items-center gap-3 text-sm dark:text-slate-200">
