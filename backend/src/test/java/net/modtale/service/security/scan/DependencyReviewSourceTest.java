@@ -94,6 +94,33 @@ class DependencyReviewSourceTest {
         assertTrue(graph.gaps().stream().anyMatch(g->g.reason()==Reason.EXTERNAL));
         assertTrue(graph.gaps().stream().anyMatch(g->g.reason()==Reason.SUPPLEMENTAL_CONTENT));
     }
+    @Test void modpackOverrideCanBeIdentifiedWithoutGrantingClearance() {
+        var modpack=version("v","1");modpack.remove("fileUrl");modpack.append("overrideFileUrl","modpack-overrides/v.zip");
+        project("modpack",modpack);
+        var source=new DependencyReviewSource(mongo);var selected=source.readRoot("modpack","v");
+        assertEquals(State.FOUND,selected.state());
+        assertEquals("modpack-overrides/v.zip",selected.snapshot().fileReference());
+        assertNull(selected.snapshot().contextSha256());
+        var inventory=DependencyReviewGraph.inspect(selected.snapshot(),source,Limits.defaults());
+        assertFalse(inventory.resolved());
+        assertTrue(inventory.gaps().stream().anyMatch(g->g.reason()==Reason.SUPPLEMENTAL_CONTENT));
+        assertTrue(inventory.gaps().stream().anyMatch(g->g.reason()==Reason.UNRESOLVED_CONTEXT));
+        mongo.save(mongo.findById("modpack",net.modtale.model.project.Project.class));
+        var projects=org.mockito.Mockito.mock(net.modtale.service.project.query.ProjectService.class);
+        org.mockito.Mockito.when(projects.getRawProjectById("modpack"))
+                .thenAnswer(i->mongo.findById("modpack",net.modtale.model.project.Project.class));
+        var controller=new net.modtale.controller.admin.DependencyInspectionController(projects,mongo,
+                org.mockito.Mockito.mock(net.modtale.service.storage.StorageService.class));
+        String token=net.modtale.service.admin.review.ProjectReviewSnapshot.token(projects.getRawProjectById("modpack"));
+        var result=controller.inspect("modpack","v",token).getBody();
+        assertEquals("modpack-overrides/v.zip",result.inventory().nodes().getFirst().fileReference());
+        assertFalse(result.inventory().resolved());
+    }
+    @Test void legacyModpackWithoutRecordedArchiveHashRemainsUnavailable() {
+        var modpack=version("v","1");modpack.remove("fileUrl");modpack.remove("hash");
+        modpack.append("overrideFileUrl","modpack-overrides/v.zip");project("legacy-modpack",modpack);
+        assertEquals(State.UNAVAILABLE,new DependencyReviewSource(mongo).readRoot("legacy-modpack","v").state());
+    }
     @Test void duplicatePinsDuplicateIdsAndMixedProjectStorageIdentitiesAreAmbiguous() {
         project("labels",version("one","V1"),version("two","v1"));
         assertEquals(State.AMBIGUOUS,new DependencyReviewSource(mongo).read(new Reference("labels","v1")).state());

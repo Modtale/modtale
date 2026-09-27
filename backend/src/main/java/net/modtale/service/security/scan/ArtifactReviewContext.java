@@ -50,4 +50,9 @@ public final class ArtifactReviewContext {
         return version.getOverrideFileUrl() != null && !version.getOverrideFileUrl().isBlank()
                 || version.getModpackConfigs() != null && !version.getModpackConfigs().isEmpty();
     }
+    public static String inspectionFileReference(ProjectVersion version) {
+        if (version == null) return null;
+        if (version.getFileUrl() != null && !version.getFileUrl().isBlank()) return version.getFileUrl();
+        return version.getOverrideFileUrl();
+    }
 }

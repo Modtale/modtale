@@ -73,7 +73,7 @@ public class DependencyInspectionController {
         var root=selected.snapshot();
         if(!id.equals(root.projectId())||!versionId.equals(root.versionId())
                 ||!Objects.equals(version.getVersionNumber(),root.versionNumber())||!Objects.equals(version.getHash(),root.artifactSha256())
-                ||!Objects.equals(version.getFileUrl(),root.fileReference())
+                ||!Objects.equals(ArtifactReviewContext.inspectionFileReference(version),root.fileReference())
                 ||!Objects.equals(ArtifactReviewContext.fingerprint(version),root.contextSha256())
                 ||ArtifactReviewContext.hasSupplementalContent(version)!=root.supplementalContent()
                 ||!sameDeclarations(version,root))throw ProjectReviewSnapshot.conflict();

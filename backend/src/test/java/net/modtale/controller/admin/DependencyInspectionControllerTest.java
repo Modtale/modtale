@@ -101,6 +101,17 @@ class DependencyInspectionControllerTest {
         var response=controller.inspect("p","v",ProjectReviewSnapshot.token(project)).getBody();
         assertFalse(response.artifactBytesVerified());assertNull(response.inventory().identity());assertFalse(response.inventory().gaps().isEmpty());
     }
+    @Test void modpackOverrideRootIsBoundToStoredReviewAndHeldAsSupplemental() {
+        version.setFileUrl(null);version.setOverrideFileUrl("modpack-overrides/v.zip");
+        var root=new Snapshot("p","v","1","modpack-overrides/v.zip","a".repeat(64),null,null,true,List.of());
+        when(source.readRoot("p","v")).thenReturn(new Lookup(State.FOUND,root));
+        when(source.read(any())).thenReturn(new Lookup(State.FOUND,root));
+        var result=controller.inspect("p","v",ProjectReviewSnapshot.token(project)).getBody();
+        assertEquals("modpack-overrides/v.zip",result.inventory().nodes().getFirst().fileReference());
+        assertFalse(result.inventory().resolved());
+        assertTrue(result.inventory().gaps().stream().anyMatch(g->g.reason()==Reason.SUPPLEMENTAL_CONTENT));
+        verifyNoInteractions(verifier);
+    }
     @Test void httpRouteRequiresSnapshotAndReturnsUncachedDeclarationInventory() throws Exception {
         var mvc=org.springframework.test.web.servlet.setup.MockMvcBuilders.standaloneSetup(controller).build();
         var route="/api/v1/admin/projects/p/version-ids/v/dependencies";

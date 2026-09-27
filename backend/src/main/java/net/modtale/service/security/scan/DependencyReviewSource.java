@@ -132,7 +132,9 @@ public final class DependencyReviewSource implements Source {
             var context=new ProjectDependency(target,null,pin,type);context.setSource(source);contextDependencies.add(context);
         }
         model.setDependencies(contextDependencies);
+        model.setFileUrl(optionalString(v,"fileUrl"));
         String override=optionalString(v,"overrideFileUrl");
+        model.setOverrideFileUrl(override);
         boolean supplemental=override!=null&&!override.isBlank()||v.get("modpackConfigs")!=null&&!list(v.get("modpackConfigs")).isEmpty();
         RecordedScan scan=null;
         if(v.get("scanResult")!=null) {
@@ -142,7 +144,7 @@ public final class DependencyReviewSource implements Source {
                 scan=new RecordedScan(string(evidence,"artifactSha256"),string(evidence,"contentSha256"),string(evidence,"policyVersion"));
             }
         }
-        return new Snapshot(projectId,string(v,"_id"),string(v,"versionNumber"),string(v,"fileUrl"),string(v,"hash"),
+        return new Snapshot(projectId,string(v,"_id"),string(v,"versionNumber"),ArtifactReviewContext.inspectionFileReference(model),string(v,"hash"),
                 ArtifactReviewContext.fingerprint(model),scan,supplemental,dependencies);
     }
     private static Lookup absent(State state){return new Lookup(state,null);}
