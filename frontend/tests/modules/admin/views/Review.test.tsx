@@ -271,6 +271,8 @@ describe('Review security clearance status', () => {
             finding: { path: 'Same.class', description: 'prior', lineStart: 9 }, revokedDecisionId: null }] });
     it('opens prior reasoning in one click using the original occurrence index after sorting', async () => {
         vi.mocked(loadPriorFindingReasoning).mockReset().mockResolvedValue(earlierResponse('Exact second occurrence reasoning'));
+        vi.mocked(adminClient.getStructure).mockResolvedValue(['Same.class']);
+        vi.mocked(adminClient.getFileWindow).mockResolvedValue({identity:'a'.repeat(64),content:'Approved source evidence',format:'ASM_CLASS',start:0,end:24,totalCharacters:24,firstLine:1,lineMatched:true,representationComplete:true,gaps:[]});
         await render(twoFindings, true, 'snapshot', 2, earlierSources);
         const show = container.querySelector<HTMLButtonElement>('button[aria-label="Show findings"]');
         if (show) await act(async () => show.click());
@@ -282,6 +284,10 @@ describe('Review security clearance status', () => {
         expect(container.querySelector('select[aria-label="Earlier reasoning finding"]')).toBeNull();
         expect(container.textContent).toContain('Exact second occurrence reasoning');
         expect(container.textContent).toContain('No current acceptance is granted');
+        await act(async () => [...container.querySelectorAll<HTMLButtonElement>('button')]
+            .find(button => button.textContent?.includes('Inspect accepted file'))!.click());
+        expect(adminClient.getStructure).toHaveBeenLastCalledWith('project', '0.9', 'snapshot');
+        expect(adminClient.getFileWindow).toHaveBeenLastCalledWith('project', '0.9', 'Same.class', 'snapshot', 0, undefined, 9);
     });
     it('does not attach a late rationale to a different selected occurrence', async () => {
         let resolve!: (value: ReturnType<typeof earlierResponse>) => void;

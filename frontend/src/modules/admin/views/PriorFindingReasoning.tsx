@@ -3,13 +3,14 @@ import type { ScanIssue } from '@/types';
 import { loadPriorFindingReasoning, type PriorFindingReasoning as Result } from '../api/findingReviews';
 import { extractApiErrorMessage } from '@/utils/api';
 
-type Props = { projectId: string; versionId: string; token: string; issues: ScanIssue[]; sources: { id: string; versionNumber: string }[]; issueIndex?: number; sourceVersionId?: string; autoLoad?: boolean };
+type Props = { projectId: string; versionId: string; token: string; issues: ScanIssue[]; sources: { id: string; versionNumber: string }[]; issueIndex?: number; sourceVersionId?: string; autoLoad?: boolean;
+    onInspectSource?: (version: string, path: string, lineStart: number) => void };
 export function PriorFindingReasoning(props: Props) {
     const identity = JSON.stringify([props.projectId, props.versionId, props.token, props.issueIndex,
-        props.sourceVersionId, props.sources.map(source => source.id), props.issues.length]);
+        props.sourceVersionId, props.sources.map(source => [source.id, source.versionNumber]), props.issues.length]);
     return <PriorFindingReasoningSnapshot key={identity} {...props} />;
 }
-function PriorFindingReasoningSnapshot({ projectId, versionId, token, issues, sources, issueIndex, sourceVersionId, autoLoad = false }: Props) {
+function PriorFindingReasoningSnapshot({ projectId, versionId, token, issues, sources, issueIndex, sourceVersionId, autoLoad = false, onInspectSource }: Props) {
     const [source, setSource] = useState(sources.some(source => source.id === sourceVersionId) ? sourceVersionId! : sources[0]?.id || '');
     const [selectedIssue, setIssue] = useState(0);
     const issue = issueIndex ?? selectedIssue;
@@ -31,6 +32,8 @@ function PriorFindingReasoningSnapshot({ projectId, versionId, token, issues, so
         try {
             const next = await loadPriorFindingReasoning(projectId, versionId, source, issue, token);
             if (next.reviewToken !== token || next.sourceVersionId !== source) throw new Error('The review changed. Refresh its evidence.');
+            if (next.sourceVersion !== sources.find(value => value.id === source)?.versionNumber)
+                throw new Error('The approved source version changed. Refresh its evidence.');
             if (request === generation.current) setResult(next);
         } catch (failure) {
             if (request === generation.current) setError(extractApiErrorMessage(failure, 'Verified prior reasoning is unavailable.'));
@@ -58,6 +61,10 @@ function PriorFindingReasoningSnapshot({ projectId, versionId, token, issues, so
                 <p>Earlier acceptance · version {result.sourceVersion} · {decision.actorId} · {new Date(decision.createdAt).toLocaleString()}</p>
                 <p className="break-all">{decision.finding.path}:{decision.finding.lineStart}</p>
                 <p className="whitespace-pre-wrap">{decision.rationale}</p>
+                {onInspectSource && <button type="button" className="font-semibold text-indigo-600 dark:text-indigo-300"
+                    onClick={() => onInspectSource(result.sourceVersion, decision.finding.path, decision.finding.lineStart)}>
+                    Inspect accepted file at line {decision.finding.lineStart}
+                </button>}
                 <p className="text-xs">Scope: {decision.scope}. {decision.expiresAt <= Date.now() ? 'Expired.' : `Expires ${new Date(decision.expiresAt).toLocaleString()}.`} No current acceptance is granted by this display.</p>
             </article>)}
             {result.omitted > 0 && <p className="text-sm">{result.omitted} additional matches omitted. Inspect the source version’s decision history for the full record.</p>}

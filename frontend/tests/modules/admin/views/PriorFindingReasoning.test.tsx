@@ -22,6 +22,25 @@ it('loads exact prior reasoning on demand without granting or recording a decisi
     expect(container.textContent).toContain('<script>untrusted rationale</script>');expect(container.querySelector('script')).toBeNull();
     expect(container.textContent).toContain('No current acceptance is granted');expect(container.querySelector('textarea')).toBeNull();
 });
+it('opens the verified approved file and line without creating a current acceptance', async () => {
+    const inspect = vi.fn();
+    vi.mocked(loadPriorFindingReasoning).mockResolvedValue(result);
+    await act(async () => root.render(<PriorFindingReasoning {...props} onInspectSource={inspect} />));
+    await load();
+    const button = [...container.querySelectorAll<HTMLButtonElement>('button')]
+        .find(value => value.textContent?.includes('Inspect accepted file'));
+    expect(button).toBeTruthy();
+    await act(async () => button!.click());
+    expect(inspect).toHaveBeenCalledExactlyOnceWith('1', 'Mod.class', 9);
+    expect(container.textContent).toContain('No current acceptance is granted');
+});
+it('rejects a prior response whose source version number no longer matches the opened review', async () => {
+    vi.mocked(loadPriorFindingReasoning).mockResolvedValue({ ...result, sourceVersion: 'different' });
+    await act(async () => root.render(<PriorFindingReasoning {...props} onInspectSource={vi.fn()} />));
+    await load();
+    expect(container.querySelector('[role=alert]')).not.toBeNull();
+    expect(container.textContent).not.toContain('Inspect accepted file');
+});
 it('discards a response after the opened project token changes', async () => {
     let resolve!: (value: typeof result) => void;
     vi.mocked(loadPriorFindingReasoning).mockReturnValue(new Promise(done => { resolve = done; }));

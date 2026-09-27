@@ -897,6 +897,7 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
                                                             key={`${pendingVersion.id}:${mod.reviewToken}:${originalIndex}`}
                                                             projectId={mod.id} versionId={pendingVersion.id} token={mod.reviewToken || ''}
                                                             issues={scanIssues} issueIndex={originalIndex} sources={priorSources} autoLoad
+                                                            onInspectSource={(version, path, lineStart) => openInspector(version, [], path, lineStart, lineStart)}
                                                             sourceVersionId={priorSources.filter((v: ProjectVersion) => v.versionNumber === issue.baselineVersion).length === 1
                                                                 ? priorSources.find((v: ProjectVersion) => v.versionNumber === issue.baselineVersion)?.id : undefined} />}
                                                     </div>
