@@ -30,17 +30,21 @@ public class ProjectReviewAdminService {
 
     public void publishProject(User adminUser, String id) {
         projectReviewDecisionService.publishProject(adminUser, id);
+        projectReviewQueryService.reviewDecisionChanged();
     }
 
     public void approveVersion(User adminUser, String id, String versionId) {
         projectReviewDecisionService.approveVersion(adminUser, id, versionId);
+        projectReviewQueryService.reviewDecisionChanged();
     }
 
     public void rejectVersion(User adminUser, String id, String versionId, String reason) {
         projectReviewDecisionService.rejectVersion(adminUser, id, versionId, reason);
+        projectReviewQueryService.reviewDecisionChanged();
     }
 
     public void rejectProject(User adminUser, String id, String reason) {
         projectReviewDecisionService.rejectProject(adminUser, id, reason);
+        projectReviewQueryService.reviewDecisionChanged();
     }
 }

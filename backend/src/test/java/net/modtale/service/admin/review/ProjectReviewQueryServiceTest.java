@@ -24,6 +24,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.when;
 
 class ProjectReviewQueryServiceTest {
@@ -47,6 +48,8 @@ class ProjectReviewQueryServiceTest {
         assertEquals(List.of("risky", "clean"), queue.stream().map(AdminVerificationQueueItemDTO::id).toList());
         assertEquals(80, queue.getFirst().pendingVersion().scan().riskScore());
         assertEquals(2, queue.getFirst().pendingVersion().scan().newIssueCount());
+        assertEquals(queue, queryService.getVerificationQueue());
+        verify(queueService, times(1)).getVerificationQueue();
     }
 
     @Test

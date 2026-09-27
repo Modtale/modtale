@@ -1,5 +1,8 @@
 package net.modtale.service.admin.review;
 
+import com.github.benmanes.caffeine.cache.Caffeine;
+import com.github.benmanes.caffeine.cache.LoadingCache;
+import java.time.Duration;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
@@ -22,14 +25,23 @@ import org.springframework.data.mongodb.core.aggregation.Aggregation;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Service;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
+import org.springframework.scheduling.annotation.Scheduled;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Service
 public class ProjectReviewQueryService {
+
+    private static final Logger logger = LoggerFactory.getLogger(ProjectReviewQueryService.class);
+    private static final Boolean QUEUE_KEY = Boolean.TRUE;
 
     private final UserRepository userRepository;
     private final ProjectService projectService;
     private final ProjectReviewQueueService projectReviewQueueService;
     private final MongoTemplate mongoTemplate;
+    private final LoadingCache<Boolean, List<AdminVerificationQueueItemDTO>> verificationQueueCache;
 
     public ProjectReviewQueryService(
             UserRepository userRepository,
@@ -41,9 +53,37 @@ public class ProjectReviewQueryService {
         this.projectService = projectService;
         this.projectReviewQueueService = projectReviewQueueService;
         this.mongoTemplate = mongoTemplate;
+        this.verificationQueueCache = Caffeine.newBuilder()
+                .maximumSize(1)
+                .refreshAfterWrite(Duration.ofSeconds(15))
+                .build(ignored -> loadVerificationQueue());
     }
 
     public List<AdminVerificationQueueItemDTO> getVerificationQueue() {
+        return verificationQueueCache.get(QUEUE_KEY);
+    }
+
+    @EventListener(ApplicationReadyEvent.class)
+    public void warmVerificationQueue() {
+        try {
+            getVerificationQueue();
+        } catch (RuntimeException exception) {
+            logger.warn("Could not warm the verification queue cache", exception);
+        }
+    }
+
+    @Scheduled(fixedDelay = 15_000)
+    public void refreshVerificationQueue() {
+        if (verificationQueueCache.getIfPresent(QUEUE_KEY) != null) {
+            verificationQueueCache.refresh(QUEUE_KEY);
+        }
+    }
+
+    public void reviewDecisionChanged() {
+        refreshVerificationQueue();
+    }
+
+    private List<AdminVerificationQueueItemDTO> loadVerificationQueue() {
         return projectReviewQueueService.getVerificationQueue().stream()
                 .map(ProjectMapper::toVerificationQueueItemDTO)
                 .filter(Objects::nonNull)

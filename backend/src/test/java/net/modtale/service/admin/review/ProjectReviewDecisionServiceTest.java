@@ -8,6 +8,7 @@ import org.bson.Document;
 import net.modtale.model.project.Project;
 import net.modtale.model.project.ProjectStatus;
 import net.modtale.model.project.ProjectVersion;
+import net.modtale.exception.VersionStateConflictException;
 import net.modtale.model.user.User;
 import net.modtale.repository.project.ProjectRepository;
 import net.modtale.repository.user.UserRepository;
@@ -31,6 +32,7 @@ import org.springframework.data.mongodb.core.query.Update;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -137,6 +139,24 @@ class ProjectReviewDecisionServiceTest {
         verify(mongoTemplate, never()).updateFirst(any(Query.class), any(Update.class), eq(Project.class));
         verify(projectNotificationService, never()).notifyUpdates(any(), any());
         verify(adminAuditLogger, never()).logAction(any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void approvalFailsWhenScanOrVersionStateChangedBeforeWrite() {
+        User admin = user("admin-1", "Ada");
+        Project project = project("project-1", "author-1");
+        ProjectVersion version = version("version-1", "1.0.0");
+        version.setReviewStatus(ProjectVersion.ReviewStatus.PENDING);
+        project.getVersions().add(version);
+        when(mongoTemplate.aggregate(any(Aggregation.class), eq("projects"), eq(Project.class)))
+                .thenReturn(new AggregationResults<>(java.util.List.of(project), new Document()));
+        when(projectVersionAccessService.requireById(eq(project), eq("version-1"), any())).thenReturn(version);
+        when(mongoTemplate.updateFirst(any(Query.class), any(Update.class), eq(Project.class)))
+                .thenReturn(UpdateResult.acknowledged(0, 0L, null));
+
+        assertThrows(VersionStateConflictException.class,
+                () -> service.approveVersion(admin, "project-1", "version-1"));
+        verify(projectNotificationService, never()).notifyUpdates(any(), any());
     }
 
     @Test

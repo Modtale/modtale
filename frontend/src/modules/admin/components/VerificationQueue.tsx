@@ -1,5 +1,5 @@
 import { SkeletonSurface } from '@/components/ui/Skeleton';
-import React from 'react';
+import React, { useState } from 'react';
 import type { AdminVerificationQueueItem } from '@/types';
 import { CheckCircle, Clock, Shield, AlertCircle, ShieldAlert } from 'lucide-react';
 
@@ -15,6 +15,7 @@ interface VerificationQueueProps {
 export const VerificationQueue: React.FC<VerificationQueueProps> = ({
                                                                         pendingProjects, loadingQueue, loadFailed, loadingReview, reviewingId, onReview
                                                                     }) => {
+    const [visibleCount, setVisibleCount] = useState(20);
     const Surface = loadingQueue ? SkeletonSurface : React.Fragment;
     if (loadingQueue && pendingProjects.length === 0) {
         pendingProjects = Array.from({ length: 3 }, (_, index) => ({
@@ -30,7 +31,7 @@ export const VerificationQueue: React.FC<VerificationQueueProps> = ({
 
     if (pendingProjects.length === 0) {
         return (
-            <div className="text-center py-32 bg-white/40 dark:bg-white/5 rounded-3xl border border-slate-200 dark:border-white/10 shadow-sm backdrop-blur-md">
+            <div className="text-center py-32 bg-white/80 dark:bg-slate-800/80 rounded-3xl border border-slate-200 dark:border-white/10 shadow-sm">
                 <div className="w-20 h-20 bg-emerald-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
                     <CheckCircle className="w-10 h-10 text-emerald-500" />
                 </div>
@@ -52,9 +53,9 @@ export const VerificationQueue: React.FC<VerificationQueueProps> = ({
         const risk = scan?.riskScore || 0;
 
         return (
-            <div key={mod.id} className="bg-white/40 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-3xl backdrop-blur-md p-6 flex flex-col md:flex-row gap-8 hover:shadow-xl transition-all duration-300 group hover:border-modtale-accent/20">
+            <div key={mod.id} className="bg-white/80 dark:bg-slate-800/80 border border-slate-200 dark:border-white/10 rounded-3xl p-6 flex flex-col md:flex-row gap-8 hover:shadow-xl transition-all duration-300 group hover:border-modtale-accent/20">
                 <div className="w-full md:w-32 h-32 rounded-2xl overflow-hidden bg-slate-100 dark:bg-white/5 relative shrink-0 shadow-inner">
-                    <img src={mod.imageUrl} className="w-full h-full object-cover" alt="" onError={(e) => e.currentTarget.src = '/assets/favicon.svg'} />
+                    <img src={mod.imageUrl} loading="lazy" decoding="async" className="w-full h-full object-cover" alt="" onError={(e) => e.currentTarget.src = '/assets/favicon.svg'} />
                     {isProjectPending && (
                         <div className="absolute top-0 left-0 right-0 bg-orange-500 text-white text-[10px] font-bold text-center py-1 uppercase">New Project</div>
                     )}
@@ -126,7 +127,12 @@ export const VerificationQueue: React.FC<VerificationQueueProps> = ({
 
     return (
         <Surface><div className="grid gap-4">
-            {pendingProjects.map(renderQueueItem)}
+            {pendingProjects.slice(0, visibleCount).map(renderQueueItem)}
+            {pendingProjects.length > visibleCount && (
+                <button type="button" onClick={() => setVisibleCount(count => count + 20)} className="rounded-xl border border-slate-200 dark:border-white/10 px-5 py-3 text-sm font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-white/5">
+                    Show more ({pendingProjects.length - visibleCount} remaining)
+                </button>
+            )}
         </div></Surface>
     );
 };

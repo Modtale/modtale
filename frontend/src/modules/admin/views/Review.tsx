@@ -891,7 +891,7 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
                                 <div className="flex flex-col gap-4">
                                     <button
                                         onClick={handleVersionApprove}
-                                        disabled={!canDecide || deciding}
+                                        disabled={!canDecide || deciding || isScanning}
                                         className="w-full py-4 bg-emerald-500 hover:bg-emerald-600 text-white rounded-2xl font-black text-lg shadow-xl shadow-emerald-500/20 transition-all transform hover:scale-[1.02] active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
                                     >
                                         {deciding ? 'Publishing...' : 'Approve & Publish'}

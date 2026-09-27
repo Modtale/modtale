@@ -8,9 +8,11 @@ import com.mongodb.client.result.UpdateResult;
 import org.bson.Document;
 import org.bson.types.ObjectId;
 import net.modtale.exception.ResourceNotFoundException;
+import net.modtale.exception.VersionStateConflictException;
 import net.modtale.model.project.Project;
 import net.modtale.model.project.ProjectStatus;
 import net.modtale.model.project.ProjectVersion;
+import net.modtale.model.project.ScanStatus;
 import net.modtale.model.user.User;
 import net.modtale.repository.project.ProjectRepository;
 import net.modtale.service.analytics.ScoringService;
@@ -85,12 +87,15 @@ public class ProjectReviewTransitionService {
             update.set("versions.$[" + alias + "]", candidate);
             update.filterArray(Criteria.where(alias + "._id").is(candidate.getId()));
         }
-        Query query = new Query(Criteria.where("_id").is(project.getId())
-                .and("versions").elemMatch(Criteria.where("_id").is(versionId)
-                        .and("reviewStatus").is(ProjectVersion.ReviewStatus.PENDING)));
+        Query query = new Query(new Criteria().andOperator(
+                Criteria.where("_id").is(project.getId()),
+                Criteria.where("versions").elemMatch(Criteria.where("_id").is(versionId)
+                        .and("reviewStatus").is(ProjectVersion.ReviewStatus.PENDING)),
+                Criteria.where("versions").not().elemMatch(
+                        Criteria.where("scanResult.status").is(ScanStatus.SCANNING))));
         UpdateResult result = mongoTemplate.updateFirst(query, update, Project.class);
         if (result.getMatchedCount() == 0) {
-            return new VersionReviewDecision(project, version, null, false);
+            throw new VersionStateConflictException("The version changed or a scan is in progress. Refresh the review before approving.");
         }
         projectService.evictProjectCache(project);
         return new VersionReviewDecision(project, version, null, true);
