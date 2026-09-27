@@ -63,10 +63,20 @@ class ArtifactInspectionControllerTest {
         var project=new Project();var version=new ProjectVersion();version.setVersionNumber("1.0");version.setHash("a".repeat(64));
         version.setFileUrl("stored.zip");project.setVersions(List.of(version));
         when(projects.getRawProjectById("project")).thenReturn(project);
-        when(storage.download("stored.zip")).thenReturn("different".getBytes());
+        when(storage.downloadBounded("stored.zip",StorageService.MAX_REVIEW_ARTIFACT_BYTES)).thenReturn("different".getBytes());
         var controller=new ArtifactInspectionController(projects,storage,inspector);
         assertEquals(409,assertThrows(ResponseStatusException.class,()->controller.structure("project","1.0",net.modtale.service.admin.review.ProjectReviewSnapshot.token(project))).getStatusCode().value());
         verifyNoInteractions(inspector);
+    }
+    @Test void everyInspectionRouteReadsOnlyWithinTheArtifactLimit() throws Exception {
+        var f=new Fixture();
+        String token=net.modtale.service.admin.review.ProjectReviewSnapshot.token(f.project);
+        when(f.inspector.inspectWindow(any(),anyString(),anyInt(),anyInt(),anyInt())).thenReturn(window(f,0,"policy"));
+        f.controller.structure("project","2",token);
+        f.controller.file("project","2","file.json",token);
+        f.controller.window("project","2","file.json",0,2,0,null,token);
+        verify(f.storage,times(3)).downloadBounded("after.zip",StorageService.MAX_REVIEW_ARTIFACT_BYTES);
+        verify(f.storage,never()).download(anyString());
     }
     private static final class Fixture {
         final ProjectService projects=mock(ProjectService.class);
@@ -86,7 +96,7 @@ class ArtifactInspectionControllerTest {
             project.setId("project");project.setVersions(List.of(before,after));
             response=new WardenClientService.InspectionResponse(hash,List.of("file.json"),"{}","TEXT",Map.of("file.json","a".repeat(64)),"policy");
             when(projects.getRawProjectById("project")).thenReturn(project);
-            when(storage.download(anyString())).thenReturn(bytes);
+            when(storage.downloadBounded(anyString(),eq(StorageService.MAX_REVIEW_ARTIFACT_BYTES))).thenReturn(bytes);
             when(inspector.inspectFile(any(),anyString(),nullable(String.class))).thenReturn(response);
         }
     }
@@ -128,7 +138,9 @@ class ArtifactInspectionControllerTest {
         var result=f.controller.changes("project","2",token).getBody();
         assertEquals("1",result.baselineVersion());assertEquals(1,result.unchanged());assertTrue(result.contextComparable());
         verify(f.projects,times(2)).getRawProjectById("project");
-        verify(f.storage).download("before.zip");verify(f.storage).download("after.zip");
+        verify(f.storage).downloadBounded("before.zip",StorageService.MAX_REVIEW_ARTIFACT_BYTES);
+        verify(f.storage).downloadBounded("after.zip",StorageService.MAX_REVIEW_ARTIFACT_BYTES);
+        verify(f.storage,never()).download(anyString());
     }
     @Test void editedBaselineContextCannotBePresentedAsComparableApprovedContext() throws Exception {
         var f=new Fixture();f.before.setGameVersions(List.of("edited-since-approval"));String token=net.modtale.service.admin.review.ProjectReviewSnapshot.token(f.project);

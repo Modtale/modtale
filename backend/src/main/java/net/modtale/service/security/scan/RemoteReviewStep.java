@@ -27,7 +27,7 @@ public final class RemoteReviewStep {
         try {
             claim=polls.claim(binding,120000);if(claim==null)return new Outcome("NO_WORK",null);
             var acquired=claim;
-            var status=client.submitOrFind(binding,()->storage.downloadBounded(binding.filePath(),100*1024*1024),()->running.getAsBoolean() && !Thread.currentThread().isInterrupted() && polls.isCurrent(acquired));
+            var status=client.submitOrFind(binding,()->storage.downloadBounded(binding.filePath(),StorageService.MAX_REVIEW_ARTIFACT_BYTES),()->running.getAsBoolean() && !Thread.currentThread().isInterrupted() && polls.isCurrent(acquired));
             if(!running.getAsBoolean() || Thread.currentThread().isInterrupted())return new Outcome("SHUTDOWN",null);
             if(binding.jobId()==null) {
                 claim=polls.attachJob(claim,status.jobId());if(claim==null)return new Outcome("SUPERSEDED",null);

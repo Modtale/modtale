@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.*;
 import com.fasterxml.jackson.databind.*;
 import net.modtale.config.properties.AppWardenProperties;
 import net.modtale.model.project.*;
+import net.modtale.service.storage.StorageService;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.*;
@@ -100,7 +101,7 @@ public final class RemoteReviewClient implements AutoCloseable {
                 .body(BodyInserters.fromMultipartData(form.build())),binding.origin()),202,65536,current),found.isPresent()?binding.withJobId(found.get().jobId()):binding);
     }
     private static void validateOriginal(RemoteReviewBinding binding,byte[] bytes) {
-        if(bytes==null || bytes.length==0 || bytes.length>100*1024*1024 || !binding.artifactSha256().equals(hash(bytes)))
+        if(bytes==null || bytes.length==0 || bytes.length>StorageService.MAX_REVIEW_ARTIFACT_BYTES || !binding.artifactSha256().equals(hash(bytes)))
             throw new IllegalArgumentException("Original artifact does not match review binding");
     }
     public Status status(RemoteReviewBinding binding) {return status(binding,()->true,timeout::toNanos);}

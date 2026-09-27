@@ -23,6 +23,7 @@ import software.amazon.awssdk.services.s3.model.*;
 
 @Service
 public class StorageService {
+    public static final int MAX_REVIEW_ARTIFACT_BYTES = 100 * 1024 * 1024;
 
     private static final Logger logger = LoggerFactory.getLogger(StorageService.class);
 
@@ -209,7 +210,7 @@ public class StorageService {
     }
 
     public byte[] downloadBounded(String fileName,int maxBytes) {
-        if(maxBytes<1 || maxBytes>100*1024*1024)throw new IllegalArgumentException("Invalid download limit");
+        if(maxBytes<1 || maxBytes>MAX_REVIEW_ARTIFACT_BYTES)throw new IllegalArgumentException("Invalid download limit");
         try (ResponseInputStream<GetObjectResponse> response=s3Client.getObject(GetObjectRequest.builder().bucket(bucketName).key(fileName).build())) {
             Long size=response.response().contentLength();
             if(size!=null && (size<0 || size>maxBytes)){response.abort();throw new IOException("Stored artifact exceeds download limit");}

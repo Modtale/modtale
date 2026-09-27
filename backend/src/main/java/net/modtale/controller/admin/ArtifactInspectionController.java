@@ -79,7 +79,7 @@ public class ArtifactInspectionController {
     }
     private byte[] verifiedBytes(ProjectVersion version) {
         if (version.getFileUrl() == null) throw new ResponseStatusException(HttpStatus.NOT_FOUND);
-        byte[] bytes = storage.download(version.getFileUrl());
+        byte[] bytes = storage.downloadBounded(version.getFileUrl(), StorageService.MAX_REVIEW_ARTIFACT_BYTES);
         if (!Objects.equals(digest(bytes),version.getHash())) throw new ResponseStatusException(HttpStatus.CONFLICT,"Stored artifact hash mismatch");
         return bytes;
     }
@@ -153,7 +153,7 @@ public class ArtifactInspectionController {
     }
     private WardenClientService.InspectionResponse inspect(ProjectVersion version, String path) {
         if(version.getFileUrl()==null)throw new ResponseStatusException(HttpStatus.NOT_FOUND);
-        byte[] bytes=storage.download(version.getFileUrl());
+        byte[] bytes=storage.downloadBounded(version.getFileUrl(), StorageService.MAX_REVIEW_ARTIFACT_BYTES);
         try {
             String actual=HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(bytes));
             if(!actual.equals(version.getHash())) throw new ResponseStatusException(HttpStatus.CONFLICT,"Stored artifact hash mismatch");

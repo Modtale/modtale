@@ -138,7 +138,7 @@ public class ScanExecutionService {
         logger.info("Starting scan project={} version={} attempt={} manualRescan={}", projectId, versionId, expectedAttempt, isManualRescan);
 
         try {
-            byte[] fileBytes = storageService.download(filePath);
+            byte[] fileBytes = storageService.downloadBounded(filePath, StorageService.MAX_REVIEW_ARTIFACT_BYTES);
             var result = wardenService.scanFile(fileBytes, originalFilename);
             if (requestId == null) scanCompletionService.handleCompletedScan(projectId, versionId, expectedAttempt, isManualRescan, result);
             else scanCompletionService.handleCompletedScan(projectId, versionId, expectedAttempt, isManualRescan, result, requestId);

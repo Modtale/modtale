@@ -13,12 +13,14 @@ class ScanRequestIdentityExecutionTest {
         var persistence=mock(ScanPersistenceService.class); var completion=mock(ScanCompletionService.class);
         var service=new ScanExecutionService(warden,storage,work::add,persistence,completion,mock(ScanRecoveryService.class));
         when(persistence.markAttemptRunning("p","v",1,"request-a")).thenReturn(true);
-        byte[] bytes={1}; var result=new ScanResult(); when(storage.download("artifact")).thenReturn(bytes);
+        byte[] bytes={1}; var result=new ScanResult(); when(storage.downloadBounded("artifact",StorageService.MAX_REVIEW_ARTIFACT_BYTES)).thenReturn(bytes);
         when(warden.scanFile(bytes,"mod.jar")).thenReturn(result);
         service.enqueueBackgroundScan("p","v","artifact","mod.jar",false,1,"request-a");
         verifyNoInteractions(persistence,storage,completion);
         verify(warden,never()).scanFile(any(),any());
         work.getFirst().run();
+        verify(storage).downloadBounded("artifact",StorageService.MAX_REVIEW_ARTIFACT_BYTES);
+        verify(storage,never()).download(anyString());
         verify(completion).handleCompletedScan("p","v",1,false,result,"request-a");
         verify(persistence,never()).markAttemptRunning("p","v",1);
     }
@@ -35,7 +37,7 @@ class ScanRequestIdentityExecutionTest {
         var storage=mock(StorageService.class); var persistence=mock(ScanPersistenceService.class);
         var completion=mock(ScanCompletionService.class); var failure=new IllegalStateException("test failure");
         when(persistence.markAttemptRunning("p","v",1,"request-a")).thenReturn(true);
-        when(storage.download("artifact")).thenThrow(failure);
+        when(storage.downloadBounded("artifact",StorageService.MAX_REVIEW_ARTIFACT_BYTES)).thenThrow(failure);
         var service=new ScanExecutionService(mock(WardenClientService.class),storage,Runnable::run,persistence,completion,mock(ScanRecoveryService.class));
         service.enqueueBackgroundScan("p","v","artifact","mod.jar",false,1,"request-a");
         verify(completion).handleScanFailure("p","v","mod.jar",1,failure,"request-a");
