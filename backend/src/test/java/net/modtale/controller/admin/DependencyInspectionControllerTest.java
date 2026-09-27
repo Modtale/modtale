@@ -102,7 +102,8 @@ class DependencyInspectionControllerTest {
         assertFalse(response.artifactBytesVerified());assertNull(response.inventory().identity());assertFalse(response.inventory().gaps().isEmpty());
     }
     @Test void modpackOverrideRootIsBoundToStoredReviewAndHeldAsSupplemental() {
-        version.setFileUrl(null);version.setOverrideFileUrl("modpack-overrides/v.zip");
+        project.setClassification(ProjectClassification.MODPACK);
+        version.setFileUrl("modpack-cache/generated.zip");version.setOverrideFileUrl("modpack-overrides/v.zip");
         var root=new Snapshot("p","v","1","modpack-overrides/v.zip","a".repeat(64),null,null,true,List.of());
         when(source.readRoot("p","v")).thenReturn(new Lookup(State.FOUND,root));
         when(source.read(any())).thenReturn(new Lookup(State.FOUND,root));

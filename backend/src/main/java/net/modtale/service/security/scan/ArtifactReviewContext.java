@@ -3,6 +3,7 @@ package net.modtale.service.security.scan;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import net.modtale.model.project.ProjectVersion;
+import net.modtale.model.project.ProjectClassification;
 import java.security.*;
 import java.util.*;
 
@@ -51,7 +52,12 @@ public final class ArtifactReviewContext {
                 || version.getModpackConfigs() != null && !version.getModpackConfigs().isEmpty();
     }
     public static String inspectionFileReference(ProjectVersion version) {
+        return inspectionFileReference(version, null);
+    }
+    public static String inspectionFileReference(ProjectVersion version, ProjectClassification classification) {
         if (version == null) return null;
+        if (classification == ProjectClassification.MODPACK && version.getOverrideFileUrl() != null
+                && !version.getOverrideFileUrl().isBlank()) return version.getOverrideFileUrl();
         if (version.getFileUrl() != null && !version.getFileUrl().isBlank()) return version.getFileUrl();
         return version.getOverrideFileUrl();
     }

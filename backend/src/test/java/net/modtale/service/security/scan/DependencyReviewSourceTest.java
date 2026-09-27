@@ -95,8 +95,11 @@ class DependencyReviewSourceTest {
         assertTrue(graph.gaps().stream().anyMatch(g->g.reason()==Reason.SUPPLEMENTAL_CONTENT));
     }
     @Test void modpackOverrideCanBeIdentifiedWithoutGrantingClearance() {
-        var modpack=version("v","1");modpack.remove("fileUrl");modpack.append("overrideFileUrl","modpack-overrides/v.zip");
+        var modpack=version("v","1");modpack.append("fileUrl","modpack-cache/generated.zip");
+        modpack.append("overrideFileUrl","modpack-overrides/v.zip");
         project("modpack",modpack);
+        mongo.getCollection("projects").updateOne(new Document("_id","modpack"),
+                new Document("$set",new Document("classification","MODPACK")));
         var source=new DependencyReviewSource(mongo);var selected=source.readRoot("modpack","v");
         assertEquals(State.FOUND,selected.state());
         assertEquals("modpack-overrides/v.zip",selected.snapshot().fileReference());
@@ -119,6 +122,8 @@ class DependencyReviewSourceTest {
     @Test void legacyModpackWithoutRecordedArchiveHashRemainsUnavailable() {
         var modpack=version("v","1");modpack.remove("fileUrl");modpack.remove("hash");
         modpack.append("overrideFileUrl","modpack-overrides/v.zip");project("legacy-modpack",modpack);
+        mongo.getCollection("projects").updateOne(new Document("_id","legacy-modpack"),
+                new Document("$set",new Document("classification","MODPACK")));
         assertEquals(State.UNAVAILABLE,new DependencyReviewSource(mongo).readRoot("legacy-modpack","v").state());
     }
     @Test void duplicatePinsDuplicateIdsAndMixedProjectStorageIdentitiesAreAmbiguous() {
@@ -163,6 +168,16 @@ class DependencyReviewSourceTest {
             return 0;
         },1_000_000_000L);
         assertEquals(State.UNAVAILABLE,source.readRoot("root","first").state());
+    }
+    @Test void projectClassificationChangeBetweenIndexAndRecordReadsFailsClosed() {
+        project("root",version("v","1"));
+        var calls=new java.util.concurrent.atomic.AtomicInteger();
+        var source=new DependencyReviewSource(mongo,()->{
+            if(calls.incrementAndGet()==3)mongo.getCollection("projects").updateOne(new Document("_id","root"),
+                    new Document("$set",new Document("classification","MODPACK")));
+            return 0;
+        },1_000_000_000L);
+        assertEquals(State.UNAVAILABLE,source.readRoot("root","v").state());
     }
     @Test void byteEndpointRevalidatesRealDatabaseDependenciesAfterReadingStorage() throws Exception {
         byte[] bytes={1,2,3};String hash=HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(bytes));

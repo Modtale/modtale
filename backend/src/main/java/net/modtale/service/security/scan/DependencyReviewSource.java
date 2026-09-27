@@ -6,6 +6,7 @@ import com.mongodb.client.MongoCollection;
 import com.mongodb.client.model.Collation;
 import net.modtale.model.project.ProjectVersion;
 import net.modtale.model.project.ProjectDependency;
+import net.modtale.model.project.ProjectClassification;
 import org.bson.Document;
 import org.bson.types.ObjectId;
 import org.springframework.data.mongodb.core.MongoTemplate;
@@ -35,7 +36,7 @@ public final class DependencyReviewSource implements Source {
     private Lookup lookup(String projectId,String selector,boolean byId) {
         try {
             var ids=new ArrayList<Object>();ids.add(projectId);if(ObjectId.isValid(projectId))ids.add(new ObjectId(projectId));
-            var projection=new Document("_id",1).append("versions",new Document("$map",new Document("input",new Document("$slice",List.of("$versions",MAX_VERSIONS+1)))
+            var projection=new Document("_id",1).append("classification",1).append("versions",new Document("$map",new Document("input",new Document("$slice",List.of("$versions",MAX_VERSIONS+1)))
                     .append("as","v").append("in",new Document("id","$$v._id").append("label","$$v.versionNumber").append("unique",uniqueNames("$$v")))));
             var roots=query(new Document("_id",new Document("$in",ids)),projection);
             if(roots.isEmpty())return absent(State.MISSING);
@@ -53,12 +54,14 @@ public final class DependencyReviewSource implements Source {
                 }
             }
             if(selected<0)return absent(State.MISSING);
-            var records=query(new Document("_id",root.get("_id")),new Document("_id",1)
+            var records=query(new Document("_id",root.get("_id")),new Document("_id",1).append("classification",1)
                     .append("version",new Document("$arrayElemAt",List.of("$versions",selected))));
             if(records.size()!=1)return absent(State.UNAVAILABLE);
+            if(!Objects.equals(root.get("classification"),records.getFirst().get("classification")))return absent(State.UNAVAILABLE);
+            var classification=root.get("classification")==null?null:ProjectClassification.valueOf(string(root,"classification"));
             var v=document(records.getFirst().get("version"));
             if(!id.equals(string(v,"_id"))||!label.equals(string(v,"versionNumber")))return absent(State.UNAVAILABLE);
-            var result=snapshot(projectId,v);
+            var result=snapshot(projectId,v,classification);
             remaining();
             return new Lookup(State.FOUND,result);
         } catch(AmbiguousRecord ambiguous) {return absent(State.AMBIGUOUS);}
@@ -115,7 +118,7 @@ public final class DependencyReviewSource implements Source {
         long remaining=budget-(clock.getAsLong()-started);
         if(remaining<=0)throw new IllegalStateException("Inspection deadline exceeded");return remaining;
     }
-    private static Snapshot snapshot(String projectId,Document v) {
+    private static Snapshot snapshot(String projectId,Document v,ProjectClassification classification) {
         var model=new ProjectVersion();model.setManifestId(optionalString(v,"manifestId"));model.setManifestVersion(optionalString(v,"manifestVersion"));
         var games=new ArrayList<String>();
         if(v.get("gameVersions")!=null)for(var game:list(v.get("gameVersions"))) {
@@ -144,7 +147,7 @@ public final class DependencyReviewSource implements Source {
                 scan=new RecordedScan(string(evidence,"artifactSha256"),string(evidence,"contentSha256"),string(evidence,"policyVersion"));
             }
         }
-        return new Snapshot(projectId,string(v,"_id"),string(v,"versionNumber"),ArtifactReviewContext.inspectionFileReference(model),string(v,"hash"),
+        return new Snapshot(projectId,string(v,"_id"),string(v,"versionNumber"),ArtifactReviewContext.inspectionFileReference(model,classification),string(v,"hash"),
                 ArtifactReviewContext.fingerprint(model),scan,supplemental,dependencies);
     }
     private static Lookup absent(State state){return new Lookup(state,null);}
