@@ -289,6 +289,37 @@ describe('Review security clearance status', () => {
         expect(adminClient.getStructure).toHaveBeenLastCalledWith('project', '0.9', 'snapshot');
         expect(adminClient.getFileWindow).toHaveBeenLastCalledWith('project', '0.9', 'Same.class', 'snapshot', 0, undefined, 9);
     });
+    it('folds repeated nested-library findings while retaining every occurrence and the mod finding', async () => {
+        const archive = 'META-INF/jars/lwjgl-nanovg-3.3.3.jar';
+        const native = Array.from({ length: 275 }, (_, index) => ({ type: 'NativeMethod', severity: 'HIGH',
+            description: `native entry ${index}`, filePath: `${archive}!/org/lwjgl/nanovg/Native${index}.class`,
+            lineStart: -1, lineEnd: -1, reviewCadence: 'ALWAYS' }));
+        const own = { type: 'OutboundNetwork', severity: 'HIGH', description: 'Mod network behavior',
+            filePath: 'com/example/ExampleMod.class', lineStart: 12, lineEnd: 12, scoreImpact: 40 };
+        await render({ ...clear, status: 'SUSPICIOUS', verdict: 'REVIEW', issues: [own, ...native] }, true, 'snapshot', 2);
+        const show = container.querySelector<HTMLButtonElement>('button[aria-label="Show findings"]');
+        if (show) await act(async () => show.click());
+        expect(container.textContent).toContain(`275 findings in nested archive ${archive}`);
+        expect(container.textContent).toContain('275 always-review');
+        expect(container.textContent).toContain('Mod network behavior');
+        expect(container.querySelectorAll('button').length).toBeLessThan(100);
+        const summary = [...container.querySelectorAll<HTMLButtonElement>('button')]
+            .find(value => value.textContent?.includes(`275 findings in nested archive ${archive}`))!;
+        await act(async () => summary.click());
+        expect(container.querySelectorAll<HTMLButtonElement>('button').length).toBeGreaterThan(100);
+        for (let remaining = 175; remaining > 0; remaining -= 100) {
+            const more = [...container.querySelectorAll<HTMLButtonElement>('button')]
+                .find(value => value.textContent?.includes('Show more findings in'));
+            expect(more).toBeTruthy();
+            await act(async () => more!.click());
+        }
+        expect(container.textContent).toContain('native entry 274');
+        expect(container.textContent).toContain('This grouping does not verify the archive');
+        await searchFindings('native entry 274');
+        expect(container.textContent).not.toContain(`275 findings in nested archive ${archive}`);
+        expect(container.textContent).toContain('Showing 1–1 of 1 matching findings (276 total)');
+        expect(container.textContent).toContain('native entry 274');
+    });
     it('does not attach a late rationale to a different selected occurrence', async () => {
         let resolve!: (value: ReturnType<typeof earlierResponse>) => void;
         vi.mocked(loadPriorFindingReasoning).mockReset().mockReturnValueOnce(new Promise(done => { resolve = done; }))

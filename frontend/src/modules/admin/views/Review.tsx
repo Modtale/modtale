@@ -1,4 +1,5 @@
 import { FindingGroups } from './FindingGroups';
+import { findingRows } from './findingRows';
 import { PriorFindingReasoning } from './PriorFindingReasoning';
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { Shield, List, FileText, Box, User as UserIcon, Check, ArrowLeft, Copy, ExternalLink, Terminal, Download, ArrowRight, X, ImageIcon, ChevronDown, ChevronUp, ShieldAlert, Eye, RefreshCw, PlayCircle } from 'lucide-react';
@@ -138,9 +139,12 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
     const [findingFocus, setFindingFocus] = useState('attention');
     const [findingType, setFindingType] = useState<string | null>(null);
     const [findingPage, setFindingPage] = useState(0);
+    const [archiveLimits, setArchiveLimits] = useState<Record<string, number>>({});
+    const [expandedArchives, setExpandedArchives] = useState<Set<string>>(() => new Set());
     useEffect(() => {
-        setFindingSearch(''); setFindingFocus('attention'); setFindingType(null); setFindingPage(0);
+        setFindingSearch(''); setFindingFocus('attention'); setFindingType(null); setFindingPage(0); setArchiveLimits({}); setExpandedArchives(new Set());
     }, [mod.id, mod.reviewToken, pendingVersion?.id, pendingVersion?.reviewToken]);
+    useEffect(() => setExpandedArchives(new Set()), [findingSearch, findingFocus, findingType]);
 
     const orderedIssues = useMemo(() => {
         const severityRank = (value?: string) => {
@@ -190,9 +194,11 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
             setFindingFocus('attention'); setFindingPage(0);
         }
     }, [findingFocus, activeComparison, changedFindingCount]);
-    const findingPages = Math.max(1, Math.ceil(matchingIssues.length / 100));
+    const rows = useMemo(() => findingRows(matchingIssues), [matchingIssues]);
+    const foldedFindings = matchingIssues.length - rows.length;
+    const findingPages = Math.max(1, Math.ceil(rows.length / 100));
     const visibleFindingPage = Math.min(findingPage, findingPages - 1);
-    const visibleIssues = matchingIssues.slice(visibleFindingPage * 100, (visibleFindingPage + 1) * 100);
+    const visibleRows = rows.slice(visibleFindingPage * 100, (visibleFindingPage + 1) * 100);
 
 
     useEffect(() => {
@@ -818,7 +824,9 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
                                                         </select>
                                                     </div>
                                                     <p className="text-xs text-slate-600 dark:text-slate-300" role="status">
-                                                        Showing {matchingIssues.length ? visibleFindingPage * 100 + 1 : 0}–{Math.min((visibleFindingPage + 1) * 100, matchingIssues.length)} of {matchingIssues.length} matching findings ({orderedIssues.length} total).
+                                                        {foldedFindings > 0
+                                                            ? <>Showing {rows.length ? visibleFindingPage * 100 + 1 : 0}–{Math.min((visibleFindingPage + 1) * 100, rows.length)} of {rows.length} review rows covering {matchingIssues.length} matching findings ({orderedIssues.length} total).</>
+                                                            : <>Showing {matchingIssues.length ? visibleFindingPage * 100 + 1 : 0}–{Math.min((visibleFindingPage + 1) * 100, matchingIssues.length)} of {matchingIssues.length} matching findings ({orderedIssues.length} total).</>}
                                                         {' '}Filters only change this view; previously seen findings may still require review.
                                                     </p>
                                                     {findingFocus === 'attention' && findingType === null && !findingSearch.trim() && identicalPriorCount > 0 &&
@@ -839,7 +847,8 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
                                                         <button type="button" disabled={visibleFindingPage + 1 >= findingPages} onClick={() => setFindingPage(visibleFindingPage + 1)}>Next findings</button>
                                                     </nav>}
                                                 </div>}
-                                                {visibleIssues.map(({ issue, originalIndex }) => (
+                                                {visibleRows.map(row => {
+                                                    const renderFinding = ({ issue, originalIndex }: { issue: ScanIssue; originalIndex: number }) => (
                                                     <div key={originalIndex} className="text-sm bg-slate-50 dark:bg-white/5 p-3 rounded-xl border border-slate-200 dark:border-white/5">
                                                         <div className="flex flex-wrap items-center justify-between gap-2">
                                                         <div className="flex-1 min-w-0 pr-4">
@@ -901,7 +910,33 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
                                                             sourceVersionId={priorSources.filter((v: ProjectVersion) => v.versionNumber === issue.baselineVersion).length === 1
                                                                 ? priorSources.find((v: ProjectVersion) => v.versionNumber === issue.baselineVersion)?.id : undefined} />}
                                                     </div>
-                                                ))}
+                                                    );
+                                                    if (row.kind === 'finding') return renderFinding(row.finding);
+                                                    const shown = archiveLimits[row.archive] || 100;
+                                                    const high = row.findings.filter(({ issue }) => issue.severity === 'HIGH' || issue.severity === 'CRITICAL').length;
+                                                    const always = row.findings.filter(({ issue }) => issue.reviewCadence?.toUpperCase() === 'ALWAYS').length;
+                                                    const expanded = expandedArchives.has(row.archive);
+                                                    return <section key={`archive:${row.archive}`} aria-label={`Nested archive findings: ${row.archive}`}
+                                                        className="rounded-xl border border-amber-300 dark:border-amber-700 bg-amber-50/50 dark:bg-amber-950/10 p-3">
+                                                        <button type="button" aria-expanded={expanded} className="text-left text-sm font-semibold dark:text-slate-100 break-all"
+                                                            onClick={() => setExpandedArchives(previous => {
+                                                                const next = new Set(previous);
+                                                                if (next.has(row.archive)) next.delete(row.archive); else next.add(row.archive);
+                                                                return next;
+                                                            })}>
+                                                            {row.findings.length} findings in nested archive {row.archive}
+                                                            <span className="ml-2 text-xs font-normal text-amber-800 dark:text-amber-200">{high} high/critical · {always} always-review</span>
+                                                        </button>
+                                                        <p className="mt-2 text-xs text-amber-800 dark:text-amber-200">This grouping does not verify the archive or accept any finding. Inspect its code, native files, and callers as needed.</p>
+                                                        {expanded && <>
+                                                            <div className="mt-3 space-y-2">{row.findings.slice(0, shown).map(renderFinding)}</div>
+                                                            {row.findings.length > shown && <button type="button" className="mt-3 text-sm font-semibold text-indigo-600 dark:text-indigo-300"
+                                                                onClick={() => setArchiveLimits(value => ({ ...value, [row.archive]: shown + 100 }))}>
+                                                                Show more findings in {row.archive} ({row.findings.length - shown} remaining)
+                                                            </button>}
+                                                        </>}
+                                                    </section>;
+                                                })}
                                             </div>
                                         )}
                                     </div>
