@@ -36,10 +36,10 @@ class ProjectMutationObservationProgressTest {
         var bindings=new HashMap<String,RemoteReviewBinding>();
         for(var version:versions){if("w".equals(version.get("_id")))continue;var binding=f.mongo.getConverter().read(RemoteReviewBinding.class,version.get("scanResult",Document.class).get("remoteReview",Document.class));bindings.put(binding.jobId(),binding);}
         f.server.removeContext("/api/v1/review-jobs");f.route(e->{
-            if(e.getRequestURI().getPath().endsWith("/configuration")){var bytes=f.mapper.writeValueAsBytes(Map.of("policyVersion",f.binding.policyVersion(),"reviewConfigSha256",base.base.config));e.sendResponseHeaders(200,bytes.length);e.getResponseBody().write(bytes);return;}
+            if(e.getRequestURI().getPath().endsWith("/configuration")){var bytes=f.mapper.writeValueAsBytes(Map.of("contractVersion",1,"policyVersion",f.binding.policyVersion(),"reviewConfigSha256",base.base.config));e.sendResponseHeaders(200,bytes.length);e.getResponseBody().write(bytes);return;}
             var path=e.getRequestURI().getPath();var binding=bindings.get(path.substring(path.lastIndexOf('/')+1));assertNotNull(binding);reads.incrementAndGet();
             String state="v2".equals(binding.versionId())?secondState:"COMPLETED";
-            var body=new LinkedHashMap<String,Object>();body.put("jobId",binding.jobId());body.put("requestId",binding.requestId());body.put("binding",Map.of("artifactSha256",binding.artifactSha256(),"contextSha256",binding.contextSha256(),"policyVersion",binding.policyVersion(),"reviewConfigSha256",binding.reviewConfigSha256()));
+            var body=new LinkedHashMap<String,Object>();body.put("contractVersion",1);body.put("jobId",binding.jobId());body.put("requestId",binding.requestId());body.put("binding",Map.of("artifactSha256",binding.artifactSha256(),"contextSha256",binding.contextSha256(),"policyVersion",binding.policyVersion(),"reviewConfigSha256",binding.reviewConfigSha256()));
             body.put("state",state);body.put("workState",state);body.put("artifactRetained",true);body.put("createdAt",1000L);body.put("expiresAt",2000L);
             byte[] bytes=f.mapper.writeValueAsBytes(body);e.sendResponseHeaders(200,bytes.length);e.getResponseBody().write(bytes);
         });

@@ -63,13 +63,13 @@ public final class RemoteReviewClient implements AutoCloseable {
     public Configuration configuration(java.util.function.BooleanSupplier current,java.util.function.LongSupplier remainingNanos) {
         var origin=origin(current,remainingNanos);
         var body=exchange(scoped(client.get().uri("/api/v1/review-jobs/configuration"),origin),200,65536,current,remainingNanos);
-        fields(body,"policyVersion","reviewConfigSha256");String policy=text(body,"policyVersion"),config=text(body,"reviewConfigSha256");
+        fields(body,"contractVersion","policyVersion","reviewConfigSha256");requireContract(body);String policy=text(body,"policyVersion"),config=text(body,"reviewConfigSha256");
         if (!policy.matches("warden-3\\.0\\.0:[0-9a-f]{64}") || !digest(config)) throw new Unavailable(502);
         return new Configuration(policy,config,origin);
     }
     public RemoteReviewOrigin origin() {return origin(()->true,timeout::toNanos);}
     private RemoteReviewOrigin origin(java.util.function.BooleanSupplier current,java.util.function.LongSupplier remainingNanos) {
-        var body=exchange(client.get().uri("/api/v1/review-jobs/identity"),200,65536,current,remainingNanos);fields(body,"deploymentId","callerScope");
+        var body=exchange(client.get().uri("/api/v1/review-jobs/identity"),200,65536,current,remainingNanos);fields(body,"contractVersion","deploymentId","callerScope");requireContract(body);
         try{return new RemoteReviewOrigin(text(body,"deploymentId"),text(body,"callerScope"));}
         catch(IllegalArgumentException invalid){throw new Unavailable(502);}
     }
@@ -115,7 +115,7 @@ public final class RemoteReviewClient implements AutoCloseable {
     public ScanResult result(RemoteReviewBinding binding) {
         requireJob(binding);var body=exchange(scoped(client.get().uri(uri(binding,"/"+binding.jobId()+"/result",true)),binding.origin()),200,16*1024*1024);
         fields(body,"contractVersion","jobId","requestId","binding","completedAt","scan");
-        if(number(body,"contractVersion")!=1)throw new Unavailable(502);
+        requireContract(body);
         identity(body,binding);
         if(number(body,"completedAt")<=0 || !body.path("scan").isObject())throw new Unavailable(502);
         try {
@@ -126,7 +126,7 @@ public final class RemoteReviewClient implements AutoCloseable {
         }catch(Unavailable failure){throw failure;}catch(Exception invalid){throw new Unavailable(502);}
     }
     private Status statusBody(JsonNode body,RemoteReviewBinding binding) {
-        fields(body,"jobId","requestId","binding","state","artifactRetained","createdAt","expiresAt","workState");identity(body,binding);
+        fields(body,"contractVersion","jobId","requestId","binding","state","artifactRetained","createdAt","expiresAt","workState");requireContract(body);identity(body,binding);
         String state=text(body,"state");long created=number(body,"createdAt"),expires=number(body,"expiresAt");
         if(!Set.of("QUEUED","RUNNING","COMPLETED","CANCELLED","EXPIRED","HELD","UPLOADING","AWAITING_UPLOAD").contains(state)
                 || !body.path("artifactRetained").isBoolean() || created<=0 || expires<=created
@@ -172,6 +172,7 @@ public final class RemoteReviewClient implements AutoCloseable {
     }
     private static String text(JsonNode node,String key){if(!node.path(key).isTextual())throw new Unavailable(502);return node.get(key).textValue();}
     private static long number(JsonNode node,String key){if(!node.path(key).isIntegralNumber()||!node.get(key).canConvertToLong())throw new Unavailable(502);return node.get(key).longValue();}
+    private static void requireContract(JsonNode body){if(number(body,"contractVersion")!=1)throw new Unavailable(502);}
     private static boolean digest(String value){return value.matches("[0-9a-f]{64}");}
     private static String hash(byte[] bytes){try{return HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(bytes));}catch(java.security.NoSuchAlgorithmException impossible){throw new IllegalStateException(impossible);}}
     @Override @jakarta.annotation.PreDestroy public void close(){if(closed.compareAndSet(false,true)){stop.tryEmitEmpty();connections.dispose();}}

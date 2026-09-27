@@ -17,7 +17,7 @@ class ProjectMutationBackgroundFlowTest {
     @Test void backgroundAdmissionAndDeliveryCompleteWithoutAnUploadEnqueue()throws Exception {
         var f=base.f();f.server.removeContext("/api/v1/review-jobs");var created=new AtomicBoolean();
         f.route(e->{String path=e.getRequestURI().getPath();if(path.endsWith("/configuration")){
-            byte[] body=f.mapper.writeValueAsBytes(Map.of("policyVersion",f.binding.policyVersion(),"reviewConfigSha256",f.binding.reviewConfigSha256()));e.sendResponseHeaders(200,body.length);e.getResponseBody().write(body);
+            byte[] body=f.mapper.writeValueAsBytes(Map.of("contractVersion",1,"policyVersion",f.binding.policyVersion(),"reviewConfigSha256",f.binding.reviewConfigSha256()));e.sendResponseHeaders(200,body.length);e.getResponseBody().write(body);
         }else if(e.getRequestMethod().equals("POST")){
             f.binding=f.mongo.findById(f.project,Project.class).getVersions().get(1).getScanResult().getRemoteReview();f.job=UUID.randomUUID().toString();created.set(true);f.reply(e,202,"QUEUED");
         }else if(path.contains("/requests/")&&!created.get())f.reply(e,404,"QUEUED");else f.reply(e,200,"COMPLETED","COMPLETED");});

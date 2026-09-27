@@ -28,7 +28,7 @@ class ProjectMutationAdmissionPreparationTest {
         assertEquals("APPLIED",base.base.executor().apply(base.prepared,"owner",()->true).state());
         prior=new ProjectMutationPriorWorkReader(f.mongo,base.budget,base.history);service=create(base.base.base.base.archive,clock);
         f.route(e->{if(e.getRequestURI().getPath().endsWith("/configuration")){
-            byte[] bytes=f.mapper.writeValueAsBytes(Map.of("policyVersion",f.binding.policyVersion(),"reviewConfigSha256",config));e.sendResponseHeaders(200,bytes.length);e.getResponseBody().write(bytes);
+            byte[] bytes=f.mapper.writeValueAsBytes(Map.of("contractVersion",1,"policyVersion",f.binding.policyVersion(),"reviewConfigSha256",config));e.sendResponseHeaders(200,bytes.length);e.getResponseBody().write(bytes);
         }else f.reply(e,status,state,workState);});
     }
     ProjectMutationAdmissionPreparation create(ReviewSnapshotArchive archive,Clock time){var f=base.base.base.base.fixture;return new ProjectMutationAdmissionPreparation(f.mongo,base.budget,archive,base.history,prior,base.accounting,f.client,time,60000);}

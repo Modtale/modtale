@@ -23,7 +23,7 @@ class RemoteReviewClientTest {
     void route(Handler handler) {
         server.createContext("/api/v1/review-jobs",exchange->{calls.incrementAndGet();if(exchange.getRequestMethod().equals("POST"))posts.incrementAndGet();
             try {assertEquals(expectedApiKey,exchange.getRequestHeaders().getFirst("X-Warden-Api-Key"));
-                if(exchange.getRequestURI().getPath().endsWith("/identity")){reply(exchange,200,origin);return;}
+                if(exchange.getRequestURI().getPath().endsWith("/identity")){reply(exchange,200,Map.of("contractVersion",1,"deploymentId",origin.deploymentId(),"callerScope",origin.callerScope()));return;}
                 assertEquals(origin.deploymentId(),exchange.getRequestHeaders().getFirst("X-Warden-Deployment-Id"));assertEquals(origin.callerScope(),exchange.getRequestHeaders().getFirst("X-Warden-Caller-Scope"));handler.handle(exchange);}
             catch(Exception failure){throw new RuntimeException(failure);}finally{exchange.close();}});
     }
@@ -32,7 +32,7 @@ class RemoteReviewClientTest {
         exchange.sendResponseHeaders(code,body.length);exchange.getResponseBody().write(body);
     }
     Map<String,Object> status(String state) {
-        var result=new LinkedHashMap<String,Object>();result.put("jobId",job);result.put("requestId",request);result.put("binding",wireBinding());
+        var result=new LinkedHashMap<String,Object>();result.put("contractVersion",1);result.put("jobId",job);result.put("requestId",request);result.put("binding",wireBinding());
         result.put("state",state);result.put("artifactRetained",!state.equals("AWAITING_UPLOAD"));result.put("createdAt",1000L);result.put("expiresAt",2000L);result.put("workState",null);return result;
     }
     Map<String,String> wireBinding(){return Map.of("artifactSha256",binding.artifactSha256(),"contextSha256",binding.contextSha256(),"policyVersion",binding.policyVersion(),"reviewConfigSha256",binding.reviewConfigSha256());}
@@ -122,7 +122,7 @@ class RemoteReviewClientTest {
         finally{release.countDown();}
     }
     @Test void configurationAndCancellationUseAuthenticatedBoundRoutes() {
-        route(e->{if(e.getRequestURI().getPath().endsWith("configuration"))reply(e,200,Map.of("policyVersion",binding.policyVersion(),"reviewConfigSha256",binding.reviewConfigSha256()));
+        route(e->{if(e.getRequestURI().getPath().endsWith("configuration"))reply(e,200,Map.of("contractVersion",1,"policyVersion",binding.policyVersion(),"reviewConfigSha256",binding.reviewConfigSha256()));
             else {assertEquals("DELETE",e.getRequestMethod());assertTrue(e.getRequestURI().getQuery().contains(request));reply(e,200,status("CANCELLED"));}});
         var configuration=client.configuration();assertEquals(origin,configuration.origin());assertEquals(binding.reviewConfigSha256(),configuration.reviewConfigSha256());assertEquals("CANCELLED",client.cancel(binding.withJobId(job)).state());
     }
@@ -139,10 +139,36 @@ class RemoteReviewClientTest {
         client.status(attached);assertEquals(2,calls.get());
     }
     @Test void malformedIdentityResponsesCannotSupplyConfiguration() {
-        var value=new AtomicReference<Object>(Map.of("deploymentId","invalid","callerScope",origin.callerScope()));
+        var value=new AtomicReference<Object>(Map.of("contractVersion",1,"deploymentId","invalid","callerScope",origin.callerScope()));
         server.createContext("/api/v1/review-jobs/identity",e->{try{reply(e,200,value.get());}catch(Exception invalid){throw new RuntimeException(invalid);}finally{e.close();}});
-        assertThrows(RemoteReviewClient.Unavailable.class,()->client.configuration());value.set(Map.of("deploymentId",origin.deploymentId(),"callerScope",origin.callerScope(),"extra",true));
+        assertThrows(RemoteReviewClient.Unavailable.class,()->client.configuration());value.set(Map.of("contractVersion",1,"deploymentId",origin.deploymentId(),"callerScope",origin.callerScope(),"extra",true));
         assertThrows(RemoteReviewClient.Unavailable.class,()->client.configuration());assertEquals(0,calls.get());
+    }
+    @Test void identityContractMustMatchBeforeAnyBoundJobRequest() {
+        var value=new AtomicReference<Object>(Map.of("deploymentId",origin.deploymentId(),"callerScope",origin.callerScope()));
+        server.createContext("/api/v1/review-jobs/identity",e->{try{reply(e,200,value.get());}catch(Exception invalid){throw new RuntimeException(invalid);}finally{e.close();}});
+        route(e->fail("An incompatible identity must stop before a bound request"));
+        assertThrows(RemoteReviewClient.Unavailable.class,()->client.configuration());
+        value.set(Map.of("contractVersion",2,"deploymentId",origin.deploymentId(),"callerScope",origin.callerScope()));
+        assertThrows(RemoteReviewClient.Unavailable.class,()->client.configuration());
+        value.set(Map.of("contractVersion",1.0,"deploymentId",origin.deploymentId(),"callerScope",origin.callerScope()));
+        assertThrows(RemoteReviewClient.Unavailable.class,()->client.configuration());
+        assertEquals(0,calls.get());
+    }
+    @Test void configurationAndStatusRejectMissingOrIncompatibleContracts() {
+        var response=new AtomicReference<Object>(Map.of("policyVersion",binding.policyVersion(),"reviewConfigSha256",binding.reviewConfigSha256()));
+        route(e->reply(e,200,response.get()));
+        assertThrows(RemoteReviewClient.Unavailable.class,()->client.configuration());
+        response.set(Map.of("contractVersion",2,"policyVersion",binding.policyVersion(),"reviewConfigSha256",binding.reviewConfigSha256()));
+        assertThrows(RemoteReviewClient.Unavailable.class,()->client.configuration());
+        response.set(Map.of("contractVersion",1.0,"policyVersion",binding.policyVersion(),"reviewConfigSha256",binding.reviewConfigSha256()));
+        assertThrows(RemoteReviewClient.Unavailable.class,()->client.configuration());
+        var status=status("QUEUED");status.remove("contractVersion");response.set(status);
+        assertThrows(RemoteReviewClient.Unavailable.class,()->client.status(binding.withJobId(job)));
+        status.put("contractVersion",2);
+        assertThrows(RemoteReviewClient.Unavailable.class,()->client.status(binding.withJobId(job)));
+        status.put("contractVersion",1.0);
+        assertThrows(RemoteReviewClient.Unavailable.class,()->client.status(binding.withJobId(job)));
     }
     @Test void changedDeploymentBetweenIdentityAndConfigurationIsNotRetriedOrRebound() {
         route(e->reply(e,409,Map.of()));assertEquals(409,assertThrows(RemoteReviewClient.Unavailable.class,()->client.configuration()).status());assertEquals(2,calls.get());assertEquals(0,posts.get());

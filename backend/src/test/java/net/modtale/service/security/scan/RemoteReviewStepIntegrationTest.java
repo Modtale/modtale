@@ -29,13 +29,13 @@ class RemoteReviewStepIntegrationTest {
     RemoteReviewOrigin origin=new RemoteReviewOrigin("11111111-1111-1111-1111-111111111111","e".repeat(64));
     AtomicInteger identityGets=new AtomicInteger(),posts=new AtomicInteger(),gets=new AtomicInteger();ObjectMapper mapper=new ObjectMapper();
     interface Handler {void handle(HttpExchange e)throws Exception;}
-    void route(Handler handler){server.createContext("/api/v1/review-jobs",e->{try{if(e.getRequestURI().getPath().endsWith("/identity")){identityGets.incrementAndGet();byte[] body=mapper.writeValueAsBytes(origin);e.sendResponseHeaders(200,body.length);e.getResponseBody().write(body);return;}
+    void route(Handler handler){server.createContext("/api/v1/review-jobs",e->{try{if(e.getRequestURI().getPath().endsWith("/identity")){identityGets.incrementAndGet();byte[] body=mapper.writeValueAsBytes(Map.of("contractVersion",1,"deploymentId",origin.deploymentId(),"callerScope",origin.callerScope()));e.sendResponseHeaders(200,body.length);e.getResponseBody().write(body);return;}
         assertEquals(origin.deploymentId(),e.getRequestHeaders().getFirst("X-Warden-Deployment-Id"));assertEquals(origin.callerScope(),e.getRequestHeaders().getFirst("X-Warden-Caller-Scope"));if(e.getRequestMethod().equals("POST")){posts.incrementAndGet();e.getRequestBody().readAllBytes();}else gets.incrementAndGet();handler.handle(e);}catch(Exception failure){throw new RuntimeException(failure);}finally{e.close();}});}
     void reply(HttpExchange e,int code,String state)throws Exception {
         reply(e,code,state,null);
     }
     void reply(HttpExchange e,int code,String state,String workState)throws Exception {
-        var body=new LinkedHashMap<String,Object>();body.put("jobId",job);body.put("requestId",binding.requestId());
+        var body=new LinkedHashMap<String,Object>();body.put("contractVersion",1);body.put("jobId",job);body.put("requestId",binding.requestId());
         body.put("binding",Map.of("artifactSha256",binding.artifactSha256(),"contextSha256",binding.contextSha256(),"policyVersion",binding.policyVersion(),"reviewConfigSha256",binding.reviewConfigSha256()));
         body.put("state",state);body.put("artifactRetained",!Set.of("UPLOADING","AWAITING_UPLOAD").contains(state));body.put("createdAt",1000L);body.put("expiresAt",2000L);body.put("workState",workState);
         if(e.getRequestURI().getPath().endsWith("/result")) {
@@ -139,7 +139,7 @@ class RemoteReviewStepIntegrationTest {
         mongo.updateFirst(Query.query(Criteria.where("_id").is(project)),new Update().unset("versions.0.scanResult.remoteReview").set("versions.0.scanResult.scanState","QUEUED"),Project.class);
     }
     void configuration(HttpExchange e)throws Exception {
-        byte[] data=mapper.writeValueAsBytes(Map.of("policyVersion",binding.policyVersion(),"reviewConfigSha256",binding.reviewConfigSha256()));
+        byte[] data=mapper.writeValueAsBytes(Map.of("contractVersion",1,"policyVersion",binding.policyVersion(),"reviewConfigSha256",binding.reviewConfigSha256()));
         e.sendResponseHeaders(200,data.length);e.getResponseBody().write(data);
     }
     RemoteReviewBootstrap bootstrap(RemoteReviewPersistence persistence) {return new RemoteReviewBootstrap(persistence,client,step);}
