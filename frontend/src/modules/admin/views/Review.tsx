@@ -141,10 +141,13 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
     const [findingPage, setFindingPage] = useState(0);
     const [archiveLimits, setArchiveLimits] = useState<Record<string, number>>({});
     const [expandedArchives, setExpandedArchives] = useState<Set<string>>(() => new Set());
+    const [expandedRepeatedPrior, setExpandedRepeatedPrior] = useState(false);
+    const [repeatedPriorLimit, setRepeatedPriorLimit] = useState(100);
     useEffect(() => {
         setFindingSearch(''); setFindingFocus('attention'); setFindingType(null); setFindingPage(0); setArchiveLimits({}); setExpandedArchives(new Set());
+        setExpandedRepeatedPrior(false); setRepeatedPriorLimit(100);
     }, [mod.id, mod.reviewToken, pendingVersion?.id, pendingVersion?.reviewToken]);
-    useEffect(() => setExpandedArchives(new Set()), [findingSearch, findingFocus, findingType]);
+    useEffect(() => { setExpandedArchives(new Set()); setExpandedRepeatedPrior(false); setRepeatedPriorLimit(100); }, [findingSearch, findingFocus, findingType]);
 
     const orderedIssues = useMemo(() => {
         const severityRank = (value?: string) => {
@@ -194,7 +197,11 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
             setFindingFocus('attention'); setFindingPage(0);
         }
     }, [findingFocus, activeComparison, changedFindingCount]);
-    const rows = useMemo(() => findingRows(matchingIssues), [matchingIssues]);
+    const rows = useMemo(() => findingRows(matchingIssues, 10,
+        findingFocus === 'attention' && findingType === null && !findingSearch.trim()
+            && activeComparison?.baselineVersion && !canDeprioritizePriorFindings
+            ? issue => !changedFindingPaths.has(issue.filePath) : undefined),
+    [matchingIssues, findingFocus, findingType, findingSearch, activeComparison, canDeprioritizePriorFindings, changedFindingPaths]);
     const foldedFindings = matchingIssues.length - rows.length;
     const findingPages = Math.max(1, Math.ceil(rows.length / 100));
     const visibleFindingPage = Math.min(findingPage, findingPages - 1);
@@ -912,6 +919,21 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
                                                     </div>
                                                     );
                                                     if (row.kind === 'finding') return renderFinding(row.finding);
+                                                    if (row.kind === 'repeated-prior') return <section key="repeated-prior" aria-label="Repeated prior findings"
+                                                        className="rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-white/5 p-3">
+                                                        <button type="button" aria-expanded={expandedRepeatedPrior} className="text-left text-sm font-semibold dark:text-slate-100"
+                                                            onClick={() => setExpandedRepeatedPrior(value => !value)}>
+                                                            {row.findings.length} previously seen findings with identical file evidence
+                                                        </button>
+                                                        <p className="mt-2 text-xs text-slate-600 dark:text-slate-300">These findings remain open because files or review context changed. Their unchanged files can still be affected by changed callers or dependencies. This grouping grants no acceptance.</p>
+                                                        {expandedRepeatedPrior && <>
+                                                            <div className="mt-3 space-y-2">{row.findings.slice(0, repeatedPriorLimit).map(renderFinding)}</div>
+                                                            {row.findings.length > repeatedPriorLimit && <button type="button" className="mt-3 text-sm font-semibold text-indigo-600 dark:text-indigo-300"
+                                                                onClick={() => setRepeatedPriorLimit(value => value + 100)}>
+                                                                Show more previously seen findings ({row.findings.length - repeatedPriorLimit} remaining)
+                                                            </button>}
+                                                        </>}
+                                                    </section>;
                                                     const shown = archiveLimits[row.archive] || 100;
                                                     const high = row.findings.filter(({ issue }) => issue.severity === 'HIGH' || issue.severity === 'CRITICAL').length;
                                                     const always = row.findings.filter(({ issue }) => issue.reviewCadence?.toUpperCase() === 'ALWAYS').length;

@@ -247,6 +247,40 @@ describe('Review security clearance status', () => {
         expect(container.textContent).toContain('Context-dependent prior finding');
         expect(container.textContent).toContain('Comparison unavailable');
     });
+    it('folds repeated unchanged-file evidence on changed updates without folding urgent or changed findings', async () => {
+        vi.mocked(adminClient.getArtifactChanges).mockResolvedValue({ reviewToken: 'snapshot', baselineVersion: '0.9',
+            contextComparable: true, contextChanged: false, added: 0, modified: 1, removed: 0, unchanged: 120,
+            files: [{ path: 'Changed.class', change: 'MODIFIED' }] });
+        const prior = Array.from({ length: 120 }, (_, index) => ({ type: 'Network', severity: 'LOW',
+            description: `Earlier occurrence ${index}`, filePath: `Prior${index}.class`, lineStart: 1,
+            knownIssue: true, historicalFileEvidenceIdentical: true, baselineVersion: '0.9' }));
+        const changed = { ...prior[0], description: 'Changed-file occurrence', filePath: 'Changed.class' };
+        const high = { ...prior[1], description: 'High unchanged occurrence', severity: 'HIGH' };
+        const always = { ...prior[2], description: 'Always-review occurrence', reviewCadence: 'ALWAYS' };
+        const issues = [...prior, changed, high, always];
+        await render({ ...clear, status: 'SUSPICIOUS', verdict: 'REVIEW', issues }, true, 'snapshot', 2,
+            [{ id: 'baseline', versionNumber: '0.9', reviewStatus: 'APPROVED' }]);
+        await showFindings();
+        const group = container.querySelector<HTMLElement>('section[aria-label="Repeated prior findings"]');
+        expect(group).toBeTruthy();
+        expect(group?.textContent).toContain('120 previously seen findings with identical file evidence');
+        expect(group?.textContent).toContain('changed callers or dependencies');
+        expect(container.textContent).toContain('4 review rows covering 123 matching findings');
+        expect(container.textContent).toContain('Changed-file occurrence');
+        expect(container.textContent).toContain('High unchanged occurrence');
+        expect(container.textContent).toContain('Always-review occurrence');
+        expect(container.textContent).not.toContain('Earlier occurrence 119');
+        await act(async () => group!.querySelector('button')!.click());
+        expect(group?.textContent).toContain('Earlier occurrence 0');
+        expect(group?.textContent).toContain('Show more previously seen findings (20 remaining)');
+        await act(async () => [...group!.querySelectorAll('button')]
+            .find(button => button.textContent?.includes('Show more previously seen findings'))!.click());
+        expect(group?.textContent).toContain('Earlier occurrence 119');
+        await searchFindings('Earlier occurrence 119');
+        expect(container.querySelector('section[aria-label="Repeated prior findings"]')).toBeNull();
+        expect(container.textContent).toContain('Earlier occurrence 119');
+        expect(container.textContent).not.toContain('Artifact Review Completed');
+    });
     it('keeps the latest selected comparison file when structure responses arrive out of order', async () => {
         vi.mocked(adminClient.getArtifactChanges).mockResolvedValue({ reviewToken: 'snapshot', baselineVersion: '0.9',
             contextComparable: true, contextChanged: false, added: 1, modified: 0, removed: 1, unchanged: 0,
