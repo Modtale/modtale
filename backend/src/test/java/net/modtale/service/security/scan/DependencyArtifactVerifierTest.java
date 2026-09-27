@@ -46,6 +46,19 @@ class DependencyArtifactVerifierTest {
         var inventory=new Inventory(root.key(),List.of(root),List.of(),List.of(new Gap(root.key(),root.reference(),Reason.MISSING)),null,1);
         assertEquals(UNRESOLVED,verifier.verify(inventory).state());assertEquals(0,calls.get());
     }
+    @Test void verifiesOnlyTheSelectedUploadWhileSupplementalGraphRemainsHeld()throws Exception {
+        byte[] bytes={1,2,3};var calls=new AtomicInteger();
+        var verifier=new DependencyArtifactVerifier(path->{calls.incrementAndGet();return new ByteArrayInputStream(bytes);},new Semaphore(2));
+        var root=new Snapshot("pack","v","1","modpack-overrides/upload.zip",hash(bytes),null,null,true,List.of());
+        var unresolved=new Inventory(new Key("pack","v"),List.of(root),List.of(),
+                List.of(new Gap(new Key("pack","v"),new Reference("pack","1"),Reason.SUPPLEMENTAL_CONTENT)),null,1);
+        assertEquals(UNRESOLVED,verifier.verify(unresolved).state());
+        var result=verifier.verifyRoot(root,10,Duration.ofSeconds(1));
+        assertTrue(result.matched());assertNull(result.inventoryIdentity());assertEquals(1,calls.get());
+        assertEquals("modpack-overrides/upload.zip",result.artifacts().getFirst().fileReference());
+        assertEquals(MISMATCH,verifier.verifyRoot(new Snapshot("pack","v","1","modpack-overrides/upload.zip",
+                "a".repeat(64),null,null,true,List.of()),10,Duration.ofSeconds(1)).state());
+    }
     @Test void unavailableTruncatedAndNonProgressingStreamsDoNotVerify()throws Exception {
         var input=inventory(node("a","file",new byte[]{1,2}));
         var unavailable=new DependencyArtifactVerifier(path->{throw new IOException("Unavailable");},new Semaphore(2));

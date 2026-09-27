@@ -1,9 +1,9 @@
 import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { DependencyInspection, type DependencyInspectionResult, type DependencyByteResult } from '@/modules/admin/views/DependencyInspection';
+import { DependencyInspection, type DependencyInspectionResult, type DependencyByteResult, type RootByteResult } from '@/modules/admin/views/DependencyInspection';
 import { adminClient } from '@/modules/admin/api/adminClient';
-vi.mock('@/modules/admin/api/adminClient', () => ({ adminClient: { getDependencyInspection: vi.fn(), verifyDependencyBytes: vi.fn() } }));
+vi.mock('@/modules/admin/api/adminClient', () => ({ adminClient: { getDependencyInspection: vi.fn(), verifyDependencyBytes: vi.fn(), verifyUploadedBytes: vi.fn() } }));
 let container: HTMLDivElement, root: Root;
 const result: DependencyInspectionResult = { reviewToken: 'token', artifactBytesVerified: false, inventory: {
     root: { projectId: 'p', versionId: 'v' }, identity: null,
@@ -42,6 +42,20 @@ const byteResult: DependencyByteResult = { reviewToken: 'token', inventoryIdenti
     inventoryIdentity: 'a'.repeat(64), state: 'MATCHED', bytes: 3, artifacts: [{ fileReference: 'file.jar', expectedSha256: 'a'.repeat(64), actualSha256: 'a'.repeat(64), bytes: 3, state: 'MATCHED' }],
 } };
 const verify = async () => act(async () => [...container.querySelectorAll('button')].find(button => button.textContent === 'Verify stored files')!.click());
+const verifyRoot = async () => act(async () => [...container.querySelectorAll('button')].find(button => button.textContent === 'Verify uploaded artifact bytes')!.click());
+const rootByteResult: RootByteResult = { reviewToken: 'token', artifactSha256: 'a'.repeat(64), verification: {
+    state: 'MATCHED', bytes: 3, artifacts: [{ fileReference: 'modpack-overrides/upload.zip', expectedSha256: 'a'.repeat(64), actualSha256: 'a'.repeat(64), bytes: 3, state: 'MATCHED' }],
+} };
+it('checks uploaded bytes on a held graph without presenting dependency clearance', async () => {
+    vi.mocked(adminClient.getDependencyInspection).mockResolvedValue(result);
+    vi.mocked(adminClient.verifyUploadedBytes).mockResolvedValue(rootByteResult);
+    await render(); await load(); expect(container.textContent).not.toContain('Verify stored files');
+    await verifyRoot();
+    expect(adminClient.verifyUploadedBytes).toHaveBeenCalledWith('p', 'v', 'token', 'a'.repeat(64));
+    expect(container.textContent).toContain('Dependencies and supplemental content still require separate review');
+    expect(container.textContent).toContain('Pinned version not found');
+    await render('changed'); expect(container.textContent).not.toContain('Uploaded artifact bytes matched');
+});
 it('verifies only resolved inventory on explicit request and keeps approval separate', async () => {
     vi.mocked(adminClient.getDependencyInspection).mockResolvedValue(complete);
     vi.mocked(adminClient.verifyDependencyBytes).mockResolvedValue(byteResult);

@@ -19,6 +19,11 @@ export interface DependencyByteResult {
     inventoryIdentity: string;
     verification: { inventoryIdentity: string; state: string; bytes: number; artifacts: { fileReference: string; expectedSha256: string; actualSha256: string | null; bytes: number; state: string }[] };
 }
+export interface RootByteResult {
+    reviewToken: string;
+    artifactSha256: string;
+    verification: { state: string; bytes: number; artifacts: { fileReference: string; expectedSha256: string; actualSha256: string | null; bytes: number; state: string }[] };
+}
 const byteStates: Record<string, string> = {
     MATCHED: 'Stored files matched the recorded hashes during this check. Security approval is still separate.',
     MISMATCH: 'Stored file bytes do not match the recorded inventory. Review the mismatch before deciding.',
@@ -38,13 +43,14 @@ export function DependencyInspection({ projectId, versionId, reviewToken }: { pr
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [bytes, setBytes] = useState<DependencyByteResult | null>(null);
+    const [rootBytes, setRootBytes] = useState<RootByteResult | null>(null);
     const generation = useRef(0);
     useEffect(() => {
-        generation.current++; setResult(null); setBytes(null); setLoading(false); setError('');
+        generation.current++; setResult(null); setBytes(null); setRootBytes(null); setLoading(false); setError('');
         return () => { generation.current++; };
     }, [projectId, versionId, reviewToken]);
     const load = async () => {
-        const request = ++generation.current; setResult(null); setBytes(null); setError(''); setLoading(true);
+        const request = ++generation.current; setResult(null); setBytes(null); setRootBytes(null); setError(''); setLoading(true);
         try {
             const next = await adminClient.getDependencyInspection(projectId, versionId, reviewToken);
             if (next.reviewToken !== reviewToken || next.inventory.root.projectId !== projectId || next.inventory.root.versionId !== versionId)
@@ -67,6 +73,20 @@ export function DependencyInspection({ projectId, versionId, reviewToken }: { pr
             if (request === generation.current) { setResult(null); setError(extractApiErrorMessage(failure, 'Stored file verification is unavailable.')); }
         } finally { if (request === generation.current) setLoading(false); }
     };
+    const verifyRoot = async () => {
+        const root = result?.inventory.nodes.find(node => node.projectId === projectId && node.versionId === versionId);
+        if (!root) return;
+        const hash = root.artifactSha256;
+        const request = ++generation.current; setRootBytes(null); setError(''); setLoading(true);
+        try {
+            const next = await adminClient.verifyUploadedBytes(projectId, versionId, reviewToken, hash);
+            if (next.reviewToken !== reviewToken || next.artifactSha256 !== hash)
+                throw new Error('Uploaded artifact verification no longer matches this review. Inspect dependencies again.');
+            if (request === generation.current) setRootBytes(next);
+        } catch (failure) {
+            if (request === generation.current) { setResult(null); setError(extractApiErrorMessage(failure, 'Uploaded artifact verification is unavailable.')); }
+        } finally { if (request === generation.current) setLoading(false); }
+    };
     return <section aria-label="Dependency inventory" className="rounded-2xl border border-slate-200 dark:border-slate-700 p-5 space-y-4">
         <div className="flex items-center justify-between gap-3">
             <h4 className="font-bold dark:text-white">Dependency inventory</h4>
@@ -78,6 +98,16 @@ export function DependencyInspection({ projectId, versionId, reviewToken }: { pr
         {error && <p role="alert" className="text-sm text-red-600 dark:text-red-400">{error}</p>}
         {result && <>
             <p role="status" className="text-sm dark:text-slate-200">{result.inventory.nodes.length} versions recorded · {result.inventory.edges.length} declarations · {result.inventory.gaps.length} unresolved items</p>
+            {!result.inventory.identity && result.inventory.nodes.some(node => node.projectId === projectId && node.versionId === versionId) &&
+                <button type="button" onClick={verifyRoot} disabled={loading} className="text-sm font-semibold text-indigo-600 dark:text-indigo-400 disabled:opacity-50">
+                    {loading ? 'Checking uploaded artifact…' : 'Verify uploaded artifact bytes'}
+                </button>}
+            {rootBytes && <div className="text-sm dark:text-slate-200" role="status">
+                {rootBytes.verification.state === 'MATCHED'
+                    ? 'Uploaded artifact bytes matched the recorded SHA-256. Dependencies and supplemental content still require separate review.'
+                    : `Uploaded artifact: ${byteStates[rootBytes.verification.state] || 'Verification is incomplete.'}`}
+                {rootBytes.verification.artifacts[0] && <p className="break-all font-mono text-xs mt-1">Observed SHA-256: {rootBytes.verification.artifacts[0].actualSha256 || 'Unavailable'}</p>}
+            </div>}
             {result.inventory.identity && result.inventory.gaps.length === 0 && <button type="button" onClick={verify} disabled={loading}
                 className="text-sm font-semibold text-indigo-600 dark:text-indigo-400 disabled:opacity-50">{loading ? 'Checking stored files…' : 'Verify stored files'}</button>}
             {bytes && <div className="space-y-2">

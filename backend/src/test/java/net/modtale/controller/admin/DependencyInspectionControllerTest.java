@@ -112,6 +112,37 @@ class DependencyInspectionControllerTest {
         assertFalse(result.inventory().resolved());
         assertTrue(result.inventory().gaps().stream().anyMatch(g->g.reason()==Reason.SUPPLEMENTAL_CONTENT));
         verifyNoInteractions(verifier);
+        String token=ProjectReviewSnapshot.token(project);
+        when(verifier.verifyRoot(root)).thenReturn(new DependencyArtifactVerifier.Result(null,List.of(),DependencyArtifactVerifier.State.MATCHED,3));
+        var checked=controller.verifyRootBytes("p","v","a".repeat(64),token);
+        assertEquals("no-store",checked.getHeaders().getCacheControl());
+        assertEquals(DependencyArtifactVerifier.State.MATCHED,checked.getBody().verification().state());
+        assertFalse(controller.inspect("p","v",token).getBody().inventory().resolved());
+        verify(verifier).verifyRoot(root);
+        assertEquals(409,assertThrows(ResponseStatusException.class,
+                ()->controller.verifyRootBytes("p","v","b".repeat(64),token)).getStatusCode().value());
+        verify(verifier).verifyRoot(root);
+    }
+    @Test void rootByteObservationIsDiscardedWhenReviewChangesDuringStorageRead() {
+        var root=snapshot();String token=ProjectReviewSnapshot.token(project);
+        when(verifier.verifyRoot(root)).thenAnswer(i->{version.setFindingReviewHead("changed");
+            return new DependencyArtifactVerifier.Result(null,List.of(),DependencyArtifactVerifier.State.MATCHED,3);});
+        assertEquals(409,assertThrows(ResponseStatusException.class,
+                ()->controller.verifyRootBytes("p","v","a".repeat(64),token)).getStatusCode().value());
+    }
+    @Test void rootByteObservationIsDiscardedWhenAResolvedDependencyChangesDuringStorageRead() {
+        var dependency=new ProjectDependency("child",null,"1");version.setDependencies(List.of(dependency));
+        var root=new Snapshot("p","v","1","files/v","a".repeat(64),ArtifactReviewContext.fingerprint(version),null,false,
+                List.of(new Dependency(dependency.getSource(),dependency.getDependencyType(),new Reference("child","1"))));
+        var child=new java.util.concurrent.atomic.AtomicReference<>(new Snapshot("child","child-v","1","files/child","b".repeat(64),
+                "c".repeat(64),null,false,List.of()));
+        when(source.readRoot("p","v")).thenReturn(new Lookup(State.FOUND,root));
+        when(source.read(any())).thenAnswer(i->new Lookup(State.FOUND,((Reference)i.getArgument(0)).projectId().equals("p")?root:child.get()));
+        when(verifier.verifyRoot(root)).thenAnswer(i->{child.set(new Snapshot("child","child-v","1","files/child","d".repeat(64),
+                "c".repeat(64),null,false,List.of()));
+            return new DependencyArtifactVerifier.Result(null,List.of(),DependencyArtifactVerifier.State.MATCHED,3);});
+        assertEquals(409,assertThrows(ResponseStatusException.class,
+                ()->controller.verifyRootBytes("p","v","a".repeat(64),ProjectReviewSnapshot.token(project))).getStatusCode().value());
     }
     @Test void httpRouteRequiresSnapshotAndReturnsUncachedDeclarationInventory() throws Exception {
         var mvc=org.springframework.test.web.servlet.setup.MockMvcBuilders.standaloneSetup(controller).build();
@@ -124,5 +155,21 @@ class DependencyInspectionControllerTest {
                 .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header().string("Cache-Control","no-store"))
                 .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.artifactBytesVerified").value(false))
                 .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.inventory.root.versionId").value("v"));
+    }
+    @Test void rootByteHttpRouteRequiresHashAndOpenedReview() throws Exception {
+        var mvc=org.springframework.test.web.servlet.setup.MockMvcBuilders.standaloneSetup(controller).build();
+        String route="/api/v1/admin/projects/p/version-ids/v/root-bytes";
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(route)
+                        .header("If-Match",ProjectReviewSnapshot.token(project)))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isBadRequest());
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(route)
+                        .param("artifactSha256","a".repeat(64)))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isConflict());
+        when(verifier.verifyRoot(any())).thenReturn(new DependencyArtifactVerifier.Result(null,List.of(),DependencyArtifactVerifier.State.BUSY,0));
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(route)
+                        .header("If-Match",ProjectReviewSnapshot.token(project)).param("artifactSha256","a".repeat(64)))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header().string("Cache-Control","no-store"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.verification.state").value("BUSY"));
     }
 }

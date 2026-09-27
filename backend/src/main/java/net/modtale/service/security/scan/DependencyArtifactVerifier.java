@@ -26,43 +26,54 @@ public final class DependencyArtifactVerifier {
     }
     Result verify(DependencyReviewGraph.Inventory inventory,long maxBytes,Duration timeout) {
         Objects.requireNonNull(inventory);
-        long nanos=timeout.toNanos();
-        if(maxBytes<1||maxBytes>128L*1024*1024||nanos<1||nanos>TimeUnit.SECONDS.toNanos(15))throw new IllegalArgumentException("Invalid byte inspection limits");
         if(!inventory.resolved()||inventory.nodes().isEmpty()||inventory.nodes().size()>64)
             return new Result(inventory.identity(),List.of(),State.UNRESOLVED,0);
-        if(!capacity.tryAcquire())return new Result(inventory.identity(),List.of(),State.BUSY,0);
+        return verifyNodes(inventory.nodes(),inventory.identity(),maxBytes,timeout);
+    }
+    /** Observes only the selected upload when other dependency or supplemental evidence remains unresolved. */
+    public Result verifyRoot(DependencyReviewGraph.Snapshot root) {
+        return verifyRoot(root,128L*1024*1024,Duration.ofSeconds(15));
+    }
+    Result verifyRoot(DependencyReviewGraph.Snapshot root,long maxBytes,Duration timeout) {
+        Objects.requireNonNull(root);
+        return verifyNodes(List.of(root),null,maxBytes,timeout);
+    }
+    private Result verifyNodes(List<DependencyReviewGraph.Snapshot> nodes,String identity,long maxBytes,Duration timeout) {
+        long nanos=timeout.toNanos();
+        if(maxBytes<1||maxBytes>128L*1024*1024||nanos<1||nanos>TimeUnit.SECONDS.toNanos(15))throw new IllegalArgumentException("Invalid byte inspection limits");
+        if(!capacity.tryAcquire())return new Result(identity,List.of(),State.BUSY,0);
         var future=new CompletableFuture<Result>();
         long started=System.nanoTime();
         Thread worker;
         try {
             worker=Thread.ofVirtual().name("dependency-byte-inspection").start(()->{
-                try {future.complete(read(inventory,maxBytes,started,nanos));}
-                catch(Exception failure){future.complete(new Result(inventory.identity(),List.of(),State.UNAVAILABLE,0));}
+                try {future.complete(read(nodes,identity,maxBytes,started,nanos));}
+                catch(Exception failure){future.complete(new Result(identity,List.of(),State.UNAVAILABLE,0));}
                 finally {capacity.release();}
             });
         } catch(RuntimeException failure){capacity.release();throw failure;}
         try {
             var result=future.get(Math.max(1,nanos-(System.nanoTime()-started)),TimeUnit.NANOSECONDS);
-            return expired(started,nanos)?new Result(inventory.identity(),List.of(),State.TIME_LIMIT,0):result;
+            return expired(started,nanos)?new Result(identity,List.of(),State.TIME_LIMIT,0):result;
         }
-        catch(TimeoutException failure){worker.interrupt();return new Result(inventory.identity(),List.of(),State.TIME_LIMIT,0);}
-        catch(InterruptedException failure){worker.interrupt();Thread.currentThread().interrupt();return new Result(inventory.identity(),List.of(),State.TIME_LIMIT,0);}
-        catch(ExecutionException failure){return new Result(inventory.identity(),List.of(),State.UNAVAILABLE,0);}
+        catch(TimeoutException failure){worker.interrupt();return new Result(identity,List.of(),State.TIME_LIMIT,0);}
+        catch(InterruptedException failure){worker.interrupt();Thread.currentThread().interrupt();return new Result(identity,List.of(),State.TIME_LIMIT,0);}
+        catch(ExecutionException failure){return new Result(identity,List.of(),State.UNAVAILABLE,0);}
         // A stalled stream retains its capacity slot until it actually exits, even after caller timeout.
     }
-    private Result read(DependencyReviewGraph.Inventory inventory,long maxBytes,long started,long nanos)throws Exception {
+    private Result read(List<DependencyReviewGraph.Snapshot> nodes,String identity,long maxBytes,long started,long nanos)throws Exception {
         var artifacts=new ArrayList<Artifact>();var seen=new HashMap<String,Artifact>();long total=0;
-        for(var node:inventory.nodes()) {
-            if(expired(started,nanos))return new Result(inventory.identity(),artifacts,State.TIME_LIMIT,total);
+        for(var node:nodes) {
+            if(expired(started,nanos))return new Result(identity,artifacts,State.TIME_LIMIT,total);
             var previous=seen.get(node.fileReference());
             if(previous!=null) {
                 if(!previous.expectedSha256().equals(node.artifactSha256())) {
                     artifacts.add(new Artifact(node.fileReference(),node.artifactSha256(),previous.actualSha256(),0,State.MISMATCH));
-                    return new Result(inventory.identity(),artifacts,State.MISMATCH,total);
+                    return new Result(identity,artifacts,State.MISMATCH,total);
                 }
                 continue;
             }
-            if(total>=maxBytes)return new Result(inventory.identity(),artifacts,State.BYTE_LIMIT,total);
+            if(total>=maxBytes)return new Result(identity,artifacts,State.BYTE_LIMIT,total);
             long bytes=0;String actual=null;State state;
             InputStream stream=null;
             try {
@@ -92,9 +103,9 @@ public final class DependencyArtifactVerifier {
             }
             total+=bytes;var artifact=new Artifact(node.fileReference(),node.artifactSha256(),actual,bytes,state);
             artifacts.add(artifact);seen.put(node.fileReference(),artifact);
-            if(state!=State.MATCHED)return new Result(inventory.identity(),artifacts,state,total);
+            if(state!=State.MATCHED)return new Result(identity,artifacts,state,total);
         }
-        return new Result(inventory.identity(),artifacts,State.MATCHED,total);
+        return new Result(identity,artifacts,State.MATCHED,total);
     }
     private static boolean expired(long started,long nanos){return Thread.currentThread().isInterrupted()||System.nanoTime()-started>=nanos;}
     private static class ByteLimit extends IOException {}

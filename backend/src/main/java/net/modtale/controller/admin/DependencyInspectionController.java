@@ -28,6 +28,31 @@ public class DependencyInspectionController {
         this.projects=projects;this.sources=sources;this.verifier=verifier;
     }
     public record ByteInspection(String reviewToken,String inventoryIdentity,DependencyArtifactVerifier.Result verification) {}
+    public record RootByteInspection(String reviewToken,String artifactSha256,DependencyArtifactVerifier.Result verification) {}
+    @GetMapping("/root-bytes")
+    public ResponseEntity<RootByteInspection> verifyRootBytes(@PathVariable String id,@PathVariable String versionId,
+            @RequestParam String artifactSha256,@RequestHeader(value="If-Match",required=false) String expected) {
+        if(artifactSha256==null||!artifactSha256.matches("[0-9a-f]{64}"))
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Invalid uploaded artifact identity");
+        var before=inspect(id,versionId,expected).getBody();
+        var root=before.inventory().nodes().stream().filter(node->node.projectId().equals(before.inventory().root().projectId())
+                &&node.versionId().equals(before.inventory().root().versionId())).findFirst()
+                .orElseThrow(ProjectReviewSnapshot::conflict);
+        if(!artifactSha256.equals(root.artifactSha256())||before.inventory().gaps().stream()
+                .anyMatch(gap->gap.reason()==DependencyReviewGraph.Reason.CHANGED))
+            throw ProjectReviewSnapshot.conflict();
+        var verification=verifier.verifyRoot(root);
+        var after=inspect(id,versionId,expected).getBody();
+        if(!Objects.equals(before.reviewToken(),after.reviewToken())
+                ||!before.inventory().root().equals(after.inventory().root())
+                ||!before.inventory().nodes().equals(after.inventory().nodes())
+                ||!before.inventory().edges().equals(after.inventory().edges())
+                ||!before.inventory().gaps().equals(after.inventory().gaps())
+                ||verification==null)
+            throw new ResponseStatusException(HttpStatus.CONFLICT,"Uploaded artifact changed during byte verification");
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).header("X-Content-Type-Options","nosniff")
+                .body(new RootByteInspection(after.reviewToken(),artifactSha256,verification));
+    }
     @GetMapping("/dependency-bytes")
     public ResponseEntity<ByteInspection> verifyBytes(@PathVariable String id,@PathVariable String versionId,
             @RequestParam String inventoryIdentity,@RequestHeader(value="If-Match",required=false) String expected) {

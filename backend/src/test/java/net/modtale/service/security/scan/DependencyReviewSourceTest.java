@@ -94,8 +94,10 @@ class DependencyReviewSourceTest {
         assertTrue(graph.gaps().stream().anyMatch(g->g.reason()==Reason.EXTERNAL));
         assertTrue(graph.gaps().stream().anyMatch(g->g.reason()==Reason.SUPPLEMENTAL_CONTENT));
     }
-    @Test void modpackOverrideCanBeIdentifiedWithoutGrantingClearance() {
+    @Test void modpackOverrideCanBeIdentifiedAndByteCheckedWithoutGrantingClearance() throws Exception {
         var modpack=version("v","1");modpack.append("fileUrl","modpack-cache/generated.zip");
+        byte[] uploaded={1,2,3};String uploadedHash=HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(uploaded));
+        modpack.append("hash",uploadedHash);
         modpack.append("overrideFileUrl","modpack-overrides/v.zip");
         project("modpack",modpack);
         mongo.getCollection("projects").updateOne(new Document("_id","modpack"),
@@ -112,12 +114,19 @@ class DependencyReviewSourceTest {
         var projects=org.mockito.Mockito.mock(net.modtale.service.project.query.ProjectService.class);
         org.mockito.Mockito.when(projects.getRawProjectById("modpack"))
                 .thenAnswer(i->mongo.findById("modpack",net.modtale.model.project.Project.class));
-        var controller=new net.modtale.controller.admin.DependencyInspectionController(projects,mongo,
-                org.mockito.Mockito.mock(net.modtale.service.storage.StorageService.class));
+        var storage=org.mockito.Mockito.mock(net.modtale.service.storage.StorageService.class);
+        org.mockito.Mockito.when(storage.getStream("modpack-overrides/v.zip"))
+                .thenAnswer(i->new java.io.ByteArrayInputStream(uploaded));
+        var controller=new net.modtale.controller.admin.DependencyInspectionController(projects,mongo,storage);
         String token=net.modtale.service.admin.review.ProjectReviewSnapshot.token(projects.getRawProjectById("modpack"));
         var result=controller.inspect("modpack","v",token).getBody();
         assertEquals("modpack-overrides/v.zip",result.inventory().nodes().getFirst().fileReference());
         assertFalse(result.inventory().resolved());
+        var checked=controller.verifyRootBytes("modpack","v",uploadedHash,token).getBody();
+        assertTrue(checked.verification().matched());
+        assertEquals("modpack-overrides/v.zip",checked.verification().artifacts().getFirst().fileReference());
+        assertEquals(409,assertThrows(org.springframework.web.server.ResponseStatusException.class,
+                ()->controller.verifyBytes("modpack","v",uploadedHash,token)).getStatusCode().value());
     }
     @Test void legacyModpackWithoutRecordedArchiveHashRemainsUnavailable() {
         var modpack=version("v","1");modpack.remove("fileUrl");modpack.remove("hash");
