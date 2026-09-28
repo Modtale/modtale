@@ -20,7 +20,8 @@ public class ArtifactReviewReuseService {
         ProjectVersion target = project.getVersions().stream().filter(Objects::nonNull)
                 .filter(version -> Objects.equals(currentVersionId, version.getId())).findFirst().orElse(null);
         String context = ArtifactReviewContext.automaticallyReviewableFingerprint(target);
-        if (context == null || target.getReplacementSecurityHold()!=null || target.getFindingReviewHead() != null) return;
+        if (context == null || !Objects.equals(target.getHash(), current.artifactSha256())
+                || target.getReplacementSecurityHold()!=null || target.getFindingReviewHead() != null) return;
         long now = System.currentTimeMillis();
         for (ProjectVersion version : project.getVersions()) {
             if (version == null || Objects.equals(version.getId(), currentVersionId)
@@ -30,6 +31,7 @@ public class ArtifactReviewReuseService {
             var prior = version.getApprovedSecurityEvidence();
             if (prior == null || !prior.complete() || current.policyVersion() == null
                     || !current.policyVersion().equals(prior.policyVersion())
+                    || !current.artifactSha256().equals(prior.artifactSha256())
                     || current.contentSha256() == null || !current.contentSha256().equals(prior.contentSha256())
                     || current.entryHashes() == null || current.entryHashes().isEmpty()
                     || !context.equals(version.getApprovedSecurityContextSha256())

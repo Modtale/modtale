@@ -115,6 +115,23 @@ class ArtifactReviewLineageIntegrationTest {
                 SecurityManifest.identity(entries),true,false,evidence.reviewState(),entries));
         assertFalse(apply());assertHeld();
     }
+    @Test void persistedReuseCannotAuthorizeDifferentArchiveBytesWithEqualLogicalEntries() {
+        var previous = result.getSecurityEvidence();
+        String changedArchive = "f".repeat(64);
+        assertNotEquals(previous.artifactSha256(), changedArchive);
+        result.setSecurityEvidence(new ScanResult.SecurityEvidence(previous.policyVersion(), changedArchive,
+                previous.contentSha256(), true, false, previous.reviewState(), previous.entryHashes()));
+        target.setHash(changedArchive);
+        mongo.updateFirst(Query.query(Criteria.where("_id").is(id)),
+                new Update().set("versions.1.hash", changedArchive), Project.class);
+        target.setScanResult(result);
+        new SecurityIssueApprovalService(new SecurityIssueClassificationService(
+                new AppSecurityProperties("test",60,120,2,12,15,120,25,2)))
+                .markIssuesAcceptedForApprovedVersion(target);
+
+        assertFalse(apply());
+        assertHeld();
+    }
     @Test void objectIdBackedVersionIdentifiersRemainBoundToTheCorrectSource() {
         var sourceId=new org.bson.types.ObjectId();
         mongo.getCollection("projects").updateOne(new Document(),Updates.set("versions.0._id",sourceId));

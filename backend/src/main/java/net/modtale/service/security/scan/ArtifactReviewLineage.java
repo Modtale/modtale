@@ -99,7 +99,8 @@ public final class ArtifactReviewLineage {
                 return false;
             }
             var prior = source.getApprovedSecurityEvidence();
-            if (!Objects.equals(evidence.contentSha256(), prior.contentSha256())
+            if (!Objects.equals(evidence.artifactSha256(), prior.artifactSha256())
+                    || !Objects.equals(evidence.contentSha256(), prior.contentSha256())
                     || !Objects.equals(evidence.policyVersion(), prior.policyVersion())
                     || !Objects.equals(scan.getReviewedContextSha256(), source.getApprovedSecurityContextSha256())
                     || scan.getReusedReviewApprovedAt() != source.getSecurityApprovedAt()) return false;

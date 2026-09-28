@@ -19,6 +19,7 @@ class ArtifactReviewReuseServiceTest {
         prior.setSecurityApprovedAt(System.currentTimeMillis() - 1000);
         prior.setApprovedSecurityContextSha256(ArtifactReviewContext.fingerprint(prior));
         ProjectVersion current = new ProjectVersion(); current.setId("new"); current.setVersionNumber("1.1");
+        current.setHash(result.getSecurityEvidence().artifactSha256());
         Project project = new Project(); project.setId("p"); project.setVersions(List.of(prior, current)); return project;
     }
     @Test void freshAdverseEvidenceCannotBeHiddenByAnIdenticalHistoricalApproval() {
@@ -47,6 +48,27 @@ class ArtifactReviewReuseServiceTest {
         service.annotate(project, "new", result);
         assertEquals("1.0", result.getReusedReviewVersion());
         assertEquals(project.getVersions().getFirst().getSecurityApprovedAt(), result.getReusedReviewApprovedAt());
+    }
+    @Test void equalLogicalEntriesCannotCarryApprovalAcrossDifferentArchiveBytes() {
+        ScanResult result = ScanEvidenceFixtures.complete(false);
+        Project project = project(result);
+        var prior = result.getSecurityEvidence();
+        String changedArchive = "f".repeat(64);
+        assertNotEquals(prior.artifactSha256(), changedArchive);
+        result.setSecurityEvidence(new ScanResult.SecurityEvidence(prior.policyVersion(), changedArchive,
+                prior.contentSha256(), prior.complete(), prior.clearanceGranted(), prior.reviewState(), prior.entryHashes()));
+        project.getVersions().get(1).setHash(changedArchive);
+
+        service.annotate(project, "new", result);
+        assertNull(result.getReusedReviewVersion());
+        assertNull(result.getReusedReviewOrigins());
+    }
+    @Test void targetArtifactIdentityMustMatchTheCurrentScan() {
+        ScanResult result = ScanEvidenceFixtures.complete(false);
+        Project project = project(result);
+        project.getVersions().get(1).setHash("f".repeat(64));
+        service.annotate(project, "new", result);
+        assertNull(result.getReusedReviewVersion());
     }
     @Test void retainedReplacementBlockPreventsReuseAsSourceOrTarget() {
         for(int index:List.of(0,1)) {
