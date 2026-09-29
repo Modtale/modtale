@@ -105,6 +105,48 @@ class ModpackArchiveServiceTest {
     }
 
     @Test
+    void cachedModpackCannotServeAnOlderApprovedDependencyArtifact() throws Exception {
+        Project pack = pack();
+        ProjectVersion version = version("1.0.0", null);
+        ProjectDependency dependency = new ProjectDependency("plugin", "Plugin", "2.0.0");
+        version.setDependencies(List.of(dependency));
+        when(archiveSupport.resolveDependency(dependency)).thenReturn(new DownloadArchiveSupport.ResolvedDependency(
+                dependencyProject("plugin", ProjectClassification.PLUGIN), version("2.0.0", "plugin-old.jar")));
+        when(archiveSupport.download("plugin-old.jar")).thenReturn(bytes("old-approved-bytes"));
+        when(archiveSupport.extractOriginalFilename("plugin-old.jar")).thenReturn("plugin.jar");
+        byte[] cached = service.generateModpackZip(pack, version);
+
+        version.setFileUrl("modpacks/cached.zip");
+        when(archiveSupport.download("modpacks/cached.zip")).thenReturn(cached);
+        when(archiveSupport.resolveDependency(dependency)).thenReturn(new DownloadArchiveSupport.ResolvedDependency(
+                dependencyProject("plugin", ProjectClassification.PLUGIN), version("2.0.0", "plugin-new.jar")));
+        when(archiveSupport.download("plugin-new.jar")).thenReturn(bytes("new-approved-bytes"));
+        when(archiveSupport.extractOriginalFilename("plugin-new.jar")).thenReturn("plugin.jar");
+
+        Map<String, String> entries = unzip(service.generateModpackZip(pack, version));
+
+        assertEquals("new-approved-bytes", entries.get("plugin.jar"));
+    }
+
+    @Test
+    void dependencyChangingDuringBuildCannotBeCachedOrDelivered() throws Exception {
+        Project pack = pack();
+        ProjectVersion version = version("1.0.0", null);
+        ProjectDependency dependency = new ProjectDependency("plugin", "Plugin", "2.0.0");
+        version.setDependencies(List.of(dependency));
+        var old = new DownloadArchiveSupport.ResolvedDependency(
+                dependencyProject("plugin", ProjectClassification.PLUGIN), version("2.0.0", "plugin-old.jar"));
+        var replacement = new DownloadArchiveSupport.ResolvedDependency(
+                dependencyProject("plugin", ProjectClassification.PLUGIN), version("2.0.0", "plugin-new.jar"));
+        when(archiveSupport.resolveDependency(dependency)).thenReturn(old, old, replacement);
+        when(archiveSupport.download("plugin-old.jar")).thenReturn(bytes("old-approved-bytes"));
+        when(archiveSupport.extractOriginalFilename("plugin-old.jar")).thenReturn("plugin.jar");
+
+        assertThrows(IOException.class, () -> service.generateModpackZip(pack, version));
+        verify(archiveSupport, never()).upload(any(), any());
+    }
+
+    @Test
     void generateModpackZipRebuildsLegacyArchivesThatPredateIntegrityLockfiles() throws Exception {
         Project pack = pack();
         ProjectVersion version = version("1.0.0", "modpacks/legacy.zip");

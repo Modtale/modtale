@@ -11,10 +11,12 @@ import java.util.zip.ZipOutputStream;
 import net.modtale.exception.StorageDownloadException;
 import net.modtale.model.project.ProjectDependency;
 import net.modtale.model.project.ProjectClassification;
+import net.modtale.model.project.Project;
 import net.modtale.model.project.ProjectVersion;
 import net.modtale.model.worldlist.WorldModList;
 import net.modtale.service.project.query.ProjectService;
 import net.modtale.service.security.access.AccessControlService;
+import net.modtale.service.storage.DownloadService;
 import net.modtale.service.storage.StorageService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -29,13 +31,15 @@ public class WorldModListArchiveService {
     private final StorageService storageService;
     private final ProjectService projectService;
     private final AccessControlService accessControlService;
+    private final DownloadService downloadService;
     private final ObjectWriter manifestWriter;
 
     public WorldModListArchiveService(StorageService storageService, ObjectMapper mapper,
-            ProjectService projectService, AccessControlService accessControlService) {
+            ProjectService projectService, AccessControlService accessControlService, DownloadService downloadService) {
         this.storageService = storageService;
         this.projectService = projectService;
         this.accessControlService = accessControlService;
+        this.downloadService = downloadService;
         this.manifestWriter = mapper.writerWithDefaultPrettyPrinter();
     }
 
@@ -52,14 +56,17 @@ public class WorldModListArchiveService {
                 zip.closeEntry();
             }
             for (WorldModList.Item item : list.getMods()) {
+                ApprovedArtifact approved = currentlyApproved(item);
                 if (!item.isDownloadable() || item.getFileUrl() == null || item.getFileUrl().isBlank()
-                        || !currentlyApproved(item)) {
+                        || approved == null) {
                     continue;
                 }
                 try {
-                    byte[] file = storageService.download(item.getFileUrl());
+                    byte[] file = approved.project().getClassification() == ProjectClassification.MODPACK
+                            ? downloadService.generateModpackZip(approved.project(), approved.version(), null)
+                            : storageService.download(item.getFileUrl());
                     writeEntry(zip, entries, filename(item), file);
-                } catch (StorageDownloadException ex) {
+                } catch (StorageDownloadException | IOException ex) {
                     logger.warn("Skipping unavailable world list file {} for list {}", item.getFileUrl(), list.getId(), ex);
                 }
             }
@@ -67,18 +74,21 @@ public class WorldModListArchiveService {
         return bytes.toByteArray();
     }
 
-    private boolean currentlyApproved(WorldModList.Item item) {
+    private ApprovedArtifact currentlyApproved(WorldModList.Item item) {
         if (item.getSource() != ProjectDependency.Source.MODTALE || item.getProjectId() == null
-                || item.getProjectId().isBlank() || item.getVersionNumber() == null) return false;
+                || item.getProjectId().isBlank() || item.getVersionNumber() == null) return null;
         var project = projectService.getRawProjectById(item.getProjectId());
-        if (project == null || !accessControlService.isPubliclyReadable(project) || project.getVersions() == null) return false;
-        return project.getVersions().stream().filter(version -> version != null
+        if (project == null || !accessControlService.isPubliclyReadable(project) || project.getVersions() == null) return null;
+        var matches = project.getVersions().stream().filter(version -> version != null
                 && version.getReviewStatus() == ProjectVersion.ReviewStatus.APPROVED
                 && item.getVersionNumber().equals(version.getVersionNumber())
                 && item.getFileUrl().equals(version.getFileUrl())
                 && (project.getClassification() != ProjectClassification.MODPACK || bundledDependenciesAvailable(version)))
-                .limit(2).count() == 1;
+                .limit(2).toList();
+        return matches.size() == 1 ? new ApprovedArtifact(project, matches.getFirst()) : null;
     }
+
+    private record ApprovedArtifact(Project project, ProjectVersion version) {}
 
     private boolean bundledDependenciesAvailable(ProjectVersion version) {
         if (version.getDependencies() == null) return true;

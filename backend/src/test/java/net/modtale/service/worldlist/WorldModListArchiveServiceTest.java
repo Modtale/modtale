@@ -23,6 +23,7 @@ import net.modtale.model.worldlist.WorldModList;
 import net.modtale.service.project.query.ProjectService;
 import net.modtale.service.security.access.AccessControlService;
 import net.modtale.service.storage.StorageService;
+import net.modtale.service.storage.DownloadService;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.ObjectMapper;
 
@@ -57,7 +58,7 @@ class WorldModListArchiveServiceTest {
         approvedItem.setProjectId("project-1");
         list.setMods(List.of(approvedItem, item("External Mod", "0.2.0", false, "")));
 
-        byte[] archive = new WorldModListArchiveService(storageService, new ObjectMapper(), projectService, accessControlService).generateZip(list);
+        byte[] archive = new WorldModListArchiveService(storageService, new ObjectMapper(), projectService, accessControlService, mock(DownloadService.class)).generateZip(list);
         Map<String, String> entries = entries(archive);
 
         assertTrue(entries.containsKey("modtale-list.json"));
@@ -90,7 +91,7 @@ class WorldModListArchiveServiceTest {
         when(accessControlService.isPubliclyReadable(project)).thenReturn(true);
         when(storageService.download("storage/withdrawn.jar")).thenReturn("old-bytes".getBytes(StandardCharsets.UTF_8));
 
-        Map<String, String> entries = entries(new WorldModListArchiveService(storageService, new ObjectMapper(), projectService, accessControlService).generateZip(list));
+        Map<String, String> entries = entries(new WorldModListArchiveService(storageService, new ObjectMapper(), projectService, accessControlService, mock(DownloadService.class)).generateZip(list));
 
         assertFalse(entries.containsKey("Withdrawn-Mod-2.0.0.jar"));
     }
@@ -128,9 +129,39 @@ class WorldModListArchiveServiceTest {
         when(storageService.download("storage/pack.zip")).thenReturn("stale-pack".getBytes(StandardCharsets.UTF_8));
 
         Map<String, String> entries = entries(new WorldModListArchiveService(storageService, new ObjectMapper(),
-                projectService, accessControlService).generateZip(list));
+                projectService, accessControlService, mock(DownloadService.class)).generateZip(list));
 
         assertFalse(entries.containsKey("Modpack-1.0.0.jar"));
+    }
+
+    @Test
+    void approvedModpackUsesCurrentArchiveInsteadOfCachedFileBytes() throws IOException {
+        StorageService storageService = mock(StorageService.class);
+        ProjectService projectService = mock(ProjectService.class);
+        AccessControlService accessControlService = mock(AccessControlService.class);
+        DownloadService downloadService = mock(DownloadService.class);
+        WorldModList.Item item = item("Modpack", "1.0.0", true, "storage/pack.zip");
+        item.setProjectId("pack");
+        WorldModList list = new WorldModList();
+        list.setId("list-1");
+        list.setMods(List.of(item));
+        Project pack = new Project();
+        pack.setId("pack");
+        pack.setClassification(ProjectClassification.MODPACK);
+        ProjectVersion version = new ProjectVersion();
+        version.setVersionNumber("1.0.0");
+        version.setFileUrl("storage/pack.zip");
+        version.setReviewStatus(ProjectVersion.ReviewStatus.APPROVED);
+        pack.setVersions(List.of(version));
+        when(projectService.getRawProjectById("pack")).thenReturn(pack);
+        when(accessControlService.isPubliclyReadable(pack)).thenReturn(true);
+        when(storageService.download("storage/pack.zip")).thenReturn("stale-bytes".getBytes(StandardCharsets.UTF_8));
+        when(downloadService.generateModpackZip(pack, version, null)).thenReturn("current-bytes".getBytes(StandardCharsets.UTF_8));
+
+        Map<String, String> entries = entries(new WorldModListArchiveService(storageService, new ObjectMapper(),
+                projectService, accessControlService, downloadService).generateZip(list));
+
+        assertEquals("current-bytes", entries.get("Modpack-1.0.0.jar"));
     }
 
     @Test
@@ -154,7 +185,7 @@ class WorldModListArchiveServiceTest {
         when(accessControlService.isPubliclyReadable(project)).thenReturn(true);
         when(storageService.download("storage/old.jar")).thenReturn("old-bytes".getBytes(StandardCharsets.UTF_8));
 
-        Map<String, String> entries = entries(new WorldModListArchiveService(storageService, new ObjectMapper(), projectService, accessControlService).generateZip(list));
+        Map<String, String> entries = entries(new WorldModListArchiveService(storageService, new ObjectMapper(), projectService, accessControlService, mock(DownloadService.class)).generateZip(list));
 
         assertFalse(entries.containsKey("Changed-Mod-2.0.0.jar"));
     }
