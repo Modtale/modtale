@@ -411,6 +411,40 @@ describe('Review security clearance status', () => {
         expect(container.textContent).toContain('Showing 1–1 of 1 matching findings (276 total)');
         expect(container.textContent).toContain('native entry 274');
     });
+    it('folds repeated medium indirect calls without hiding higher-priority calls or search results', async () => {
+        const repeated = Array.from({ length: 120 }, (_, index) => ({ type: 'IndirectInvocation', severity: 'MEDIUM',
+            description: `indirect call ${index}`, filePath: `org/h2/engine/Caller${index}.class`, lineStart: index + 1, lineEnd: index + 1,
+            reviewCadence: 'WHEN_CHANGED' }));
+        const high = { ...repeated[0], severity: 'HIGH', description: 'high indirect call' };
+        const always = { ...repeated[0], reviewCadence: 'ALWAYS', description: 'always indirect call' };
+        const escalated = { ...repeated[0], escalated: true, description: 'escalated indirect call' };
+        const ownReflection = Array.from({ length: 12 }, (_, index) => ({ ...repeated[0],
+            description: `own reflection ${index}`, filePath: `dev/hytalemodding/plugin/Own${index}.class` }));
+        const own = { type: 'OutboundNetwork', severity: 'HIGH', description: 'Mod network behavior',
+            filePath: 'com/example/ExampleMod.class', lineStart: 12, lineEnd: 12 };
+        await render({ ...clear, status: 'SUSPICIOUS', verdict: 'REVIEW', issues: [own, high, always, escalated, ...ownReflection, ...repeated] }, true, 'snapshot', 2);
+        const show = container.querySelector<HTMLButtonElement>('button[aria-label="Show findings"]');
+        if (show) await act(async () => show.click());
+        const group = container.querySelector<HTMLElement>('section[aria-label="Indirect invocation findings: org/h2"]');
+        expect(group?.textContent).toContain('120 indirect invocation findings under org/h2');
+        expect(group?.textContent).toContain('120 new');
+        expect(container.textContent).toContain('17 review rows covering 136 matching findings');
+        expect(container.querySelector('section[aria-label="Indirect invocation findings: dev/hytalemodding"]')).toBeNull();
+        expect(container.textContent).toContain('own reflection 11');
+        for (const detail of ['high indirect call', 'always indirect call', 'escalated indirect call', 'Mod network behavior'])
+            expect(container.textContent).toContain(detail);
+        expect(container.textContent).not.toContain('indirect call 119');
+        await act(async () => group!.querySelector('button')!.click());
+        expect(group?.textContent).toContain('indirect call 99');
+        expect(group?.textContent).toContain('Show more indirect calls in org/h2 (20 remaining)');
+        await act(async () => [...group!.querySelectorAll<HTMLButtonElement>('button')]
+            .find(button => button.textContent?.includes('Show more indirect calls'))!.click());
+        expect(group?.textContent).toContain('indirect call 119');
+        await searchFindings('indirect call 119');
+        expect(container.querySelector('section[aria-label="Indirect invocation findings: org/h2"]')).toBeNull();
+        expect(container.textContent).toContain('Showing 1–1 of 1 matching findings (136 total)');
+        expect(container.textContent).toContain('indirect call 119');
+    });
     it('does not attach a late rationale to a different selected occurrence', async () => {
         let resolve!: (value: ReturnType<typeof earlierResponse>) => void;
         vi.mocked(loadPriorFindingReasoning).mockReset().mockReturnValueOnce(new Promise(done => { resolve = done; }))

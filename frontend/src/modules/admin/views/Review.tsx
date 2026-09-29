@@ -159,12 +159,16 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
     const [repeatedPriorLimit, setRepeatedPriorLimit] = useState(100);
     const [expandedVettedHigh, setExpandedVettedHigh] = useState(false);
     const [vettedHighLimit, setVettedHighLimit] = useState(100);
+    const [expandedIndirectPackages, setExpandedIndirectPackages] = useState<Set<string>>(() => new Set());
+    const [indirectPackageLimits, setIndirectPackageLimits] = useState<Record<string, number>>({});
     useEffect(() => {
         setFindingSearch(''); setFindingFocus('attention'); setFindingType(null); setFindingPage(0); setArchiveLimits({}); setExpandedArchives(new Set());
         setExpandedRepeatedPrior(false); setRepeatedPriorLimit(100); setExpandedVettedHigh(false); setVettedHighLimit(100);
+        setExpandedIndirectPackages(new Set()); setIndirectPackageLimits({});
     }, [mod.id, mod.reviewToken, pendingVersion?.id, pendingVersion?.reviewToken]);
     useEffect(() => { setExpandedArchives(new Set()); setExpandedRepeatedPrior(false); setRepeatedPriorLimit(100);
-        setExpandedVettedHigh(false); setVettedHighLimit(100); }, [findingSearch, findingFocus, findingType]);
+        setExpandedVettedHigh(false); setVettedHighLimit(100); setExpandedIndirectPackages(new Set()); setIndirectPackageLimits({});
+    }, [findingSearch, findingFocus, findingType]);
 
     const orderedIssues = useMemo(() => {
         const severityRank = (value?: string) => {
@@ -218,7 +222,8 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
         findingFocus === 'attention' && findingType === null && !findingSearch.trim()
             && activeComparison?.baselineVersion && !canDeprioritizePriorFindings
             ? issue => !changedFindingPaths.has(issue.filePath) : undefined,
-        activeComparison?.contextComparable ? activeComparison.baselineVersion || undefined : undefined),
+        activeComparison?.contextComparable ? activeComparison.baselineVersion || undefined : undefined,
+        findingFocus === 'attention' && findingType === null && !findingSearch.trim()),
     [matchingIssues, findingFocus, findingType, findingSearch, activeComparison, canDeprioritizePriorFindings, changedFindingPaths]);
     const foldedFindings = matchingIssues.length - rows.length;
     const findingPages = Math.max(1, Math.ceil(rows.length / 100));
@@ -967,6 +972,31 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
                                                             </button>}
                                                         </>}
                                                     </section>;
+                                                    if (row.kind === 'indirect-package') {
+                                                        const shown = indirectPackageLimits[row.packagePath] || 100;
+                                                        const expanded = expandedIndirectPackages.has(row.packagePath);
+                                                        const newCount = row.findings.filter(({ issue }) => !issue.knownIssue).length;
+                                                        return <section key={`indirect:${row.packagePath}`} aria-label={`Indirect invocation findings: ${row.packagePath}`}
+                                                            className="rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-white/5 p-3">
+                                                            <button type="button" aria-expanded={expanded} className="text-left text-sm font-semibold dark:text-slate-100 break-all"
+                                                                onClick={() => setExpandedIndirectPackages(previous => {
+                                                                    const next = new Set(previous);
+                                                                    if (next.has(row.packagePath)) next.delete(row.packagePath); else next.add(row.packagePath);
+                                                                    return next;
+                                                                })}>
+                                                                {row.findings.length} indirect invocation findings under {row.packagePath}
+                                                                <span className="ml-2 text-xs font-normal text-slate-600 dark:text-slate-300">{newCount} new</span>
+                                                            </button>
+                                                            <p className="mt-2 text-xs text-slate-600 dark:text-slate-300">Targets remain unresolved. This grouping changes no finding or decision; inspect each call and its context as needed.</p>
+                                                            {expanded && <>
+                                                                <div className="mt-3 space-y-2">{row.findings.slice(0, shown).map(renderFinding)}</div>
+                                                                {row.findings.length > shown && <button type="button" className="mt-3 text-sm font-semibold text-indigo-600 dark:text-indigo-300"
+                                                                    onClick={() => setIndirectPackageLimits(value => ({ ...value, [row.packagePath]: shown + 100 }))}>
+                                                                    Show more indirect calls in {row.packagePath} ({row.findings.length - shown} remaining)
+                                                                </button>}
+                                                            </>}
+                                                        </section>;
+                                                    }
                                                     const shown = archiveLimits[row.archive] || 100;
                                                     const high = row.findings.filter(({ issue }) => issue.severity === 'HIGH' || issue.severity === 'CRITICAL').length;
                                                     const always = row.findings.filter(({ issue }) => issue.reviewCadence?.toUpperCase() === 'ALWAYS').length;
