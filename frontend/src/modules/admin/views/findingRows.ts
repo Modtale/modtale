@@ -3,9 +3,11 @@ import type { ScanIssue } from '@/types';
 export type IndexedFinding = { issue: ScanIssue; originalIndex: number };
 export type FindingRow = { kind: 'finding'; finding: IndexedFinding }
     | { kind: 'archive'; archive: string; findings: IndexedFinding[] }
-    | { kind: 'repeated-prior'; findings: IndexedFinding[] };
+    | { kind: 'repeated-prior'; findings: IndexedFinding[] }
+    | { kind: 'vetted-high'; findings: IndexedFinding[] };
 
-export function findingRows(findings: IndexedFinding[], minimumGroupSize = 10, repeatedPriorEligible?: (issue: ScanIssue) => boolean): FindingRow[] {
+export function findingRows(findings: IndexedFinding[], minimumGroupSize = 10, repeatedPriorEligible?: (issue: ScanIssue) => boolean,
+    approvedBaselineVersion?: string): FindingRow[] {
     const byArchive = new Map<string, IndexedFinding[]>();
     for (const finding of findings) {
         const marker = finding.issue.filePath.indexOf('!/');
@@ -22,10 +24,22 @@ export function findingRows(findings: IndexedFinding[], minimumGroupSize = 10, r
         && !(issue.filePath.includes('!/')
             && (byArchive.get(issue.filePath.slice(0, issue.filePath.indexOf('!/')))?.length || 0) >= minimumGroupSize)) : [];
     const groupedPrior = repeatedPrior.length >= minimumGroupSize ? new Set(repeatedPrior.map(finding => finding.originalIndex)) : new Set<number>();
+    const vettedHigh = repeatedPriorEligible && approvedBaselineVersion ? findings.filter(({ issue }) => repeatedPriorEligible(issue)
+        && issue.knownIssue && issue.historicalFileEvidenceIdentical === true && issue.resolved === true
+        && issue.severity === 'HIGH' && !issue.escalated && issue.reviewCadence?.toUpperCase() === 'WHEN_CHANGED'
+        && issue.baselineVersion === approvedBaselineVersion
+        && !(issue.filePath.includes('!/')
+            && (byArchive.get(issue.filePath.slice(0, issue.filePath.indexOf('!/')))?.length || 0) >= minimumGroupSize)) : [];
+    const groupedHigh = vettedHigh.length >= minimumGroupSize ? new Set(vettedHigh.map(finding => finding.originalIndex)) : new Set<number>();
     const emitted = new Set<string>();
-    let priorEmitted = false;
+    let priorEmitted = false, highEmitted = false;
     const rows: FindingRow[] = [];
     for (const finding of findings) {
+        if (groupedHigh.has(finding.originalIndex)) {
+            if (!highEmitted) rows.push({ kind: 'vetted-high', findings: vettedHigh });
+            highEmitted = true;
+            continue;
+        }
         if (groupedPrior.has(finding.originalIndex)) {
             if (!priorEmitted) rows.push({ kind: 'repeated-prior', findings: repeatedPrior });
             priorEmitted = true;

@@ -157,11 +157,14 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
     const [expandedArchives, setExpandedArchives] = useState<Set<string>>(() => new Set());
     const [expandedRepeatedPrior, setExpandedRepeatedPrior] = useState(false);
     const [repeatedPriorLimit, setRepeatedPriorLimit] = useState(100);
+    const [expandedVettedHigh, setExpandedVettedHigh] = useState(false);
+    const [vettedHighLimit, setVettedHighLimit] = useState(100);
     useEffect(() => {
         setFindingSearch(''); setFindingFocus('attention'); setFindingType(null); setFindingPage(0); setArchiveLimits({}); setExpandedArchives(new Set());
-        setExpandedRepeatedPrior(false); setRepeatedPriorLimit(100);
+        setExpandedRepeatedPrior(false); setRepeatedPriorLimit(100); setExpandedVettedHigh(false); setVettedHighLimit(100);
     }, [mod.id, mod.reviewToken, pendingVersion?.id, pendingVersion?.reviewToken]);
-    useEffect(() => { setExpandedArchives(new Set()); setExpandedRepeatedPrior(false); setRepeatedPriorLimit(100); }, [findingSearch, findingFocus, findingType]);
+    useEffect(() => { setExpandedArchives(new Set()); setExpandedRepeatedPrior(false); setRepeatedPriorLimit(100);
+        setExpandedVettedHigh(false); setVettedHighLimit(100); }, [findingSearch, findingFocus, findingType]);
 
     const orderedIssues = useMemo(() => {
         const severityRank = (value?: string) => {
@@ -214,7 +217,8 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
     const rows = useMemo(() => findingRows(matchingIssues, 10,
         findingFocus === 'attention' && findingType === null && !findingSearch.trim()
             && activeComparison?.baselineVersion && !canDeprioritizePriorFindings
-            ? issue => !changedFindingPaths.has(issue.filePath) : undefined),
+            ? issue => !changedFindingPaths.has(issue.filePath) : undefined,
+        activeComparison?.contextComparable ? activeComparison.baselineVersion || undefined : undefined),
     [matchingIssues, findingFocus, findingType, findingSearch, activeComparison, canDeprioritizePriorFindings, changedFindingPaths]);
     const foldedFindings = matchingIssues.length - rows.length;
     const findingPages = Math.max(1, Math.ceil(rows.length / 100));
@@ -945,6 +949,21 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
                                                             {row.findings.length > repeatedPriorLimit && <button type="button" className="mt-3 text-sm font-semibold text-indigo-600 dark:text-indigo-300"
                                                                 onClick={() => setRepeatedPriorLimit(value => value + 100)}>
                                                                 Show more previously seen findings ({row.findings.length - repeatedPriorLimit} remaining)
+                                                            </button>}
+                                                        </>}
+                                                    </section>;
+                                                    if (row.kind === 'vetted-high') return <section key="vetted-high" aria-label="Vetted high findings requiring review"
+                                                        className="rounded-xl border border-orange-400 dark:border-orange-700 bg-orange-50 dark:bg-orange-950/20 p-3">
+                                                        <button type="button" aria-expanded={expandedVettedHigh} className="text-left text-sm font-semibold text-orange-900 dark:text-orange-200"
+                                                            onClick={() => setExpandedVettedHigh(value => !value)}>
+                                                            {row.findings.length} previously resolved HIGH findings require review
+                                                        </button>
+                                                        <p className="mt-2 text-xs text-orange-800 dark:text-orange-200">Their file evidence matches the approved version, but changes elsewhere may affect callers or dependencies. This group stays in review focus and grants no acceptance.</p>
+                                                        {expandedVettedHigh && <>
+                                                            <div className="mt-3 space-y-2">{row.findings.slice(0, vettedHighLimit).map(renderFinding)}</div>
+                                                            {row.findings.length > vettedHighLimit && <button type="button" className="mt-3 text-sm font-semibold text-indigo-600 dark:text-indigo-300"
+                                                                onClick={() => setVettedHighLimit(value => value + 100)}>
+                                                                Show more HIGH findings ({row.findings.length - vettedHighLimit} remaining)
                                                             </button>}
                                                         </>}
                                                     </section>;

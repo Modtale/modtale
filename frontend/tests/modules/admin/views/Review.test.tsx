@@ -301,6 +301,43 @@ describe('Review security clearance status', () => {
         expect(container.textContent).toContain('Earlier occurrence 119');
         expect(container.textContent).not.toContain('Artifact Review Completed');
     });
+    it('groups only resolved HIGH repeats from the verified approved baseline on changed updates', async () => {
+        vi.mocked(adminClient.getArtifactChanges).mockResolvedValue({ reviewToken: 'snapshot', baselineVersion: '0.9',
+            contextComparable: true, contextChanged: true, contextChanges: ['DEPENDENCIES'], added: 0, modified: 1, removed: 0, unchanged: 16,
+            files: [{ path: 'Changed.class', change: 'MODIFIED' }] });
+        const prior = { type: 'VulnerableDependency', severity: 'HIGH', filePath: 'Library.class', lineStart: 1,
+            knownIssue: true, historicalFileEvidenceIdentical: true, resolved: true, reviewCadence: 'WHEN_CHANGED', baselineVersion: '0.9' };
+        const vetted = Array.from({ length: 12 }, (_, index) => ({ ...prior, filePath: `Library${index}.class`, description: `Vetted high ${index}` }));
+        const exceptions = [
+            { ...prior, description: 'Changed high', filePath: 'Changed.class' },
+            { ...prior, description: 'Unresolved high', resolved: false },
+            { ...prior, description: 'Other baseline high', baselineVersion: '0.8' },
+            { ...prior, description: 'Escalated high', escalated: true },
+            { ...prior, description: 'Critical prior', severity: 'CRITICAL' },
+            { ...prior, description: 'Always review high', reviewCadence: 'ALWAYS' }
+        ];
+        await render({ ...clear, status: 'SUSPICIOUS', verdict: 'REVIEW', issues: [...vetted, ...exceptions] }, true, 'snapshot', 2,
+            [{ id: 'baseline', versionNumber: '0.9', reviewStatus: 'APPROVED' }]);
+        await showFindings();
+        const group = container.querySelector<HTMLElement>('section[aria-label="Vetted high findings requiring review"]');
+        expect(group?.textContent).toContain('12 previously resolved HIGH findings require review');
+        expect(container.textContent).toContain('7 review rows covering 18 matching findings');
+        for (const issue of exceptions) expect(container.textContent).toContain(issue.description);
+        expect(container.textContent).not.toContain('Vetted high 11');
+        await act(async () => group!.querySelector('button')!.click());
+        expect(group?.textContent).toContain('Vetted high 11');
+        await searchFindings('Vetted high 11');
+        expect(container.querySelector('section[aria-label="Vetted high findings requiring review"]')).toBeNull();
+        expect(container.textContent).toContain('Vetted high 11');
+        expect(container.textContent).not.toContain('Artifact Review Completed');
+        vi.mocked(adminClient.getArtifactChanges).mockResolvedValueOnce({ reviewToken: 'snapshot', baselineVersion: '0.9',
+            contextComparable: false, contextChanged: true, contextChanges: [], added: 0, modified: 1, removed: 0, unchanged: 16,
+            files: [{ path: 'Changed.class', change: 'MODIFIED' }] });
+        await searchFindings('');
+        await click('Refresh comparison');
+        expect(container.querySelector('section[aria-label="Vetted high findings requiring review"]')).toBeNull();
+        expect(container.textContent).toContain('Vetted high 11');
+    });
     it('keeps the latest selected comparison file when structure responses arrive out of order', async () => {
         vi.mocked(adminClient.getArtifactChanges).mockResolvedValue({ reviewToken: 'snapshot', baselineVersion: '0.9',
             contextComparable: true, contextChanged: false, contextChanges: [], added: 1, modified: 0, removed: 1, unchanged: 0,
