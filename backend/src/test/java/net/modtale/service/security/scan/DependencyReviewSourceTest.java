@@ -78,6 +78,7 @@ class DependencyReviewSourceTest {
     @Test void applicationStoredVersionsPreserveContextAndRecordedScanIdentity() {
         var version=new net.modtale.model.project.ProjectVersion();version.setId("v");version.setVersionNumber("1");
         version.setFileUrl("files/v");version.setGameVersions(List.of("1"));version.setManifestId("example");version.setManifestVersion("1");
+        version.setIncompatibleProjectIds(List.of("conflicting-mod"));
         var result=ScanEvidenceFixtures.complete(false);version.setHash(result.getSecurityEvidence().artifactSha256());version.setScanResult(result);
         var project=new net.modtale.model.project.Project();project.setId("project");project.setVersions(List.of(version));mongo.save(project);
         var lookup=new DependencyReviewSource(mongo).readRoot("project","v");assertEquals(State.FOUND,lookup.state());

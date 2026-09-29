@@ -228,6 +228,15 @@ class ArtifactInspectionControllerTest {
         var upgraded=ProjectDependency.modtale("second","Second","2",ProjectDependency.DependencyType.OPTIONAL);
         after.setDependencies(List.of(upgraded,first));
         assertEquals(List.of("DEPENDENCIES"),net.modtale.service.security.scan.ArtifactReviewContext.changedFields(before,after));
+        after.setDependencies(List.of(second,first));
+        before.setIncompatibleProjectIds(List.of("one","two"));after.setIncompatibleProjectIds(List.of("two","one"));
+        assertEquals(net.modtale.service.security.scan.ArtifactReviewContext.fingerprint(before),
+                net.modtale.service.security.scan.ArtifactReviewContext.fingerprint(after));
+        after.setIncompatibleProjectIds(List.of("two","other"));
+        assertEquals(List.of("INCOMPATIBLE_PROJECTS"),
+                net.modtale.service.security.scan.ArtifactReviewContext.changedFields(before,after));
+        after.setIncompatibleProjectIds(java.util.Arrays.asList("two",null));
+        assertNull(net.modtale.service.security.scan.ArtifactReviewContext.fingerprint(after));
     }
     @Test void changedOrUnaccountedApprovedManifestFallsBackToLiveInspection() throws Exception {
         for(String scenario:List.of("policy","digest","revoked","expired")) {

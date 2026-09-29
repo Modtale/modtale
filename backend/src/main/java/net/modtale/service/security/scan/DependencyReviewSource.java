@@ -135,6 +135,12 @@ public final class DependencyReviewSource implements Source {
             var context=new ProjectDependency(target,null,pin,type);context.setSource(source);contextDependencies.add(context);
         }
         model.setDependencies(contextDependencies);
+        var incompatible=new ArrayList<String>();
+        if(v.get("incompatibleProjectIds")!=null)for(var item:list(v.get("incompatibleProjectIds"))) {
+            if(!(item instanceof String id)||id.isBlank()||id.length()>128)throw new IllegalArgumentException("Invalid incompatible project");
+            incompatible.add(id);
+        }
+        model.setIncompatibleProjectIds(incompatible);
         model.setFileUrl(optionalString(v,"fileUrl"));
         String override=optionalString(v,"overrideFileUrl");
         model.setOverrideFileUrl(override);

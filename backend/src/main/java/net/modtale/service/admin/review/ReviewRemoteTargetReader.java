@@ -44,7 +44,7 @@ public final class ReviewRemoteTargetReader {
                     || !binding.filePath().equals(original.get("fileUrl")) || !binding.artifactSha256().equals(original.get("hash")))throw unavailable();
             // Poll/result corruption must not prevent retaining an otherwise intact artifact identity.
             var context=new Document();
-            for(String field:List.of("_id","fileUrl","hash","gameVersions","dependencies","manifestId","manifestVersion","overrideFileUrl","modpackConfigs"))
+            for(String field:List.of("_id","fileUrl","hash","gameVersions","dependencies","incompatibleProjectIds","manifestId","manifestVersion","overrideFileUrl","modpackConfigs"))
                 if(original.containsKey(field))context.put(field,original.get(field));
             var version=mongo.getConverter().read(ProjectVersion.class,context);
             if(!binding.contextSha256().equals(ArtifactReviewContext.automaticallyReviewableFingerprint(version)))throw unavailable();

@@ -146,6 +146,11 @@ class ArtifactReviewLineageIntegrationTest {
         mongo.getCollection("projects").updateOne(new Document(),Updates.set("versions.0.reviewStatus","REJECTED"));
         assertFalse(apply());assertHeld();
     }
+    @Test void sourceIncompatibilityEditRevokesCopiedApprovalBeforePublication() {
+        mongo.getCollection("projects").updateOne(new Document(),
+                Updates.set("versions.0.incompatibleProjectIds",List.of("conflicting-mod")));
+        assertFalse(apply());assertHeld();
+    }
     @Test void rejectionBetweenOriginReadAndWriteCannotPublishOrModifySource() {
         doAnswer(invocation -> {
             Query query=invocation.getArgument(0);

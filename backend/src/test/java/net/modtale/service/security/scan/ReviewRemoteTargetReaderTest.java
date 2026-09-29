@@ -36,7 +36,7 @@ class ReviewRemoteTargetReaderTest {
         assertNotEquals(0,captured.snapshot().versionBytes()[0]);
     }
 
-    @ParameterizedTest @ValueSource(strings={"floatAttempt","overflowAttempt","stringAttempt","missingOrigin","missingJob","stringManual","changedHash","changedContext"})
+    @ParameterizedTest @ValueSource(strings={"floatAttempt","overflowAttempt","stringAttempt","missingOrigin","missingJob","stringManual","changedHash","changedContext","changedIncompatibility"})
     void malformedOrStaleTargetsCannotBecomeReplacementEvidence(String corruption) {
         fixture.fixture.attached(30000);
         switch(corruption) {
@@ -48,6 +48,7 @@ class ReviewRemoteTargetReaderTest {
             case "stringManual" -> fixture.fixture.change("scanResult.remoteReview.manualRescan","false");
             case "changedHash" -> fixture.fixture.change("hash","d".repeat(64));
             case "changedContext" -> fixture.fixture.change("gameVersions",java.util.List.of("changed"));
+            case "changedIncompatibility" -> fixture.fixture.change("incompatibleProjectIds",java.util.List.of("conflicting-mod"));
         }
         var before=fixture.raw();assertThrows(IllegalStateException.class,this::capture);
         assertEquals(before,fixture.raw());assertEquals(0,fixture.fixture.gets.get());assertEquals(0,fixture.fixture.posts.get());

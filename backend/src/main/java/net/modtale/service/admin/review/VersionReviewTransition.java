@@ -18,11 +18,11 @@ public final class VersionReviewTransition {
         }
     }
     private static final Set<String> ARTIFACT=Set.of("fileUrl","hash","manifestId","manifestVersion","overrideFileUrl","modpackConfigs");
-    private static final Set<String> CONTEXT=Set.of("gameVersions","dependencies");
+    private static final Set<String> CONTEXT=Set.of("gameVersions","dependencies","incompatibleProjectIds");
     private static final Set<String> REVIEW=Set.of("versionMutation","scanResult","retainedRemoteReview","reviewReplacement","reviewIsolation","replacementSecurityHold",
             "findingReviewHead","approvedFindingReviewHead","reviewStatus","rejectionReason","scheduledPublishDate","securityApprovalProjectId",
             "approvedReviewOrigins","approvedSecurityEvidence","approvedSecurityContextSha256","securityApprovedAt","approvedIssueBaselines");
-    private static final Set<String> METADATA=Set.of("versionNumber","changelog","channel","incompatibleProjectIds","downloadCount","releaseDate");
+    private static final Set<String> METADATA=Set.of("versionNumber","changelog","channel","downloadCount","releaseDate");
     private VersionReviewTransition() {}
 
     /** Uses IDs rather than array positions for matching, retaining both positions for the eventual signed proposal. */
@@ -74,7 +74,7 @@ public final class VersionReviewTransition {
                 && !Objects.equals(version.get("securityApprovedAt"),0);
     }
     private static boolean equal(String field,Object left,Object right) {
-        if("gameVersions".equals(field) && strings(left) && strings(right))
+        if(("gameVersions".equals(field) || "incompatibleProjectIds".equals(field)) && strings(left) && strings(right))
             return sorted(left).equals(sorted(right));
         if("dependencies".equals(field) && documents(left) && documents(right))
             return sortedDocuments(left).equals(sortedDocuments(right));

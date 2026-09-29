@@ -64,7 +64,7 @@ public class VersionUpdateCommandHandler {
                 () -> new VersionNotFoundException("We couldn't find that project version."));
 
         var mapper = new com.fasterxml.jackson.databind.ObjectMapper();
-        var originalContext = mapper.valueToTree(java.util.Arrays.asList(version.getGameVersions(), version.getDependencies()));
+        var originalContext = mapper.valueToTree(java.util.Arrays.asList(version.getGameVersions(), version.getDependencies(), version.getIncompatibleProjectIds()));
         String originalFingerprint = net.modtale.service.security.scan.ArtifactReviewContext.fingerprint(version);
         var previousScan = version.getScanResult();
         String oldCachedArchive = null;
@@ -110,7 +110,7 @@ public class VersionUpdateCommandHandler {
 
         String updatedFingerprint = net.modtale.service.security.scan.ArtifactReviewContext.fingerprint(version);
         boolean contextChanged = originalFingerprint != null && updatedFingerprint != null
-                ? !originalFingerprint.equals(updatedFingerprint) : !originalContext.equals(mapper.valueToTree(java.util.Arrays.asList(version.getGameVersions(), version.getDependencies())));
+                ? !originalFingerprint.equals(updatedFingerprint) : !originalContext.equals(mapper.valueToTree(java.util.Arrays.asList(version.getGameVersions(), version.getDependencies(), version.getIncompatibleProjectIds())));
         if (contextChanged && retainedMutations!=null) {
             var outcome=retainedMutations.editVersion(snapshot.raw(),reviewPersistence.versionEditProposal(snapshot,versionId,childIdsChanged));
             if(!"APPLIED".equals(outcome.state()))throw ProjectReviewSnapshot.conflict();

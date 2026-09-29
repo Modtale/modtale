@@ -15,7 +15,7 @@ public final class ArtifactReviewLineage {
     private static final ObjectMapper JSON = new ObjectMapper().enable(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS);
     private static final List<String> FIELDS = List.of("_id", "hash", "reviewStatus", "replacementSecurityHold", "findingReviewHead", "approvedFindingReviewHead",
             "securityApprovalProjectId", "approvedSecurityEvidence", "approvedSecurityContextSha256", "securityApprovedAt", "approvedReviewOrigins",
-            "gameVersions", "dependencies", "manifestId", "manifestVersion", "overrideFileUrl", "modpackConfigs");
+            "gameVersions", "dependencies", "incompatibleProjectIds", "manifestId", "manifestVersion", "overrideFileUrl", "modpackConfigs");
     private ArtifactReviewLineage() {}
 
     public static boolean wellFormed(Map<String, String> origins) {

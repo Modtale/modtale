@@ -18,6 +18,7 @@ export interface ArtifactChangeSummary {
 const contextLabels = new Map([
     ['GAME_VERSIONS', 'game versions'], ['DEPENDENCIES', 'dependencies'],
     ['MANIFEST_ID', 'manifest identity'], ['MANIFEST_VERSION', 'manifest version'],
+    ['INCOMPATIBLE_PROJECTS', 'incompatible projects'],
 ]);
 export function contextChangeMessage(summary: ArtifactChangeSummary): string | null {
     if (!summary.contextComparable) return 'The earlier approval context cannot be verified for this comparison. Inspect dependency and supplemental content.';

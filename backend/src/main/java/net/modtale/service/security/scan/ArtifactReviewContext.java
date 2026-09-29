@@ -24,7 +24,9 @@ public final class ArtifactReviewContext {
             List<String> games = new ArrayList<>(version.getGameVersions() == null ? List.of() : version.getGameVersions());
             if (games.stream().anyMatch(Objects::isNull)) return null;
             Collections.sort(games);
-            byte[] canonical = MAPPER.writeValueAsBytes(Arrays.asList("artifact-context-1", games, dependencies,
+            List<String> incompatible = canonicalIncompatible(version);
+            if (incompatible == null) return null;
+            byte[] canonical = MAPPER.writeValueAsBytes(Arrays.asList("artifact-context-2", games, dependencies, incompatible,
                     version.getManifestId(), version.getManifestVersion()));
             return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(canonical));
         } catch (Exception invalidContext) {
@@ -37,6 +39,7 @@ public final class ArtifactReviewContext {
         var changed = new ArrayList<String>();
         if (!canonicalGames(baseline).equals(canonicalGames(current))) changed.add("GAME_VERSIONS");
         if (!canonicalDependencies(baseline).equals(canonicalDependencies(current))) changed.add("DEPENDENCIES");
+        if (!Objects.equals(canonicalIncompatible(baseline), canonicalIncompatible(current))) changed.add("INCOMPATIBLE_PROJECTS");
         if (!Objects.equals(baseline.getManifestId(), current.getManifestId())) changed.add("MANIFEST_ID");
         if (!Objects.equals(baseline.getManifestVersion(), current.getManifestVersion())) changed.add("MANIFEST_VERSION");
         return List.copyOf(changed);
@@ -45,6 +48,13 @@ public final class ArtifactReviewContext {
         var games = new ArrayList<>(version.getGameVersions() == null ? List.<String>of() : version.getGameVersions());
         Collections.sort(games);
         return games;
+    }
+    private static List<String> canonicalIncompatible(ProjectVersion version) {
+        var incompatible = new ArrayList<>(version.getIncompatibleProjectIds() == null
+                ? List.<String>of() : version.getIncompatibleProjectIds());
+        if (incompatible.stream().anyMatch(id -> id == null || id.isBlank())) return null;
+        Collections.sort(incompatible);
+        return incompatible;
     }
     private static List<String> canonicalDependencies(ProjectVersion version) {
         var dependencies = new ArrayList<String>();
@@ -67,6 +77,7 @@ public final class ArtifactReviewContext {
                 .and("reviewReplacement").is(version.getReviewReplacement())
                 .and("findingReviewHead").is(version.getFindingReviewHead()).and("gameVersions").is(version.getGameVersions())
                 .and("dependencies").is(version.getDependencies())
+                .and("incompatibleProjectIds").is(version.getIncompatibleProjectIds())
                 .and("manifestId").is(version.getManifestId())
                 .and("manifestVersion").is(version.getManifestVersion())
                 .and("overrideFileUrl").is(version.getOverrideFileUrl())

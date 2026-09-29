@@ -34,9 +34,9 @@ describe('artifact changes', () => {
     });
     it('names the changed runtime context without implying approval reuse', async () => {
         vi.mocked(adminClient.getArtifactChanges).mockResolvedValue({ ...summary, contextChanged: true,
-            contextChanges: ['GAME_VERSIONS', 'MANIFEST_VERSION'] });
+            contextChanges: ['GAME_VERSIONS', 'INCOMPATIBLE_PROJECTS', 'MANIFEST_VERSION'] });
         await act(async () => root.render(<ArtifactChanges autoLoad reviewToken="snapshot" projectId="project" version="2.0" onInspect={vi.fn()} />));
-        expect(container.textContent).toContain('Review changed game versions, manifest version.');
+        expect(container.textContent).toContain('Review changed game versions, incompatible projects, manifest version.');
         expect(container.textContent).not.toContain('approved for reuse');
     });
     it('does not present unverified approval context as a precise metadata comparison', async () => {

@@ -52,7 +52,7 @@ class ArtifactReviewReuseServiceTest {
         assertEquals(project.getVersions().getFirst().getSecurityApprovedAt(), result.getReusedReviewApprovedAt());
     }
     @Test void preflightHintExcludesChangedOrAdverseApprovalScope() {
-        for (String scenario : List.of("bytes", "policy", "context", "history", "block", "expired", "missing")) {
+        for (String scenario : List.of("bytes", "policy", "context", "incompatibility", "history", "block", "expired", "missing")) {
             var result = ScanEvidenceFixtures.complete(false);
             var project = project(result);
             var prior = project.getVersions().getFirst();
@@ -62,6 +62,7 @@ class ArtifactReviewReuseServiceTest {
                 case "bytes" -> target.setHash("f".repeat(64));
                 case "policy" -> policy = "warden-3.0.0:" + "e".repeat(64);
                 case "context" -> target.setGameVersions(List.of("changed-runtime"));
+                case "incompatibility" -> target.setIncompatibleProjectIds(List.of("conflicting-mod"));
                 case "history" -> prior.setFindingReviewHead("later-adverse-history");
                 case "block" -> target.setReplacementSecurityHold("retained-block");
                 case "expired" -> prior.setSecurityApprovedAt(System.currentTimeMillis() - Duration.ofDays(31).toMillis());
@@ -118,13 +119,14 @@ class ArtifactReviewReuseServiceTest {
         }
     }
     @Test void changedContextOrSupplementalContentCannotReuse() {
-        for (String scenario : List.of("games", "dependency", "override", "missing-snapshot", "edited-prior")) {
+        for (String scenario : List.of("games", "dependency", "incompatibility", "override", "missing-snapshot", "edited-prior")) {
             ScanResult result = ScanEvidenceFixtures.complete(false);
             Project project = project(result);
             ProjectVersion current = project.getVersions().get(1);
             switch (scenario) {
                 case "games" -> current.setGameVersions(List.of("changed-runtime"));
                 case "dependency" -> current.setDependencies(List.of(new ProjectDependency("dependency", "Dependency", "1.0")));
+                case "incompatibility" -> current.setIncompatibleProjectIds(List.of("conflicting-mod"));
                 case "override" -> current.setOverrideFileUrl("storage/supplement.zip");
                 case "missing-snapshot" -> project.getVersions().getFirst().setApprovedSecurityContextSha256(null);
                 case "edited-prior" -> project.getVersions().getFirst().setGameVersions(List.of("edited-after-approval"));
