@@ -65,6 +65,10 @@ public class ScanCompletionService {
             ScanResult scanResult, String requestId) {
         complete(projectId,versionId,expectedAttempt,isManualRescan,scanResult,requestId,null);
     }
+    boolean handleCompletedReuseScan(String projectId, String versionId, int expectedAttempt, boolean manualRescan,
+            ScanResult scannerEvidence, String requestId) {
+        return complete(projectId, versionId, expectedAttempt, manualRescan, scannerEvidence, requestId, null);
+    }
     public boolean handleRemoteCompletedScan(RemoteReviewPollStore.Claim claim,ScanResult result) {
         var binding=claim.binding();
         if(binding.origin()==null)return false;
@@ -162,6 +166,11 @@ public class ScanCompletionService {
             scanResult.setReusedReviewOrigins(null);
             classification = securityIssueAnalysisService.annotateAgainstBaselines(scanResult, baselines);
         }
+        if (scanResult.getSecurityEvidence() != null
+                && "SCANNER_EVIDENCE_ONLY".equals(scanResult.getSecurityEvidence().reviewState())
+                && (scanResult.getReusedReviewVersion() == null
+                    || routingDecision.action() != ScanRoutingService.RoutingAction.SCHEDULE
+                        && routingDecision.action() != ScanRoutingService.RoutingAction.APPROVE_NOW)) return false;
         boolean approvedImmediately = routingDecision.action() == ScanRoutingService.RoutingAction.APPROVE_NOW;
         boolean notifyFlagged = routingDecision.action() == ScanRoutingService.RoutingAction.REQUIRE_REVIEW;
 

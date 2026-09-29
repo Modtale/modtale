@@ -11,8 +11,14 @@ public final class RemoteReviewBootstrap {
     private final RemoteReviewPersistence persistence;
     private final RemoteReviewClient client;
     private final RemoteReviewStep step;
+    private final ExactArtifactReusePreflight reuse;
     public RemoteReviewBootstrap(RemoteReviewPersistence persistence,RemoteReviewClient client,RemoteReviewStep step) {
-        this.persistence=persistence;this.client=client;this.step=step;
+        this(persistence,client,step,null);
+    }
+    @org.springframework.beans.factory.annotation.Autowired
+    public RemoteReviewBootstrap(RemoteReviewPersistence persistence,RemoteReviewClient client,RemoteReviewStep step,
+            ExactArtifactReusePreflight reuse) {
+        this.persistence=persistence;this.client=client;this.step=step;this.reuse=reuse;
     }
     public Prepared prepare(String projectId,String versionId,int attempt,String requestId) {return prepare(projectId,versionId,attempt,requestId,()->true);}
     private Prepared prepare(String projectId,String versionId,int attempt,String requestId,java.util.function.BooleanSupplier running) {
@@ -28,6 +34,9 @@ public final class RemoteReviewBootstrap {
         }
         if(!running.getAsBoolean())throw new RemoteReviewClient.Superseded();
         var configuration=client.configuration();
+        if(!running.getAsBoolean())throw new RemoteReviewClient.Superseded();
+        if(reuse!=null && reuse.tryComplete(projectId,current,configuration.policyVersion()))
+            return new Prepared("SCANNER_COMPLETED",null);
         if(!running.getAsBoolean())throw new RemoteReviewClient.Superseded();
         var binding=new RemoteReviewBinding(projectId,versionId,requestId,attempt,current.getFileUrl(),current.getHash(),context,
                 configuration.policyVersion(),configuration.reviewConfigSha256(),null,current.getScanResult().isManualRescan(),configuration.origin());

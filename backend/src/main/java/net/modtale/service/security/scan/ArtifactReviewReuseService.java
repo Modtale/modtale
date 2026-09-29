@@ -8,6 +8,29 @@ import java.util.*;
 @Service
 public class ArtifactReviewReuseService {
     private static final long MAX_AGE_MS = Duration.ofDays(30).toMillis();
+    public boolean hasPotentialExactSource(Project project, String currentVersionId, String policyVersion) {
+        if (project == null || project.getVersions() == null || policyVersion == null) return false;
+        ProjectVersion target = project.getVersions().stream().filter(Objects::nonNull)
+                .filter(version -> Objects.equals(currentVersionId, version.getId())).findFirst().orElse(null);
+        String context = ArtifactReviewContext.automaticallyReviewableFingerprint(target);
+        if (target == null || target.getReviewStatus() != ProjectVersion.ReviewStatus.PENDING
+                || context == null || target.getHash() == null || target.getReplacementSecurityHold() != null
+                || target.getFindingReviewHead() != null) return false;
+        long now = System.currentTimeMillis();
+        for (ProjectVersion source : project.getVersions()) {
+            if (source == null || Objects.equals(source.getId(), currentVersionId)
+                    || source.getReviewStatus() != ProjectVersion.ReviewStatus.APPROVED
+                    || source.getSecurityApprovedAt() <= 0 || source.getSecurityApprovedAt() > now
+                    || now - source.getSecurityApprovedAt() > MAX_AGE_MS) continue;
+            var evidence = source.getApprovedSecurityEvidence();
+            if (evidence == null || !evidence.complete() || !policyVersion.equals(evidence.policyVersion())
+                    || !target.getHash().equals(evidence.artifactSha256())
+                    || !context.equals(source.getApprovedSecurityContextSha256())
+                    || !context.equals(ArtifactReviewContext.fingerprint(source))) continue;
+            if (ArtifactReviewLineage.extend(project, source) != null) return true;
+        }
+        return false;
+    }
     public void annotate(Project project, String currentVersionId, ScanResult result) {
         result.setReusedReviewVersion(null);
         result.setReusedReviewApprovedAt(0);

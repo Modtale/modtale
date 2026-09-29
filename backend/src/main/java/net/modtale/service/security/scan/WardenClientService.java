@@ -61,6 +61,14 @@ public class WardenClientService {
 
     public ScanResult scanFile(byte[] fileBytes, String filename) {
         if (remoteJobsEnabled) throw new IllegalStateException("Synchronous scans are disabled in remote jobs mode");
+        return requestScan(fileBytes, filename, "/api/v1/scan");
+    }
+
+    public ScanResult scanEvidenceFile(byte[] fileBytes, String filename) {
+        return requestScan(fileBytes, filename, "/api/v1/scan-evidence");
+    }
+
+    private ScanResult requestScan(byte[] fileBytes, String filename, String path) {
         if (!wardenProperties.enabled()) {
             logger.error("Warden scanner is DISABLED. Falling back to manual-review degraded result for file: {}", filename);
             return buildDegradedResult(filename, new IllegalStateException("Warden scanner disabled"));
@@ -79,7 +87,7 @@ public class WardenClientService {
                 });
 
                 ScanResult response = webClient.post()
-                        .uri("/api/v1/scan")
+                        .uri(path)
                         .contentType(MediaType.MULTIPART_FORM_DATA)
                         .body(BodyInserters.fromMultipartData(builder.build()))
                         .retrieve()

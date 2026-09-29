@@ -19,6 +19,7 @@ class ArtifactReviewReuseServiceTest {
         prior.setSecurityApprovedAt(System.currentTimeMillis() - 1000);
         prior.setApprovedSecurityContextSha256(ArtifactReviewContext.fingerprint(prior));
         ProjectVersion current = new ProjectVersion(); current.setId("new"); current.setVersionNumber("1.1");
+        current.setReviewStatus(ProjectVersion.ReviewStatus.PENDING);
         current.setHash(result.getSecurityEvidence().artifactSha256());
         Project project = new Project(); project.setId("p"); project.setVersions(List.of(prior, current)); return project;
     }
@@ -45,9 +46,29 @@ class ArtifactReviewReuseServiceTest {
     @Test void unchangedFullyInspectedArtifactReusesReview() {
         ScanResult result = ScanEvidenceFixtures.complete(false);
         Project project = project(result);
+        assertTrue(service.hasPotentialExactSource(project, "new", result.getSecurityEvidence().policyVersion()));
         service.annotate(project, "new", result);
         assertEquals("1.0", result.getReusedReviewVersion());
         assertEquals(project.getVersions().getFirst().getSecurityApprovedAt(), result.getReusedReviewApprovedAt());
+    }
+    @Test void preflightHintExcludesChangedOrAdverseApprovalScope() {
+        for (String scenario : List.of("bytes", "policy", "context", "history", "block", "expired", "missing")) {
+            var result = ScanEvidenceFixtures.complete(false);
+            var project = project(result);
+            var prior = project.getVersions().getFirst();
+            var target = project.getVersions().get(1);
+            String policy = result.getSecurityEvidence().policyVersion();
+            switch (scenario) {
+                case "bytes" -> target.setHash("f".repeat(64));
+                case "policy" -> policy = "warden-3.0.0:" + "e".repeat(64);
+                case "context" -> target.setGameVersions(List.of("changed-runtime"));
+                case "history" -> prior.setFindingReviewHead("later-adverse-history");
+                case "block" -> target.setReplacementSecurityHold("retained-block");
+                case "expired" -> prior.setSecurityApprovedAt(System.currentTimeMillis() - Duration.ofDays(31).toMillis());
+                case "missing" -> prior.setApprovedSecurityEvidence(null);
+            }
+            assertFalse(service.hasPotentialExactSource(project, "new", policy), scenario);
+        }
     }
     @Test void equalLogicalEntriesCannotCarryApprovalAcrossDifferentArchiveBytes() {
         ScanResult result = ScanEvidenceFixtures.complete(false);
