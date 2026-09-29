@@ -115,6 +115,25 @@ class ModpackArchiveServiceTest {
     }
 
     @Test
+    void legacyExternalCacheCannotBeShippedAsUnreviewedBytes() throws Exception {
+        Project pack = pack();
+        ProjectVersion version = version("1.0.0", null);
+        ProjectDependency external = ProjectDependency.external(ProjectDependency.Source.GITHUB,
+                "example/repository", "External Tool", "2.0.0", "https://github.com/example/repository",
+                ProjectDependency.DependencyType.REQUIRED);
+        external.setCachedFileUrl("external-dependencies/legacy.jar");
+        version.setDependencies(List.of(external));
+        when(archiveSupport.download("external-dependencies/legacy.jar")).thenReturn(bytes("unreviewed-binary"));
+
+        Map<String, String> entries = unzip(service.generateModpackZip(pack, version));
+        JsonNode lock = new ObjectMapper().readTree(entries.get("modtale.lock.json"));
+
+        assertEquals("REFERENCE_ONLY", lock.at("/entries/0/distribution").asText());
+        assertFalse(entries.values().contains("unreviewed-binary"));
+        verify(archiveSupport, never()).download("external-dependencies/legacy.jar");
+    }
+
+    @Test
     void cacheBindingSurvivesCacheWriteButChangesWithPackageInputs() {
         Project pack = pack();
         ProjectVersion version = version("1.0.0", null);

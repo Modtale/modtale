@@ -15,6 +15,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -58,6 +59,30 @@ class BundlePackagingServiceTest {
         ), entries);
         verify(archiveSupport, never()).resolveDependency(mainVersion.getDependencies().get(1));
         verify(archiveSupport, never()).resolveDependency(mainVersion.getDependencies().get(2));
+    }
+
+    @Test
+    void unavailableSelectedDependencyCannotProduceAnIncompleteBundle() throws Exception {
+        ProjectVersion mainVersion = new ProjectVersion();
+        mainVersion.setFileUrl("files/main.jar");
+        mainVersion.setDependencies(List.of(new ProjectDependency("dep-1", "Dependency One", "1.0.0")));
+        when(archiveSupport.downloadApproved(mainVersion)).thenReturn(bytes("main"));
+        when(archiveSupport.extractOriginalFilename("files/main.jar")).thenReturn("main.jar");
+
+        assertThrows(IOException.class,
+                () -> service.generateBundleZip(new Project(), mainVersion, List.of("dep-1")));
+    }
+
+    @Test
+    void unknownSelectionCannotBeSilentlyIgnored() throws Exception {
+        ProjectVersion mainVersion = new ProjectVersion();
+        mainVersion.setFileUrl("files/main.jar");
+        mainVersion.setDependencies(List.of());
+        when(archiveSupport.downloadApproved(mainVersion)).thenReturn(bytes("main"));
+        when(archiveSupport.extractOriginalFilename("files/main.jar")).thenReturn("main.jar");
+
+        assertThrows(IOException.class,
+                () -> service.generateBundleZip(new Project(), mainVersion, List.of("unknown")));
     }
 
     private static byte[] bytes(String value) {

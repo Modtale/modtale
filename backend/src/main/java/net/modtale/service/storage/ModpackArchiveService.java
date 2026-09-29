@@ -125,6 +125,8 @@ final class ModpackArchiveService {
     private boolean cachedDependencyBindingsMatch(JsonNode lock, List<String> expected) {
         List<String> actual = new ArrayList<>();
         for (JsonNode entry : lock.path("entries")) {
+            if (!"MODTALE".equals(entry.path("source").asText())
+                    && "BUNDLED".equals(entry.path("distribution").asText())) return false;
             if ("MODTALE".equals(entry.path("source").asText())) {
                 String binding = entry.path("reviewBinding").asText();
                 if (!binding.matches("[a-f0-9]{64}")) return false;
@@ -192,7 +194,7 @@ final class ModpackArchiveService {
         List<PreparedDependency> prepared = new ArrayList<>();
         for (ProjectDependency dependency : version.getDependencies()) {
             prepared.add(dependency.isExternal()
-                    ? prepareExternalDependency(dependency, archiveKeys)
+                    ? prepareExternalDependency(dependency)
                     : prepareModtaleDependency(dependency, archiveKeys));
         }
         return prepared;
@@ -223,30 +225,8 @@ final class ModpackArchiveService {
         return PreparedDependency.bundled(dependency, path, bytes, VersionReviewSnapshot.token(resolved.version()));
     }
 
-    private PreparedDependency prepareExternalDependency(
-            ProjectDependency dependency,
-            Set<String> archiveKeys
-    ) {
-        if (dependency.getSource() == ProjectDependency.Source.CURSEFORGE) {
-            return PreparedDependency.reference(dependency);
-        }
-
-        String cachedFileUrl = trimToNull(dependency.getCachedFileUrl());
-        if (cachedFileUrl == null) {
-            return PreparedDependency.reference(dependency);
-        }
-        try {
-            byte[] bytes = archiveSupport.download(cachedFileUrl);
-            if (bytes == null || bytes.length == 0) {
-                return PreparedDependency.reference(dependency);
-            }
-            String path = uniqueArchiveEntryName(archiveKeys, externalFilename(dependency));
-            return PreparedDependency.bundled(dependency, path, bytes, null);
-        } catch (StorageDownloadException ex) {
-            logger.warn("Unable to include cached external dependency {} from {} in generated modpack archive.",
-                    dependency.getProjectTitle(), cachedFileUrl, ex);
-            return PreparedDependency.reference(dependency);
-        }
+    private PreparedDependency prepareExternalDependency(ProjectDependency dependency) {
+        return PreparedDependency.reference(dependency);
     }
 
     private Map<String, Object> legacyManifest(Project pack, ProjectVersion version) {
@@ -390,7 +370,7 @@ final class ModpackArchiveService {
 
     static String cacheBinding(Project pack, ProjectVersion version) {
         Map<String, Object> inputs = new LinkedHashMap<>();
-        inputs.put("schema", 2);
+        inputs.put("schema", 3);
         inputs.put("projectId", pack.getId());
         inputs.put("projectTitle", pack.getTitle());
         inputs.put("projectSlug", pack.getSlug());
@@ -437,24 +417,6 @@ final class ModpackArchiveService {
             counter++;
         }
         return candidate;
-    }
-
-    private String externalFilename(ProjectDependency dependency) {
-        String filename = trimToNull(dependency.getExternalFileName());
-        if (filename == null && trimToNull(dependency.getCachedFileUrl()) != null) {
-            filename = archiveSupport.extractOriginalFilename(dependency.getCachedFileUrl());
-        }
-        if (filename != null) {
-            return sanitizeArchiveFilename(filename);
-        }
-
-        String title = dependency.getProjectTitle() == null ? dependency.getProjectId() : dependency.getProjectTitle();
-        String version = dependency.getVersionNumber() == null ? "latest" : dependency.getVersionNumber();
-        String base = (title + "-" + version)
-                .replaceAll("[^A-Za-z0-9._-]+", "-")
-                .replaceAll("-+", "-")
-                .replaceAll("(^-|-$)", "");
-        return (base.isBlank() ? "external-dependency" : base) + ".jar";
     }
 
     private String sanitizeArchiveFilename(String filename) {
