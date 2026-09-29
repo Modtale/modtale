@@ -9,7 +9,12 @@ import java.util.Set;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 import net.modtale.exception.StorageDownloadException;
+import net.modtale.model.project.ProjectDependency;
+import net.modtale.model.project.ProjectClassification;
+import net.modtale.model.project.ProjectVersion;
 import net.modtale.model.worldlist.WorldModList;
+import net.modtale.service.project.query.ProjectService;
+import net.modtale.service.security.access.AccessControlService;
 import net.modtale.service.storage.StorageService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,10 +27,15 @@ public class WorldModListArchiveService {
 
     private static final Logger logger = LoggerFactory.getLogger(WorldModListArchiveService.class);
     private final StorageService storageService;
+    private final ProjectService projectService;
+    private final AccessControlService accessControlService;
     private final ObjectWriter manifestWriter;
 
-    public WorldModListArchiveService(StorageService storageService, ObjectMapper mapper) {
+    public WorldModListArchiveService(StorageService storageService, ObjectMapper mapper,
+            ProjectService projectService, AccessControlService accessControlService) {
         this.storageService = storageService;
+        this.projectService = projectService;
+        this.accessControlService = accessControlService;
         this.manifestWriter = mapper.writerWithDefaultPrettyPrinter();
     }
 
@@ -42,7 +52,8 @@ public class WorldModListArchiveService {
                 zip.closeEntry();
             }
             for (WorldModList.Item item : list.getMods()) {
-                if (!item.isDownloadable() || item.getFileUrl() == null || item.getFileUrl().isBlank()) {
+                if (!item.isDownloadable() || item.getFileUrl() == null || item.getFileUrl().isBlank()
+                        || !currentlyApproved(item)) {
                     continue;
                 }
                 try {
@@ -54,6 +65,33 @@ public class WorldModListArchiveService {
             }
         }
         return bytes.toByteArray();
+    }
+
+    private boolean currentlyApproved(WorldModList.Item item) {
+        if (item.getSource() != ProjectDependency.Source.MODTALE || item.getProjectId() == null
+                || item.getProjectId().isBlank() || item.getVersionNumber() == null) return false;
+        var project = projectService.getRawProjectById(item.getProjectId());
+        if (project == null || !accessControlService.isPubliclyReadable(project) || project.getVersions() == null) return false;
+        return project.getVersions().stream().filter(version -> version != null
+                && version.getReviewStatus() == ProjectVersion.ReviewStatus.APPROVED
+                && item.getVersionNumber().equals(version.getVersionNumber())
+                && item.getFileUrl().equals(version.getFileUrl())
+                && (project.getClassification() != ProjectClassification.MODPACK || bundledDependenciesAvailable(version)))
+                .limit(2).count() == 1;
+    }
+
+    private boolean bundledDependenciesAvailable(ProjectVersion version) {
+        if (version.getDependencies() == null) return true;
+        for (ProjectDependency dependency : version.getDependencies()) {
+            if (dependency.isExternal()) continue;
+            var project = projectService.getRawProjectById(dependency.getProjectId());
+            if (project == null || !accessControlService.isPubliclyReadable(project) || project.getVersions() == null) return false;
+            if (project.getVersions().stream().filter(candidate -> candidate != null
+                    && candidate.getReviewStatus() == ProjectVersion.ReviewStatus.APPROVED
+                    && dependency.getVersionNumber().equals(candidate.getVersionNumber())
+                    && candidate.getFileUrl() != null && !candidate.getFileUrl().isBlank()).limit(2).count() != 1) return false;
+        }
+        return true;
     }
 
     private void writeEntry(ZipOutputStream zip, Set<String> entries, String rawName, byte[] data) throws IOException {

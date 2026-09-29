@@ -21,6 +21,7 @@ import net.modtale.model.project.ProjectVersion;
 import net.modtale.model.user.User;
 import net.modtale.service.admin.review.ProjectReviewPersistence;
 import net.modtale.service.project.query.ProjectService;
+import net.modtale.service.security.access.AccessControlService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -46,6 +47,7 @@ class DownloadServiceTest {
     private ProjectReviewPersistence reviewPersistence;
     private ProjectService projectService;
     private StorageService storageService;
+    private AccessControlService accessControlService;
 
     @BeforeEach
     void setUp() {
@@ -53,7 +55,8 @@ class DownloadServiceTest {
         when(reviewPersistence.cacheModpackArchive(any(), any(), any(), any(), any())).thenReturn(true);
         projectService = mock(ProjectService.class);
         storageService = mock(StorageService.class);
-        downloadService = new DownloadService(reviewPersistence, projectService, storageService, limitProperties(10));
+        accessControlService = mock(AccessControlService.class);
+        downloadService = new DownloadService(reviewPersistence, projectService, storageService, accessControlService, limitProperties(10));
     }
 
     @Test
@@ -91,6 +94,8 @@ class DownloadServiceTest {
                 .thenThrow(new StorageDownloadException("missing", new IOException("missing")));
         when(projectService.getRawProjectById("plugin-1")).thenReturn(pluginProject);
         when(projectService.getRawProjectById("asset-1")).thenReturn(assetProject);
+        when(accessControlService.isPubliclyReadable(pluginProject)).thenReturn(true);
+        when(accessControlService.isPubliclyReadable(assetProject)).thenReturn(true);
         when(storageService.download("files/123456789012345678901234567890123456-plugin.jar"))
                 .thenReturn("plugin-binary".getBytes(StandardCharsets.UTF_8));
         when(storageService.download("files/123456789012345678901234567890123456-assets.zip"))
@@ -116,7 +121,7 @@ class DownloadServiceTest {
 
     @Test
     void generateModpackZipAppliesPerUserRateLimiting() throws Exception {
-        downloadService = new DownloadService(reviewPersistence, projectService, storageService, limitProperties(1));
+        downloadService = new DownloadService(reviewPersistence, projectService, storageService, accessControlService, limitProperties(1));
 
         Project pack = pack("pack-1", "tiny-pack", "Tiny Pack");
         ProjectVersion version = version("1.0.0");
@@ -148,6 +153,7 @@ class DownloadServiceTest {
         when(storageService.download("files/123456789012345678901234567890123456-main.jar"))
                 .thenReturn("main-binary".getBytes(StandardCharsets.UTF_8));
         when(projectService.getRawProjectById("dep-b")).thenReturn(dependencyB);
+        when(accessControlService.isPubliclyReadable(dependencyB)).thenReturn(true);
         when(storageService.download("files/123456789012345678901234567890123456-depb.jar"))
                 .thenReturn("depb-binary".getBytes(StandardCharsets.UTF_8));
 
@@ -185,6 +191,7 @@ class DownloadServiceTest {
         ProjectVersion version = new ProjectVersion();
         version.setVersionNumber(versionNumber);
         version.setFileUrl(fileUrl);
+        version.setReviewStatus(ProjectVersion.ReviewStatus.APPROVED);
         project.setVersions(List.of(version));
         return project;
     }

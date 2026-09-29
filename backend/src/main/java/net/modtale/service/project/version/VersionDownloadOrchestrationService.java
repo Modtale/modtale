@@ -285,6 +285,9 @@ public class VersionDownloadOrchestrationService {
     }
 
     private void ensureDownloadable(Project project, ProjectVersion version, boolean launcherClient) {
+        if (version == null || version.getReviewStatus() != ProjectVersion.ReviewStatus.APPROVED) {
+            throw new VersionNotFoundException("We couldn't find the requested version for that project.");
+        }
         if (!launcherClient && project.getClassification() == ProjectClassification.MODPACK
                 && version.getDependencies() != null
                 && version.getDependencies().stream()

@@ -355,6 +355,7 @@ class VersionControllerTest {
         ProjectVersion version = new ProjectVersion();
         version.setId(id);
         version.setVersionNumber(versionNumber);
+        version.setReviewStatus(ProjectVersion.ReviewStatus.APPROVED);
         return version;
     }
 

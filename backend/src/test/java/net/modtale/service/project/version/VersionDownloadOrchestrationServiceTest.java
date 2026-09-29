@@ -7,6 +7,7 @@ import net.modtale.exception.InvalidDownloadTokenException;
 import net.modtale.exception.InvalidVersionRequestException;
 import net.modtale.exception.ResourceNotFoundException;
 import net.modtale.exception.UnauthorizedException;
+import net.modtale.exception.VersionNotFoundException;
 import net.modtale.model.dto.response.project.BundleDownloadUrlResponse;
 import net.modtale.model.dto.response.project.DownloadUrlResponse;
 import net.modtale.model.project.Project;
@@ -338,6 +339,25 @@ class VersionDownloadOrchestrationServiceTest {
         assertThrows(UnauthorizedException.class, () -> service.downloadVersion("token", false, null, null, null, user));
     }
 
+    @Test
+    void withdrawnVersionCannotIssueOrRedeemAnExistingDownloadToken() throws Exception {
+        Project project = project("project-1", "Sky Tools", ProjectClassification.PLUGIN);
+        ProjectVersion version = version("version-1", "1.0.0", "files/mod.jar");
+        version.setReviewStatus(ProjectVersion.ReviewStatus.PENDING);
+        when(projectService.getProjectById("project-1", null)).thenReturn(project);
+        when(projectService.getRawProjectById("project-1")).thenReturn(project);
+        when(accessControlService.canReadProject(project, null)).thenReturn(true);
+        when(projectVersionAccessService.requireByVersionNumber(org.mockito.Mockito.eq(project), org.mockito.Mockito.eq("1.0.0"),
+                org.mockito.Mockito.isNull(), org.mockito.Mockito.any())).thenReturn(version);
+        when(downloadTokenService.validateAndConsume("old-token")).thenReturn(token("project-1", "1.0.0", null, null));
+
+        assertThrows(VersionNotFoundException.class, () -> service.createDownloadUrl("project-1", "1.0.0", null, null));
+        assertThrows(VersionNotFoundException.class, () -> service.downloadVersion("old-token", false, null, null, null, null));
+        assertThrows(VersionNotFoundException.class, () -> service.downloadBundle("old-token", false, null, null, null, null));
+        verify(storageService, never()).download("files/mod.jar");
+        verify(storageService, never()).directDownloadUri(org.mockito.Mockito.anyString(), org.mockito.Mockito.anyString());
+    }
+
     private static DownloadTokenService.DownloadToken token(
             String projectId,
             String version,
@@ -367,6 +387,7 @@ class VersionDownloadOrchestrationServiceTest {
         version.setId(id);
         version.setVersionNumber(versionNumber);
         version.setFileUrl(fileUrl);
+        version.setReviewStatus(ProjectVersion.ReviewStatus.APPROVED);
         return version;
     }
 }

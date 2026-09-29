@@ -6,6 +6,7 @@ import net.modtale.model.project.Project;
 import net.modtale.model.project.ProjectDependency;
 import net.modtale.model.project.ProjectVersion;
 import net.modtale.service.project.query.ProjectService;
+import net.modtale.service.security.access.AccessControlService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.multipart.MultipartFile;
@@ -20,19 +21,22 @@ class DownloadArchiveSupportTest {
 
     private ProjectService projectService;
     private StorageService storageService;
+    private AccessControlService accessControlService;
     private DownloadArchiveSupport service;
 
     @BeforeEach
     void setUp() {
         projectService = mock(ProjectService.class);
         storageService = mock(StorageService.class);
-        service = new DownloadArchiveSupport(projectService, storageService);
+        accessControlService = mock(AccessControlService.class);
+        service = new DownloadArchiveSupport(projectService, storageService, accessControlService);
     }
 
     @Test
     void resolveDependencyFindsMatchingProjectVersion() {
         Project project = project("project-1", version("1.0.0", "files/a.jar"));
         when(projectService.getRawProjectById("project-1")).thenReturn(project);
+        when(accessControlService.isPubliclyReadable(project)).thenReturn(true);
 
         DownloadArchiveSupport.ResolvedDependency resolved =
                 service.resolveDependency(new ProjectDependency("project-1", "Project", "1.0.0"));
@@ -41,6 +45,25 @@ class DownloadArchiveSupportTest {
         assertEquals("files/a.jar", resolved.version().getFileUrl());
         assertNull(service.resolveDependency(new ProjectDependency("missing", "Missing", "1.0.0")));
         assertNull(service.resolveDependency(new ProjectDependency("project-1", "Project", "2.0.0")));
+    }
+
+    @Test
+    void withdrawnDependencyCannotBePackagedFromARawProject() {
+        ProjectVersion withdrawn = version("1.0.0", "files/withdrawn.jar");
+        withdrawn.setReviewStatus(ProjectVersion.ReviewStatus.PENDING);
+        Project project = project("project-1", withdrawn);
+        when(projectService.getRawProjectById("project-1")).thenReturn(project);
+        when(accessControlService.isPubliclyReadable(project)).thenReturn(true);
+
+        assertNull(service.resolveDependency(new ProjectDependency("project-1", "Project", "1.0.0")));
+    }
+
+    @Test
+    void privateDependencyCannotBePackagedFromARawProject() {
+        Project project = project("project-1", version("1.0.0", "files/private.jar"));
+        when(projectService.getRawProjectById("project-1")).thenReturn(project);
+
+        assertNull(service.resolveDependency(new ProjectDependency("project-1", "Project", "1.0.0")));
     }
 
     @Test
@@ -72,6 +95,7 @@ class DownloadArchiveSupportTest {
         ProjectVersion version = new ProjectVersion();
         version.setVersionNumber(versionNumber);
         version.setFileUrl(fileUrl);
+        version.setReviewStatus(ProjectVersion.ReviewStatus.APPROVED);
         return version;
     }
 }

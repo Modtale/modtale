@@ -52,6 +52,7 @@ final class ModpackArchiveService {
     byte[] generateModpackZip(Project pack, ProjectVersion version) throws IOException {
         String projectToken = ProjectReviewSnapshot.token(pack);
         String versionToken = VersionReviewSnapshot.token(version);
+        ensureBundledDependenciesAvailable(version);
         byte[] cachedArchive = downloadCachedArchive(pack, version);
         if (cachedArchive != null) {
             return cachedArchive;
@@ -60,6 +61,22 @@ final class ModpackArchiveService {
         byte[] zipBytes = buildArchive(pack, version);
         cacheArchive(pack, version, zipBytes, projectToken, versionToken);
         return zipBytes;
+    }
+
+    private void ensureBundledDependenciesAvailable(ProjectVersion version) throws IOException {
+        if (version.getDependencies() == null) {
+            return;
+        }
+        for (ProjectDependency dependency : version.getDependencies()) {
+            if (dependency.isExternal()) {
+                continue;
+            }
+            DownloadArchiveSupport.ResolvedDependency resolved = archiveSupport.resolveDependency(dependency);
+            if (resolved == null || trimToNull(resolved.version().getFileUrl()) == null) {
+                throw new IOException("Cannot resolve bundled Modtale dependency "
+                        + dependencyLabel(dependency) + " at version " + dependency.getVersionNumber() + ".");
+            }
+        }
     }
 
     private byte[] downloadCachedArchive(Project pack, ProjectVersion version) {

@@ -93,6 +93,18 @@ class ModpackArchiveServiceTest {
     }
 
     @Test
+    void cachedModpackCannotServeAWithdrawnBundledDependency() throws Exception {
+        Project pack = pack();
+        ProjectVersion version = version("1.0.0", "modpacks/cached.zip");
+        ProjectDependency withdrawn = new ProjectDependency("plugin", "Plugin", "2.0.0");
+        version.setDependencies(List.of(withdrawn));
+        when(archiveSupport.download("modpacks/cached.zip")).thenReturn(validEmptyArchive());
+
+        assertThrows(IOException.class, () -> service.generateModpackZip(pack, version));
+        verify(archiveSupport, never()).download("modpacks/cached.zip");
+    }
+
+    @Test
     void generateModpackZipRebuildsLegacyArchivesThatPredateIntegrityLockfiles() throws Exception {
         Project pack = pack();
         ProjectVersion version = version("1.0.0", "modpacks/legacy.zip");
