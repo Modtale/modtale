@@ -67,6 +67,16 @@ public class VersionReviewPersistence {
                 .set("versions.$.securityApprovedAt",reviewed.getSecurityApprovedAt())
                 .set("versions.$.approvedIssueBaselines",reviewed.getApprovedIssueBaselines())
                 .set("updatedAt",LocalDateTime.now().toString());
+        if (reviewed.getReviewStatus() == ProjectVersion.ReviewStatus.REJECTED) {
+            var entity=mongo.getConverter().getMappingContext().getPersistentEntity(Project.class);
+            var mapped=new UpdateMapper(mongo.getConverter()).getMappedObject(update.getUpdateObject(),entity);
+            var set=mapped.get("$set", Document.class);
+            var sourceChanges=new Document();
+            set.forEach((path,value)->{
+                if(path.startsWith("versions.$."))sourceChanges.put(path.substring("versions.$.".length()),value);
+            });
+            return applyWithDependentWithdrawal(snapshot, sourceChanges, set.getString("updatedAt"));
+        }
         return applyUpdate(snapshot, update, originGuard.getQueryObject());
     }
     public boolean queueRescan(Snapshot snapshot, net.modtale.model.project.ScanResult queued) {
@@ -81,9 +91,12 @@ public class VersionReviewPersistence {
                 .set("updatedAt", LocalDateTime.now().toString()));
     }
     public boolean appendFindingReview(Snapshot snapshot, String decisionId) {
+        return applyWithDependentWithdrawal(snapshot, new Document("findingReviewHead", decisionId)
+                .append("reviewStatus", "PENDING").append("scheduledPublishDate", null), LocalDateTime.now().toString());
+    }
+    private boolean applyWithDependentWithdrawal(Snapshot snapshot, Document sourceChanges, String updatedAt) {
         if (!(snapshot.version().get("_id") instanceof String sourceId)) return false;
-        var source = new Document("$mergeObjects", List.of("$$version", new Document("findingReviewHead", new Document("$literal", decisionId))
-                .append("reviewStatus", "PENDING").append("scheduledPublishDate", null)));
+        var source = new Document("$mergeObjects", List.of("$$version", new Document("$literal", sourceChanges)));
         var dependent = new Document("$mergeObjects", List.of("$$version", new Document("reviewStatus",
                 new Document("$cond", List.of(new Document("$eq", List.of("$$version.reviewStatus", "REJECTED")), "REJECTED", "PENDING")))
                 .append("scheduledPublishDate", null).append("approvedSecurityEvidence", null)
@@ -112,7 +125,7 @@ public class VersionReviewPersistence {
                 source, new Document("$cond", List.of(carriesSource, dependentWithScan, "$$version"))));
         var update = List.<org.bson.conversions.Bson>of(new Document("$set", new Document("versions",
                 new Document("$map", new Document("input", "$versions").append("as", "version").append("in", replacement)))
-                .append("updatedAt", LocalDateTime.now().toString())));
+                .append("updatedAt", updatedAt)));
         return mongo.getCollection(mongo.getCollectionName(Project.class)).withWriteConcern(com.mongodb.WriteConcern.MAJORITY.withJournal(true)
                 .withWTimeout(10, java.util.concurrent.TimeUnit.SECONDS)).updateOne(versionFilter(snapshot), update,
                         new com.mongodb.client.model.UpdateOptions().collation(com.mongodb.client.model.Collation.builder().locale("simple").build())).getModifiedCount() > 0;

@@ -481,6 +481,18 @@ class VersionReviewPersistenceIntegrationTest {
         var raw=mongo.getCollection("projects").find().first();
         assertEquals("preserve",raw.getList("versions",Document.class).getFirst().getString("legacyMarker"));
     }
+    @Test void conditionalRejectionPreservesConcurrentSiblingAndProjectChanges() {
+        var snapshot=persistence.capture(id,version.getId(),VersionReviewSnapshot.token(version));
+        mongo.updateFirst(Query.query(Criteria.where("_id").is(id)),new Update().set("title","concurrent title")
+                .set("versions.1.rejectionReason","independent sibling edit"),Project.class);
+        version.setReviewStatus(ProjectVersion.ReviewStatus.REJECTED);
+        version.setRejectionReason("Current source approval is invalid");
+        assertTrue(persistence.apply(snapshot,version));
+        var restored=mongo.findById(id,Project.class);
+        assertEquals("concurrent title",restored.getTitle());
+        assertEquals("independent sibling edit",restored.getVersions().get(1).getRejectionReason());
+        assertEquals(ProjectVersion.ReviewStatus.REJECTED,restored.getVersions().getFirst().getReviewStatus());
+    }
     @Test void artifactReplacementDuringDecisionPreventsApproval() {
         var snapshot=persistence.capture(id,version.getId(),VersionReviewSnapshot.token(version));
         mongo.updateFirst(Query.query(Criteria.where("_id").is(id)),new Update().set("versions.0.hash","b".repeat(64)),Project.class);

@@ -347,6 +347,44 @@ class ArtifactReviewLineageIntegrationTest {
         assertFalse(stored.getScanResult().getIssues().getFirst().isResolved());
         assertFalse(ArtifactClearancePolicy.cleared(stored.getScanResult()));
     }
+    @Test void rejectingApprovedSourceWithdrawsPublishedDependent() {
+        approveSourceWithRecordedFinding();
+        assertTrue(apply());
+        var source = mongo.findById(id, Project.class).getVersions().getFirst();
+        var persistence = new VersionReviewPersistence(mongo);
+        var snapshot = persistence.capture(id, "source", VersionReviewSnapshot.token(source));
+        source.setReviewStatus(ProjectVersion.ReviewStatus.REJECTED);
+        source.setRejectionReason("Source approval is no longer valid");
+        source.setApprovedSecurityEvidence(null);
+        source.setApprovedSecurityContextSha256(null);
+        source.setSecurityApprovedAt(0);
+        source.setApprovedIssueBaselines(null);
+        assertTrue(persistence.apply(snapshot, source));
+        var versions = mongo.findById(id, Project.class).getVersions();
+        assertEquals(ProjectVersion.ReviewStatus.REJECTED, versions.getFirst().getReviewStatus());
+        assertEquals(ProjectVersion.ReviewStatus.PENDING, versions.get(1).getReviewStatus());
+        assertNull(versions.get(1).getApprovedSecurityEvidence());
+        assertNull(ArtifactReviewLineage.stamp(versions.get(1)));
+    }
+    @Test void rejectingApprovedSourceInvalidatesPendingReuse() {
+        approveSourceWithRecordedFinding();
+        mongo.updateFirst(Query.query(Criteria.where("_id").is(id)), new Update().set("versions.1.scanResult", result), Project.class);
+        var source = mongo.findById(id, Project.class).getVersions().getFirst();
+        var persistence = new VersionReviewPersistence(mongo);
+        var snapshot = persistence.capture(id, "source", VersionReviewSnapshot.token(source));
+        source.setReviewStatus(ProjectVersion.ReviewStatus.REJECTED);
+        source.setRejectionReason("Source approval is no longer valid");
+        source.setApprovedSecurityEvidence(null);
+        source.setApprovedSecurityContextSha256(null);
+        source.setSecurityApprovedAt(0);
+        source.setApprovedIssueBaselines(null);
+        assertTrue(persistence.apply(snapshot, source));
+        var pending = mongo.findById(id, Project.class).getVersions().get(1);
+        assertEquals("REVIEW", pending.getScanResult().getVerdict());
+        assertNull(pending.getScanResult().getReusedReviewVersion());
+        assertFalse(pending.getScanResult().getIssues().getFirst().isResolved());
+        assertFalse(ArtifactClearancePolicy.cleared(pending.getScanResult()));
+    }
     @Test void sourceHistoryChangeAtTheFinalWriteCannotPublishAnExactCopy() {
         approveSourceWithRecordedFinding();
         doAnswer(invocation -> {
