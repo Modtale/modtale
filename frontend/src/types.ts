@@ -251,7 +251,8 @@ export interface ProjectVersion {
     versionNumber: string;
     gameVersion: string;
     gameVersions?: string[];
-    fileUrl: string;
+    fileName?: string;
+    fileUrl?: string;
     downloadCount: number;
     releaseDate: string;
     changelog?: string;

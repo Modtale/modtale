@@ -3,6 +3,7 @@ package net.modtale.mapper;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import net.modtale.model.dto.admin.AdminProjectVersionSummaryDTO;
 import net.modtale.model.dto.admin.AdminVerificationQueueItemDTO;
 import net.modtale.model.dto.project.ProjectCommentDTO;
@@ -154,6 +155,26 @@ class ProjectMapperTest {
         assertEquals("Lock in complete", ProjectMapper.toVersionDTO(version).getChangelog());
         assertEquals("Core", ProjectMapper.toVersionDTO(version).getDependencies().getFirst().projectTitle());
         assertEquals(List.of("modtale:legacy"), ProjectMapper.toVersionDTO(version).getIncompatibleProjectIds());
+    }
+
+    @Test
+    void publicVersionMappingExposesOnlyTheDisplayNameNotStorageKeys() throws Exception {
+        ProjectVersion version = version("v3");
+        String key = "files/plugin/123e4567-e89b-42d3-a456-426614174000-sample.jar";
+        version.setFileUrl(key);
+        ProjectDependency dependency = new ProjectDependency("modtale:child", "Child", "1.0.0",
+                ProjectDependency.DependencyType.REQUIRED);
+        dependency.setCachedFileUrl("files/plugin/private-dependency.jar");
+        version.setDependencies(List.of(dependency));
+
+        var dto = ProjectMapper.toVersionDTO(version);
+        String json = new ObjectMapper().writeValueAsString(dto);
+        assertEquals("sample.jar", dto.getFileName());
+        assertTrue(json.contains("\"fileName\":\"sample.jar\""));
+        assertFalse(json.contains("fileUrl"));
+        assertFalse(json.contains("cachedFileUrl"));
+        assertFalse(json.contains(key));
+        assertFalse(json.contains("private-dependency.jar"));
     }
 
     @Test
