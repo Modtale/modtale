@@ -64,13 +64,16 @@ const WIZARD_STEPS: WizardStep[] = [
     }
 ];
 
-const isIdenticalPriorFinding = (issue: ScanIssue, canDeprioritize: boolean, changedPaths: Set<string>) => canDeprioritize
+const isIdenticalPriorFinding = (issue: ScanIssue, canDeprioritize: boolean, changedPaths: Set<string>, baselineVersion?: string | null) => canDeprioritize
     && issue.knownIssue
     && issue.historicalFileEvidenceIdentical === true
     && !changedPaths.has(issue.filePath)
     && !issue.escalated
     && (issue.reviewCadence || '').toUpperCase() !== 'ALWAYS'
-    && issue.severity !== 'HIGH' && issue.severity !== 'CRITICAL';
+    && issue.severity !== 'CRITICAL'
+    && (issue.severity !== 'HIGH' || issue.resolved === true
+        && issue.reviewCadence?.toUpperCase() === 'WHEN_CHANGED'
+        && Boolean(baselineVersion) && issue.baselineVersion === baselineVersion);
 
 export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApprove, onReject, setStatus, canDecide = false, canRescan = false }) => {
     const [currentStep, setCurrentStep] = useState(0);
@@ -191,17 +194,17 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
         const search = findingSearch.trim().toLowerCase();
         return orderedIssues.filter(({ issue }) => {
             if (findingType !== null && issue.type !== findingType) return false;
-            if (findingFocus === 'attention' && isIdenticalPriorFinding(issue, canDeprioritizePriorFindings, changedFindingPaths)) return false;
+            if (findingFocus === 'attention' && isIdenticalPriorFinding(issue, canDeprioritizePriorFindings, changedFindingPaths, activeComparison?.baselineVersion)) return false;
             if (findingFocus === 'new' && issue.knownIssue) return false;
             if (findingFocus === 'seen' && !issue.knownIssue) return false;
             if (findingFocus === 'always' && (issue.reviewCadence || '').toUpperCase() !== 'ALWAYS') return false;
             if (findingFocus === 'changed' && !changedFindingPaths.has(issue.filePath)) return false;
             return !search || [issue.type, issue.filePath, issue.description].some(value => value?.toLowerCase().includes(search));
         });
-    }, [orderedIssues, findingSearch, findingFocus, findingType, changedFindingPaths, canDeprioritizePriorFindings]);
+    }, [orderedIssues, findingSearch, findingFocus, findingType, changedFindingPaths, canDeprioritizePriorFindings, activeComparison]);
     const hiddenHighSeverity = orderedIssues.filter(({ issue }) => ['HIGH', 'CRITICAL'].includes(issue.severity)).length
         - matchingIssues.filter(({ issue }) => ['HIGH', 'CRITICAL'].includes(issue.severity)).length;
-    const identicalPriorCount = orderedIssues.filter(({ issue }) => isIdenticalPriorFinding(issue, canDeprioritizePriorFindings, changedFindingPaths)).length;
+    const identicalPriorCount = orderedIssues.filter(({ issue }) => isIdenticalPriorFinding(issue, canDeprioritizePriorFindings, changedFindingPaths, activeComparison?.baselineVersion)).length;
     const changedFindingCount = orderedIssues.filter(({ issue }) => changedFindingPaths.has(issue.filePath)).length;
     useEffect(() => {
         if (findingFocus === 'changed' && (!activeComparison?.baselineVersion || changedFindingCount === 0)) {

@@ -455,6 +455,34 @@ describe('Review security clearance status', () => {
         expect(container.textContent).toContain('Routine prior library');
         expect(container.textContent).toContain('Showing 1–4 of 4 matching findings (4 total)');
     });
+    it('deprioritizes only resolved high-severity repeats from the exact approved baseline', async () => {
+        vi.mocked(adminClient.getArtifactChanges).mockResolvedValue({ reviewToken: 'snapshot', baselineVersion: '0.9',
+            contextComparable: true, contextChanged: false, contextChanges: [], added: 0, modified: 0, removed: 0, unchanged: 1,
+            files: [{ path: 'Library.class', change: 'UNCHANGED' }] });
+        const prior = { ...twoFindings.issues[0], type: 'VulnerableDependency', severity: 'HIGH', filePath: 'Library.class',
+            knownIssue: true, historicalFileEvidenceIdentical: true, escalated: false, reviewCadence: 'WHEN_CHANGED', baselineVersion: '0.9' };
+        const issues = [
+            { ...prior, description: 'Vetted dependency', resolved: true },
+            { ...prior, description: 'Unresolved dependency', resolved: false },
+            { ...prior, description: 'Other baseline', resolved: true, baselineVersion: '0.8' },
+            { ...prior, description: 'Always review', resolved: true, reviewCadence: 'ALWAYS' },
+            { ...prior, description: 'Critical finding', resolved: true, severity: 'CRITICAL' }
+        ];
+        await render({ ...twoFindings, issues }, true, 'snapshot', 2, earlierSources); await showFindings();
+        expect(container.textContent).not.toContain('Vetted dependency');
+        for (const description of ['Unresolved dependency', 'Other baseline', 'Always review', 'Critical finding'])
+            expect(container.textContent).toContain(description);
+        expect(container.textContent).toContain('1 high or critical findings are outside these filters');
+        await click('Show all findings');
+        expect(container.textContent).toContain('Vetted dependency');
+        await focusFindings('attention');
+        vi.mocked(adminClient.getArtifactChanges).mockResolvedValueOnce({ reviewToken: 'snapshot', baselineVersion: '0.9',
+            contextComparable: true, contextChanged: true, contextChanges: ['DEPENDENCIES'], added: 0, modified: 0, removed: 0, unchanged: 1,
+            files: [{ path: 'Library.class', change: 'UNCHANGED' }] });
+        await click('Refresh comparison');
+        expect(container.textContent).toContain('Vetted dependency');
+        expect(container.textContent).not.toContain('Artifact Review Completed');
+    });
     it('distinguishes empty filters from no evidence and resets them for a new snapshot', async () => {
         await render(twoFindings, true, 'snapshot', 2, earlierSources); await showFindings();
         await searchFindings('not-present'); await focusFindings('seen');
