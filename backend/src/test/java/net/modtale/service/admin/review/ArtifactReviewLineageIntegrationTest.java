@@ -288,6 +288,65 @@ class ArtifactReviewLineageIntegrationTest {
                 .revoke(id, "source", VersionReviewSnapshot.token(source), "moderator", event.id(), "New evidence invalidates the source conclusion");
         assertFalse(apply()); assertHeld();
     }
+    @Test void revokingApprovedSourceFindingWithdrawsAnAlreadyPublishedDependent() {
+        var event = approveSourceWithRecordedFinding();
+        assertTrue(apply());
+        var approved = mongo.findById(id, Project.class).getVersions().get(1);
+        assertEquals(ProjectVersion.ReviewStatus.APPROVED, approved.getReviewStatus());
+        assertNotNull(approved.getApprovedSecurityEvidence());
+        String targetStamp = ArtifactReviewLineage.stamp(approved);
+        assertNotNull(targetStamp);
+        var raw = mongo.getCollection("projects").find().first();
+        var targetRecord = raw.getList("versions", Document.class).get(1);
+        var grandchild = new Document(targetRecord);
+        grandchild.put("_id", "grandchild");
+        var flattened = new Document(targetRecord.get("approvedReviewOrigins", Document.class));
+        flattened.put("target", targetStamp);
+        grandchild.put("approvedReviewOrigins", flattened);
+        var unrelated = new Document(targetRecord);
+        unrelated.put("_id", "unrelated");
+        unrelated.put("approvedReviewOrigins", new Document());
+        var rejected = new Document(targetRecord);
+        rejected.put("_id", "rejected");
+        rejected.put("reviewStatus", "REJECTED");
+        rejected.put("rejectionReason", "Previously rejected by a moderator");
+        mongo.getCollection("projects").updateOne(new Document("_id", raw.get("_id")), Updates.pushEach("versions", List.of(grandchild, unrelated, rejected)));
+        var before = mongo.findById(id, Project.class).getVersions();
+        assertNotNull(ArtifactReviewLineage.stamp(before.get(2)));
+        assertNotNull(ArtifactReviewLineage.stamp(before.get(3)));
+        var source = mongo.findById(id, Project.class).getVersions().getFirst();
+        new FindingReviewService(mongo, new VersionReviewPersistence(mongo), mock(ProjectService.class), mock(WardenClientService.class))
+                .revoke(id, "source", VersionReviewSnapshot.token(source), "moderator", event.id(), "New evidence invalidates the source conclusion");
+        var versions = mongo.findById(id, Project.class).getVersions();
+        assertEquals(ProjectVersion.ReviewStatus.PENDING, versions.getFirst().getReviewStatus());
+        assertEquals(ProjectVersion.ReviewStatus.PENDING, versions.get(1).getReviewStatus());
+        assertNull(versions.get(1).getApprovedSecurityEvidence());
+        assertNull(versions.get(1).getScheduledPublishDate());
+        assertEquals(ProjectVersion.ReviewStatus.PENDING, versions.get(2).getReviewStatus());
+        assertNull(versions.get(2).getApprovedSecurityEvidence());
+        assertNull(ArtifactReviewLineage.stamp(versions.get(1)));
+        assertNull(ArtifactReviewLineage.stamp(versions.get(2)));
+        assertEquals(ProjectVersion.ReviewStatus.APPROVED, versions.get(3).getReviewStatus());
+        assertNotNull(versions.get(3).getApprovedSecurityEvidence());
+        assertEquals(ProjectVersion.ReviewStatus.REJECTED, versions.get(4).getReviewStatus());
+        assertNull(versions.get(4).getApprovedSecurityEvidence());
+    }
+    @Test void sourceRevocationInvalidatesAPendingReusedScan() {
+        var event = approveSourceWithRecordedFinding();
+        assertEquals(Set.of("source"), result.getReusedReviewOrigins().keySet());
+        mongo.updateFirst(Query.query(Criteria.where("_id").is(id)), new Update().set("versions.1.scanResult", result), Project.class);
+        var source = mongo.findById(id, Project.class).getVersions().getFirst();
+        new FindingReviewService(mongo, new VersionReviewPersistence(mongo), mock(ProjectService.class), mock(WardenClientService.class))
+                .revoke(id, "source", VersionReviewSnapshot.token(source), "moderator", event.id(), "New evidence invalidates the source conclusion");
+        var stored = mongo.findById(id, Project.class).getVersions().get(1);
+        assertEquals(ProjectVersion.ReviewStatus.PENDING, stored.getReviewStatus());
+        assertEquals("REVIEW", stored.getScanResult().getVerdict());
+        assertEquals(ScanStatus.SUSPICIOUS, stored.getScanResult().getStatus());
+        assertNull(stored.getScanResult().getReusedReviewVersion());
+        assertNull(stored.getScanResult().getReusedReviewOrigins());
+        assertFalse(stored.getScanResult().getIssues().getFirst().isResolved());
+        assertFalse(ArtifactClearancePolicy.cleared(stored.getScanResult()));
+    }
     @Test void sourceHistoryChangeAtTheFinalWriteCannotPublishAnExactCopy() {
         approveSourceWithRecordedFinding();
         doAnswer(invocation -> {

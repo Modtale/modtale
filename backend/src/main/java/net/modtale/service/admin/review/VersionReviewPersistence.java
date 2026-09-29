@@ -81,24 +81,59 @@ public class VersionReviewPersistence {
                 .set("updatedAt", LocalDateTime.now().toString()));
     }
     public boolean appendFindingReview(Snapshot snapshot, String decisionId) {
-        return applyUpdate(snapshot, new Update().set("versions.$.findingReviewHead", decisionId)
-                .set("versions.$.reviewStatus", ProjectVersion.ReviewStatus.PENDING)
-                .set("versions.$.scheduledPublishDate", null)
-                .set("updatedAt", LocalDateTime.now().toString()));
+        if (!(snapshot.version().get("_id") instanceof String sourceId)) return false;
+        var source = new Document("$mergeObjects", List.of("$$version", new Document("findingReviewHead", new Document("$literal", decisionId))
+                .append("reviewStatus", "PENDING").append("scheduledPublishDate", null)));
+        var dependent = new Document("$mergeObjects", List.of("$$version", new Document("reviewStatus",
+                new Document("$cond", List.of(new Document("$eq", List.of("$$version.reviewStatus", "REJECTED")), "REJECTED", "PENDING")))
+                .append("scheduledPublishDate", null).append("approvedSecurityEvidence", null)
+                .append("approvedSecurityContextSha256", null).append("approvedFindingReviewHead", null)
+                .append("securityApprovedAt", 0L).append("approvedIssueBaselines", null)));
+        var approvedOrigin = new Document("$getField", new Document("field", new Document("$literal", sourceId))
+                .append("input", new Document("$ifNull", List.of("$$version.approvedReviewOrigins", new Document()))));
+        var scanOrigin = new Document("$getField", new Document("field", new Document("$literal", sourceId))
+                .append("input", new Document("$ifNull", List.of("$$version.scanResult.reusedReviewOrigins", new Document()))));
+        var carriesScanSource = new Document("$ne", List.of(new Document("$type", scanOrigin), "missing"));
+        var carriesSource = new Document("$or", List.of(new Document("$ne", List.of(new Document("$type", approvedOrigin), "missing")),
+                carriesScanSource));
+        var adverse = new Document("$or", List.of(new Document("$eq", List.of("$$version.scanResult.verdict", "BLOCK")),
+                new Document("$eq", List.of("$$version.scanResult.status", "INFECTED"))));
+        var issues = new Document("$map", new Document("input", new Document("$ifNull", List.of("$$version.scanResult.issues", List.of())))
+                .append("as", "issue").append("in", new Document("$mergeObjects", List.of("$$issue",
+                        new Document("resolved", false).append("historicalFileEvidenceIdentical", false)))));
+        var heldScan = new Document("$mergeObjects", List.of("$$version.scanResult", new Document("reusedReviewVersion", null)
+                .append("reusedReviewOrigins", null).append("reusedReviewApprovedAt", 0L).append("holdUntilTimestamp", 0L)
+                .append("verdict", new Document("$cond", List.of(adverse, "$$version.scanResult.verdict", "REVIEW")))
+                .append("status", new Document("$cond", List.of(adverse, "$$version.scanResult.status", "SUSPICIOUS")))
+                .append("issues", issues)));
+        var dependentWithScan = new Document("$cond", List.of(carriesScanSource,
+                new Document("$mergeObjects", List.of(dependent, new Document("scanResult", heldScan))), dependent));
+        var replacement = new Document("$cond", List.of(new Document("$eq", List.of("$$version._id", new Document("$literal", sourceId))),
+                source, new Document("$cond", List.of(carriesSource, dependentWithScan, "$$version"))));
+        var update = List.<org.bson.conversions.Bson>of(new Document("$set", new Document("versions",
+                new Document("$map", new Document("input", "$versions").append("as", "version").append("in", replacement)))
+                .append("updatedAt", LocalDateTime.now().toString())));
+        return mongo.getCollection(mongo.getCollectionName(Project.class)).withWriteConcern(com.mongodb.WriteConcern.MAJORITY.withJournal(true)
+                .withWTimeout(10, java.util.concurrent.TimeUnit.SECONDS)).updateOne(versionFilter(snapshot), update,
+                        new com.mongodb.client.model.UpdateOptions().collation(com.mongodb.client.model.Collation.builder().locale("simple").build())).getModifiedCount() > 0;
     }
     private boolean applyUpdate(Snapshot snapshot, Update update) { return applyUpdate(snapshot, update, new Document()); }
     private boolean applyUpdate(Snapshot snapshot, Update update, Document originGuard) {
         var entity=mongo.getConverter().getMappingContext().getPersistentEntity(Project.class);
         var mapped=new UpdateMapper(mongo.getConverter()).getMappedObject(update.getUpdateObject(),entity);
-        if(!(snapshot.version().get("_id") instanceof String versionId))return false;
-        var unique=new Document("$eq",List.of(new Document("$size",new Document("$filter",
-                new Document("input",new Document("$cond",List.of(new Document("$isArray","$versions"),"$versions",List.of())))
-                        .append("as","v").append("cond",new Document("$eq",List.of("$$v._id",new Document("$literal",versionId)))))),1));
-        var filter=Filters.and(Filters.eq("_id",snapshot.projectId()),new Document("versions",new Document("$eq",snapshot.version())),new Document("$expr",unique));
+        if(!(snapshot.version().get("_id") instanceof String))return false;
+        var filter=versionFilter(snapshot);
         if (!originGuard.isEmpty()) filter = Filters.and(filter, originGuard);
         return mongo.getCollection(mongo.getCollectionName(Project.class)).withWriteConcern(com.mongodb.WriteConcern.MAJORITY.withJournal(true)
                 .withWTimeout(10,java.util.concurrent.TimeUnit.SECONDS)).updateOne(filter,mapped,
                         new com.mongodb.client.model.UpdateOptions().collation(com.mongodb.client.model.Collation.builder().locale("simple").build())).getModifiedCount()>0;
+    }
+    private org.bson.conversions.Bson versionFilter(Snapshot snapshot) {
+        String versionId = (String) snapshot.version().get("_id");
+        var unique=new Document("$eq",List.of(new Document("$size",new Document("$filter",
+                new Document("input",new Document("$cond",List.of(new Document("$isArray","$versions"),"$versions",List.of())))
+                        .append("as","v").append("cond",new Document("$eq",List.of("$$v._id",new Document("$literal",versionId)))))),1));
+        return Filters.and(Filters.eq("_id",snapshot.projectId()),new Document("versions",new Document("$eq",snapshot.version())),new Document("$expr",unique));
     }
     public static ResponseStatusException conflict() {
         return new ResponseStatusException(HttpStatus.CONFLICT,"This version changed while the decision was being applied. Refresh its evidence before deciding.");
