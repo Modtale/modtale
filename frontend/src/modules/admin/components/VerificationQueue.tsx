@@ -1,6 +1,6 @@
 import { SkeletonSurface } from '@/components/ui/Skeleton';
 import React from 'react';
-import type { AdminVerificationQueueItem } from '@/types';
+import type { AdminVerificationQueueItem, AdminVerificationQueueScan } from '@/types';
 import { CheckCircle, Clock, Shield, AlertCircle, ShieldAlert } from 'lucide-react';
 
 interface VerificationQueueProps {
@@ -14,6 +14,16 @@ interface VerificationQueueProps {
     reviewingId?: string;
     onReview: (id: string, versionId?: string) => void;
 }
+
+const hasSecuritySignals = (scan?: AdminVerificationQueueScan) => Boolean(scan
+    && (scan.verdict === 'BLOCK' || scan.status === 'INFECTED' || scan.status === 'FLAGGED'
+        || scan.newIssueCount > 0 || scan.escalatedIssueCount > 0
+        || scan.status === 'SUSPICIOUS' && scan.serviceAttention !== true));
+
+const isServiceOnly = (mod: AdminVerificationQueueItem) => {
+    const scan = mod.pendingVersion?.scan;
+    return (scan?.status === 'FAILED' || scan?.serviceAttention === true) && !hasSecuritySignals(scan);
+};
 
 export const VerificationQueue: React.FC<VerificationQueueProps> = ({
                                                                         pendingProjects, loadingQueue, loadFailed, loadingReview, reviewingId, onReview, hasMore = false, unavailableItems = 0, loaded = true
@@ -51,7 +61,8 @@ export const VerificationQueue: React.FC<VerificationQueueProps> = ({
         const targetVersion = mod.pendingVersion;
         const scan = targetVersion?.scan;
         const needsService = scan?.status === 'FAILED' || scan?.serviceAttention === true;
-        const hasIssues = scan && scan.status !== 'CLEAN' && !needsService;
+        const securitySignals = hasSecuritySignals(scan);
+        const hasIssues = scan && (scan.status !== 'CLEAN' || securitySignals) && (!needsService || securitySignals);
         const newIssues = scan?.newIssueCount || 0;
         const knownIssues = scan?.knownIssueCount || 0;
         const escalatedIssues = scan?.escalatedIssueCount || 0;
@@ -102,7 +113,7 @@ export const VerificationQueue: React.FC<VerificationQueueProps> = ({
                                 onClick={() => onReview(mod.id, targetVersion?.id)}
                                 className="px-6 py-3 bg-slate-900 dark:bg-white text-white dark:text-black rounded-xl font-black text-sm flex items-center gap-2 hover:bg-slate-800 dark:hover:bg-slate-200 transition-all shadow-lg shadow-black/10 dark:shadow-white/5 hover:scale-105 active:scale-95"
                             >
-                                {loadingReview && reviewingId === mod.id ? 'Loading...' : needsService ? 'Open diagnostics' : <><Shield className="w-4 h-4" /> Verify {isProjectPending ? 'Project' : 'Update'}</>}
+                                {loadingReview && reviewingId === mod.id ? 'Loading...' : needsService && !securitySignals ? 'Open diagnostics' : <><Shield className="w-4 h-4" /> Verify {isProjectPending ? 'Project' : 'Update'}</>}
                             </button>
                         </div>
                         <div className="flex items-center gap-2">
@@ -138,14 +149,14 @@ export const VerificationQueue: React.FC<VerificationQueueProps> = ({
 
     return (
         <Surface><div className="grid gap-4">
-            {pendingProjects.some(mod => mod.pendingVersion?.scan?.status !== 'FAILED' && mod.pendingVersion?.scan?.serviceAttention !== true) && <section aria-label="Content and security review" className="grid gap-4">
+            {pendingProjects.some(mod => !isServiceOnly(mod)) && <section aria-label="Content and security review" className="grid gap-4">
                 <h2 className="text-lg font-bold dark:text-white">Content and security review</h2>
-                {pendingProjects.filter(mod => mod.pendingVersion?.scan?.status !== 'FAILED' && mod.pendingVersion?.scan?.serviceAttention !== true).map(renderQueueItem)}
+                {pendingProjects.filter(mod => !isServiceOnly(mod)).map(renderQueueItem)}
             </section>}
-            {pendingProjects.some(mod => mod.pendingVersion?.scan?.status === 'FAILED' || mod.pendingVersion?.scan?.serviceAttention === true) && <section aria-label="Review service attention" className="grid gap-4">
+            {pendingProjects.some(isServiceOnly) && <section aria-label="Review service attention" className="grid gap-4">
                 <div><h2 className="text-lg font-bold dark:text-white">Review service attention</h2>
                     <p className="text-sm text-slate-600 dark:text-slate-300">These security reviews did not complete. Inspect the failure before requesting another scan. Existing findings still require review.</p></div>
-                {pendingProjects.filter(mod => mod.pendingVersion?.scan?.status === 'FAILED' || mod.pendingVersion?.scan?.serviceAttention === true).map(renderQueueItem)}
+                {pendingProjects.filter(isServiceOnly).map(renderQueueItem)}
             </section>}
         </div></Surface>
     );

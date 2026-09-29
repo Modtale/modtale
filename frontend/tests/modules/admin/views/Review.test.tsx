@@ -148,6 +148,15 @@ describe('Review security clearance status', () => {
         expect(container.textContent).not.toContain('Score: 75');
         expect(container.textContent).not.toContain('Artifact Review Completed');
     });
+    it('keeps new findings visible as security review when the service also fails', async () => {
+        await render({ ...clear, status: 'FAILED', verdict: 'REVIEW', riskScore: 75,
+            newIssueCount: 2, knownIssueCount: 7, escalatedIssueCount: 0,
+            securityEvidence: { ...clear.securityEvidence, complete: false, clearanceGranted: false, reviewState: 'TIMEOUT' } });
+        expect(container.textContent).toContain('Review service attention');
+        expect(container.textContent).toContain('Manual Security Review Required');
+        expect(container.textContent).toContain('Score: 75');
+        expect(container.textContent).not.toContain('Artifact Review Completed');
+    });
     it.each([true, false, undefined])('distinguishes identical local evidence without claiming clearance: %s', async identical => {
         await render({ ...clear, status: 'SUSPICIOUS', verdict: 'REVIEW',
             issues: [{ type: 'Network', severity: 'LOW', description: 'connect', filePath: 'Mod.class',

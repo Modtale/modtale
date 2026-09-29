@@ -12,17 +12,18 @@ const item = (id: string, status: 'FAILED' | 'SUSPICIOUS', scanState?: string): 
         status, scanState, verdict: 'REVIEW', riskScore: 75, newIssueCount: 2, knownIssueCount: 1, escalatedIssueCount: 0,
     } },
 });
-it('separates service failures without hiding prior findings or inventing a malware risk label', async () => {
+it('keeps new findings from a failed review in security triage with the service failure visible', async () => {
     const onReview = vi.fn();
     await act(async () => root.render(<VerificationQueue pendingProjects={[item('Threat', 'SUSPICIOUS'), item('Expired', 'FAILED', 'REMOTE_EXPIRED')]}
         loadingQueue={false} loadingReview={false} onReview={onReview} />));
     const content = container.querySelector('[aria-label="Content and security review"]')!;
-    const operations = container.querySelector('[aria-label="Review service attention"]')!;
+    const operations = container.querySelector('[aria-label="Review service attention"]');
     expect(content.textContent).toContain('Threat'); expect(content.textContent).toContain('Risk 75');
-    expect(content.textContent).not.toContain('Expired'); expect(operations.textContent).toContain('Expired');
-    expect(operations.textContent).toContain('Review expired'); expect(operations.textContent).toContain('Security clearance withheld');
-    expect(operations.textContent).not.toContain('Risk 75'); expect(operations.textContent).toContain('New 2 · Known 1');
-    await act(async () => (operations.querySelector('button') as HTMLButtonElement).click());
+    expect(content.textContent).toContain('Expired'); expect(content.textContent).toContain('Review expired');
+    expect(content.textContent).toContain('Security clearance withheld');
+    expect(content.textContent).toContain('New 2 · Known 1');
+    expect(operations).toBeNull();
+    await act(async () => ([...content.querySelectorAll('button')].at(-1) as HTMLButtonElement).click());
     expect(onReview).toHaveBeenCalledWith('Expired', 'v');
 });
 it('routes completed provider failures without new findings to diagnostics', async () => {
@@ -42,9 +43,21 @@ it('routes completed provider failures without new findings to diagnostics', asy
     await act(async () => (operations.querySelector('button') as HTMLButtonElement).click());
     expect(onReview).toHaveBeenCalledWith('Provider', 'v');
 });
+it('keeps a provider failure with new findings in security triage', async () => {
+    const mixed = item('Mixed', 'SUSPICIOUS', 'COMPLETED');
+    mixed.pendingVersion!.scan!.serviceAttention = true;
+    mixed.pendingVersion!.scan!.reviewState = 'RATE_LIMITED';
+    await act(async () => root.render(<VerificationQueue pendingProjects={[mixed]} loadingQueue={false} loadingReview={false} onReview={vi.fn()} />));
+    const content = container.querySelector('[aria-label="Content and security review"]')!;
+    expect(content.textContent).toContain('Mixed');
+    expect(content.textContent).toContain('Review service rate limit reached');
+    expect(content.textContent).toContain('Risk 75');
+    expect(container.querySelector('[aria-label="Review service attention"]')).toBeNull();
+});
 it.each([['REMOTE_ORIGIN_UNVERIFIED', 'Original review service unverified'], ['REMOTE_CONTEXT_CONFLICT', 'Review service context conflict'], ['REMOTE_ISOLATED', 'Local review isolated'], ['REMOTE_BINDING_MISSING', 'Review state needs repair'], ['REMOTE_BINDING_MISMATCH', 'Review state needs repair'], ['REMOTE_UNSUPPORTED_CONTEXT', 'Review context unsupported'], ['REMOTE_HELD', 'Review held'], ['REMOTE_CANCELLED', 'Review cancelled'], ['UNKNOWN', 'Review unavailable']])(
     'keeps %s failures visible when no content reviews remain', async (state, label) => {
-        await act(async () => root.render(<VerificationQueue pendingProjects={[item('Failure', 'FAILED', state)]}
+        const failure = item('Failure', 'FAILED', state); failure.pendingVersion!.scan!.newIssueCount = 0;
+        await act(async () => root.render(<VerificationQueue pendingProjects={[failure]}
             loadingQueue={false} loadingReview={false} onReview={vi.fn()} />));
         expect(container.querySelector('[aria-label="Content and security review"]')).toBeNull();
         expect(container.textContent).toContain(label); expect(container.textContent).not.toContain('All Caught Up');

@@ -139,6 +139,10 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
         && scanResult.securityEvidence?.complete === true
         && serviceReviewStates.includes(scanResult.securityEvidence.reviewState)
         && scanResult.newIssueCount === 0 && scanResult.escalatedIssueCount === 0;
+    const securitySignals = scanResult?.verdict === 'BLOCK' || scanResult?.status === 'INFECTED'
+        || scanResult?.status === 'FLAGGED' || (scanResult?.newIssueCount || 0) > 0
+        || (scanResult?.escalatedIssueCount || 0) > 0;
+    const serviceOnly = serviceAttention && !securitySignals;
     const hasScanIssues = !!scanResult && scanResult.status !== 'SCANNING' && !securityCleared;
     const isScanning = scanResult?.status === 'SCANNING';
 
@@ -758,14 +762,14 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
                                                 <ShieldAlert className="w-6 h-6" />
                                                 <div>
                                                     <h4 className="font-bold text-lg">
-                                                        {scanResult?.verdict === 'BLOCK' ? 'High-Risk Findings Detected' : serviceAttention ? 'Review Service Diagnostics' : 'Manual Security Review Required'}
+                                                        {scanResult?.verdict === 'BLOCK' ? 'High-Risk Findings Detected' : serviceOnly ? 'Review Service Diagnostics' : 'Manual Security Review Required'}
                                                     </h4>
                                                     <p className="text-xs opacity-80 font-medium">
                                                         Status: {scanResult.status}
                                                         {scanResult.verdict ? ` • Verdict: ${scanResult.verdict}` : ''}
-                                                        {!serviceAttention && scanResult.riskLevel ? ` • Risk: ${scanResult.riskLevel}` : ''}
-                                                        {!serviceAttention ? ` • Score: ${scanResult.riskScore}` : ''}
-                                                        {!serviceAttention && scanResult.confidenceScore ? ` • Confidence: ${scanResult.confidenceScore}%` : ''}
+                                                        {!serviceOnly && scanResult.riskLevel ? ` • Risk: ${scanResult.riskLevel}` : ''}
+                                                        {!serviceOnly ? ` • Score: ${scanResult.riskScore}` : ''}
+                                                        {!serviceOnly && scanResult.confidenceScore ? ` • Confidence: ${scanResult.confidenceScore}%` : ''}
                                                     </p>
                                                     <p className="text-xs opacity-80 font-medium">
                                                         New: {scanResult.newIssueCount || 0} • Known: {scanResult.knownIssueCount || 0} • Escalated: {scanResult.escalatedIssueCount || 0}
