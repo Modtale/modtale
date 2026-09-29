@@ -8,6 +8,10 @@ public record AppR2Properties(
         String accessKey,
         String secretKey,
         String endpoint,
-        String publicDomain
+        String publicDomain,
+        String artifactBucket
 ) {
+    public AppR2Properties(String bucket, String accessKey, String secretKey, String endpoint, String publicDomain) {
+        this(bucket, accessKey, secretKey, endpoint, publicDomain, null);
+    }
 }

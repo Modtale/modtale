@@ -101,6 +101,7 @@ jobs:
             echo "FRONTEND_DOMAIN=https://modtale.net" >> $GITHUB_ENV
             echo "TAG=latest" >> $GITHUB_ENV
             echo "R2_BUCKET_NAME=modtale-binaries" >> $GITHUB_ENV
+            echo "R2_ARTIFACT_BUCKET_NAME=${{ vars.GCP_PRIVATE_R2_BUCKET_NAME }}" >> $GITHUB_ENV
             echo "R2_ACCESS_KEY_SECRET_NAME=R2_ACCESS_KEY" >> $GITHUB_ENV
             echo "R2_SECRET_KEY_SECRET_NAME=R2_SECRET_KEY" >> $GITHUB_ENV
             echo "R2_ENDPOINT_SECRET_NAME=R2_ENDPOINT" >> $GITHUB_ENV
@@ -126,6 +127,7 @@ jobs:
             echo "FRONTEND_DOMAIN=https://dev.modtale.net" >> $GITHUB_ENV
             echo "TAG=dev" >> $GITHUB_ENV
             echo "R2_BUCKET_NAME=modtale-binaries" >> $GITHUB_ENV
+            echo "R2_ARTIFACT_BUCKET_NAME=${{ vars.GCP_PRIVATE_R2_BUCKET_NAME }}" >> $GITHUB_ENV
             echo "R2_ACCESS_KEY_SECRET_NAME=R2_ACCESS_KEY" >> $GITHUB_ENV
             echo "R2_SECRET_KEY_SECRET_NAME=R2_SECRET_KEY" >> $GITHUB_ENV
             echo "R2_ENDPOINT_SECRET_NAME=R2_ENDPOINT" >> $GITHUB_ENV
@@ -181,6 +183,7 @@ jobs:
             echo "MONGODB_SECRET_NAME=BRANCH_PREVIEW_MONGODB_URI" >> $GITHUB_ENV
             echo "TAG=$SLUG" >> $GITHUB_ENV
             echo "R2_BUCKET_NAME=modtale-branch-$SLUG" >> $GITHUB_ENV
+            echo "R2_ARTIFACT_BUCKET_NAME=" >> $GITHUB_ENV
             echo "R2_ACCESS_KEY_SECRET_NAME=branch-preview-$SLUG-r2-access-key" >> $GITHUB_ENV
             echo "R2_SECRET_KEY_SECRET_NAME=branch-preview-$SLUG-r2-secret-key" >> $GITHUB_ENV
             echo "R2_ENDPOINT_SECRET_NAME=branch-preview-$SLUG-r2-endpoint" >> $GITHUB_ENV
@@ -478,8 +481,16 @@ jobs:
             "--update-env-vars" "FRONTEND_URL=${FRONTEND_DOMAIN:-placeholder}"
             "--update-env-vars" "BACKEND_URL=${BACKEND_DOMAIN:-placeholder}"
             "--update-env-vars" "R2_BUCKET_NAME=${{ env.R2_BUCKET_NAME }}"
+            "--update-env-vars" "R2_ARTIFACT_BUCKET_NAME=${{ env.R2_ARTIFACT_BUCKET_NAME }}"
             "--update-env-vars" "R2_PUBLIC_DOMAIN=${{ env.R2_PUBLIC_DOMAIN }}"
           )
+
+          if [ "${{ env.ENV_TYPE }}" != "preview" ] && [ -n "${{ env.R2_PUBLIC_DOMAIN }}" ]; then
+            if [ -z "${{ env.R2_ARTIFACT_BUCKET_NAME }}" ] || [ "${{ env.R2_ARTIFACT_BUCKET_NAME }}" = "${{ env.R2_BUCKET_NAME }}" ]; then
+              echo "::error::A separate private R2 artifact bucket is required before this backend can deploy."
+              exit 1
+            fi
+          fi
 
           R2_ACCESS_KEY_SECRET_VERSION="${R2_ACCESS_KEY_SECRET_VERSION:-latest}"
           R2_SECRET_KEY_SECRET_VERSION="${R2_SECRET_KEY_SECRET_VERSION:-latest}"

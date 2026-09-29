@@ -32,11 +32,13 @@ public class StorageService {
     @org.springframework.beans.factory.annotation.Value("${app.downloads.direct-storage:false}")
     private boolean directStorageDownloads;
     private final String bucketName;
+    private final String artifactBucketName;
     private final String publicDomain;
 
     private static final String DEFAULT_IMAGE = "default.png";
 
     private static final String CACHE_CONTROL_HEADER = "public, max-age=31536000, immutable";
+    private static final String PRIVATE_ARTIFACT_CACHE_CONTROL = "private, no-store";
     private static final long MAX_UPLOAD_BYTES = 100L * 1024 * 1024;
     private static final String MAX_UPLOAD_ERROR_MESSAGE = "File exceeds 100MB limit. Cloudflare only supports uploads up to 100MB.";
 
@@ -60,7 +62,22 @@ public class StorageService {
         this.s3Client = s3Client;
         this.presigner = presigner;
         this.bucketName = r2Properties.bucket();
+        this.artifactBucketName = r2Properties.artifactBucket();
         this.publicDomain = r2Properties.publicDomain();
+    }
+
+    private static boolean artifactKey(String key) {
+        return key != null && (key.startsWith("files/") || key.startsWith("modpack-overrides/")
+                || key.startsWith("modpacks/"));
+    }
+
+    private String bucketForKey(String key) {
+        if (!artifactKey(key)) return bucketName;
+        if (artifactBucketName != null && !artifactBucketName.isBlank()
+                && !artifactBucketName.equals(bucketName)) return artifactBucketName;
+        if (publicDomain != null && !publicDomain.isBlank())
+            throw new IllegalStateException("A distinct private R2 artifact bucket is required when a public CDN is configured");
+        return bucketName;
     }
 
     public String upload(MultipartFile file, String pathPrefix) {
@@ -77,22 +94,23 @@ public class StorageService {
 
         String sanitizedName = sanitizeFilename(originalName);
         String storageKey = pathPrefix + "/" + UUID.randomUUID() + "-" + sanitizedName;
+        String targetBucket = bucketForKey(storageKey);
 
         String contentDisposition = "attachment; filename=\"" + originalName.replace("\"", "") + "\"";
 
         try {
             PutObjectRequest putOb = PutObjectRequest.builder()
-                    .bucket(bucketName)
+                    .bucket(targetBucket)
                     .key(storageKey)
                     .contentType(safeContentType)
                     .contentDisposition(contentDisposition)
-                    .cacheControl(CACHE_CONTROL_HEADER)
+                    .cacheControl(artifactKey(storageKey) ? PRIVATE_ARTIFACT_CACHE_CONTROL : CACHE_CONTROL_HEADER)
                     .build();
 
             s3Client.putObject(putOb, RequestBody.fromInputStream(file.getInputStream(), file.getSize()));
-            logger.info("Successfully uploaded {} to bucket {}", storageKey, bucketName);
+            logger.info("Successfully uploaded {} to bucket {}", storageKey, targetBucket);
         } catch (S3Exception | IOException e) {
-            logger.error("Failed to upload to S3/R2. Bucket: {}, Key: {}. Error: {}", bucketName, storageKey, e.getMessage());
+            logger.error("Failed to upload to S3/R2. Bucket: {}, Key: {}. Error: {}", targetBucket, storageKey, e.getMessage());
             throw StorageUploadException.from(e, "Failed to upload the file to cloud storage.");
         }
 
@@ -114,10 +132,10 @@ public class StorageService {
             byte[] resizedBytes = outputStream.toByteArray();
 
             PutObjectRequest putOb = PutObjectRequest.builder()
-                    .bucket(bucketName)
+                    .bucket(bucketForKey(fileName))
                     .key(fileName)
                     .contentType("image/jpeg")
-                    .cacheControl(CACHE_CONTROL_HEADER)
+                    .cacheControl(artifactKey(fileName) ? PRIVATE_ARTIFACT_CACHE_CONTROL : CACHE_CONTROL_HEADER)
                     .build();
 
             s3Client.putObject(putOb, RequestBody.fromBytes(resizedBytes));
@@ -130,10 +148,10 @@ public class StorageService {
 
     public void uploadDirect(String path, byte[] data, String contentType) {
         PutObjectRequest putOb = PutObjectRequest.builder()
-                .bucket(bucketName)
+                .bucket(bucketForKey(path))
                 .key(path)
                 .contentType(contentType)
-                .cacheControl(CACHE_CONTROL_HEADER)
+                .cacheControl(artifactKey(path) ? PRIVATE_ARTIFACT_CACHE_CONTROL : CACHE_CONTROL_HEADER)
                 .build();
 
         s3Client.putObject(putOb, RequestBody.fromBytes(data));
@@ -165,7 +183,7 @@ public class StorageService {
 
         try {
             DeleteObjectRequest deleteReq = DeleteObjectRequest.builder()
-                    .bucket(bucketName)
+                    .bucket(bucketForKey(fileName))
                     .key(fileName)
                     .build();
             s3Client.deleteObject(deleteReq);
@@ -177,12 +195,14 @@ public class StorageService {
 
     public java.net.URI directDownloadUri(String key, String filename) {
         if (!directStorageDownloads) return null;
+        if (artifactKey(key)) throw new IllegalArgumentException("Review artifacts require application download checks");
         try {
+            String targetBucket = bucketForKey(key);
             String disposition = org.springframework.http.ContentDisposition.attachment()
                     .filename(filename, java.nio.charset.StandardCharsets.UTF_8).build().toString();
             return presigner.presignGetObject(request -> request
                     .signatureDuration(java.time.Duration.ofMinutes(1))
-                    .getObjectRequest(object -> object.bucket(bucketName).key(key)
+                    .getObjectRequest(object -> object.bucket(targetBucket).key(key)
                             .responseContentDisposition(disposition)
                             .responseContentType("application/octet-stream")
                             .responseCacheControl("private, no-store")))
@@ -196,7 +216,7 @@ public class StorageService {
     public byte[] download(String fileName) {
         try {
             GetObjectRequest getReq = GetObjectRequest.builder()
-                    .bucket(bucketName)
+                    .bucket(bucketForKey(fileName))
                     .key(fileName)
                     .build();
             try (ResponseInputStream<GetObjectResponse> response = s3Client.getObject(getReq)) {
@@ -211,7 +231,7 @@ public class StorageService {
 
     public byte[] downloadBounded(String fileName,int maxBytes) {
         if(maxBytes<1 || maxBytes>MAX_REVIEW_ARTIFACT_BYTES)throw new IllegalArgumentException("Invalid download limit");
-        try (ResponseInputStream<GetObjectResponse> response=s3Client.getObject(GetObjectRequest.builder().bucket(bucketName).key(fileName).build())) {
+        try (ResponseInputStream<GetObjectResponse> response=s3Client.getObject(GetObjectRequest.builder().bucket(bucketForKey(fileName)).key(fileName).build())) {
             Long size=response.response().contentLength();
             if(size!=null && (size<0 || size>maxBytes)){response.abort();throw new IOException("Stored artifact exceeds download limit");}
             byte[] bytes=response.readNBytes(maxBytes+1);
@@ -223,11 +243,20 @@ public class StorageService {
     public java.util.Set<String> findExistingKeys(java.util.Set<String> requiredKeys) {
         java.util.Set<String> found = new java.util.HashSet<>();
         if (requiredKeys.isEmpty()) return found;
+        Map<String, java.util.Set<String>> byBucket = new HashMap<>();
+        for (String key : requiredKeys)
+            byBucket.computeIfAbsent(bucketForKey(key), ignored -> new java.util.HashSet<>()).add(key);
+        for (var group : byBucket.entrySet()) found.addAll(findExistingKeys(group.getKey(), group.getValue()));
+        return found;
+    }
+
+    private java.util.Set<String> findExistingKeys(String targetBucket, java.util.Set<String> requiredKeys) {
+        java.util.Set<String> found = new java.util.HashSet<>();
         try {
             String continuation = null;
             do {
                 ListObjectsV2Response page = s3Client.listObjectsV2(ListObjectsV2Request.builder()
-                        .bucket(bucketName).maxKeys(1000).continuationToken(continuation).build());
+                        .bucket(targetBucket).maxKeys(1000).continuationToken(continuation).build());
                 for (S3Object object : page.contents()) {
                     if (requiredKeys.contains(object.key())) found.add(object.key());
                 }
@@ -245,7 +274,7 @@ public class StorageService {
     public boolean exists(String fileName) {
         try {
             HeadObjectRequest headReq = HeadObjectRequest.builder()
-                    .bucket(bucketName)
+                    .bucket(bucketForKey(fileName))
                     .key(fileName)
                     .build();
             s3Client.headObject(headReq);
@@ -265,7 +294,7 @@ public class StorageService {
     public InputStream getStream(String fileName) {
         try {
             GetObjectRequest getReq = GetObjectRequest.builder()
-                    .bucket(bucketName)
+                    .bucket(bucketForKey(fileName))
                     .key(fileName)
                     .build();
             return s3Client.getObject(getReq);
@@ -279,7 +308,7 @@ public class StorageService {
     public String getContentType(String fileName) {
         try {
             HeadObjectRequest headReq = HeadObjectRequest.builder()
-                    .bucket(bucketName)
+                    .bucket(bucketForKey(fileName))
                     .key(fileName)
                     .build();
             HeadObjectResponse response = s3Client.headObject(headReq);
@@ -294,6 +323,7 @@ public class StorageService {
     }
 
     public String getPublicUrl(String fileName) {
+        if (artifactKey(fileName)) throw new IllegalArgumentException("Review artifacts have no public storage URL");
         if (publicDomain != null && !publicDomain.isBlank()) {
             return publicDomain + "/" + fileName;
         }
