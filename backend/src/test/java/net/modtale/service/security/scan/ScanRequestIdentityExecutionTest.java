@@ -8,6 +8,25 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 class ScanRequestIdentityExecutionTest {
+    @Test void synchronousExactReuseSkipsFullReviewAndFailureFallsThrough() {
+        var storage=mock(StorageService.class);var warden=mock(WardenClientService.class);
+        var persistence=mock(ScanPersistenceService.class);var completion=mock(ScanCompletionService.class);
+        var preflight=mock(ExactArtifactReusePreflight.class);byte[] bytes={1,2,3};var result=new ScanResult();
+        when(persistence.markAttemptRunning("p","v",1,"request-a")).thenReturn(true);
+        when(storage.downloadBounded("artifact",StorageService.MAX_REVIEW_ARTIFACT_BYTES)).thenReturn(bytes);
+        var service=new ScanExecutionService(warden,storage,Runnable::run,persistence,completion,mock(ScanRecoveryService.class),preflight);
+        when(preflight.tryCompleteRunning("p","v",1,"request-a","artifact",false,bytes)).thenReturn(true);
+        service.enqueueBackgroundScan("p","v","artifact","mod.jar",false,1,"request-a");
+        verify(warden,never()).scanFile(any(),any());verifyNoInteractions(completion);
+
+        clearInvocations(warden,completion,preflight,persistence,storage);
+        when(preflight.tryCompleteRunning("p","v",1,"request-a","artifact",false,bytes)).thenReturn(false);
+        when(warden.scanFile(bytes,"mod.jar")).thenReturn(result);
+        service.enqueueBackgroundScan("p","v","artifact","mod.jar",false,1,"request-a");
+        verify(preflight).tryCompleteRunning("p","v",1,"request-a","artifact",false,bytes);
+        verify(warden).scanFile(bytes,"mod.jar");
+        verify(completion).handleCompletedScan("p","v",1,false,result,"request-a");
+    }
     @Test void requestIdentitySurvivesQueueDelayAndReachesCompletion() {
         var work=new ArrayList<Runnable>(); var storage=mock(StorageService.class); var warden=mock(WardenClientService.class);
         var persistence=mock(ScanPersistenceService.class); var completion=mock(ScanCompletionService.class);

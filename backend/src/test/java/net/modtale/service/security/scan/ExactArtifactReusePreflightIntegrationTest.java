@@ -76,6 +76,17 @@ class ExactArtifactReusePreflightIntegrationTest {
         assertNull(saved.getScanResult().getRemoteReview());
         verify(scanner,times(1)).scanEvidenceFile(any(),eq("original.zip"));
     }
+    @Test void claimedSynchronousAttemptUsesTheSameAtomicReuseGate() {
+        mongo.updateFirst(Query.query(Criteria.where("_id").is(projectId)),
+                new Update().set("versions.1.scanResult.scanState","SCANNING"),Project.class);
+        var bytes="original artifact".getBytes();
+        assertTrue(preflight.tryCompleteRunning(projectId,"target",1,requestId,"original.zip",false,bytes));
+        var saved=target();
+        assertEquals(ProjectVersion.ReviewStatus.SCHEDULED,saved.getReviewStatus());
+        assertEquals("1.0",saved.getScanResult().getReusedReviewVersion());
+        verifyNoInteractions(storage);
+        verify(scanner,times(1)).scanEvidenceFile(bytes,"original.zip");
+    }
     @Test void sourceRevokedDuringFreshScanCannotCompleteReuse() {
         when(scanner.scanEvidenceFile(any(),eq("original.zip"))).thenAnswer(i->{
             mongo.updateFirst(Query.query(Criteria.where("_id").is(projectId)),

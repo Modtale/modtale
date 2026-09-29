@@ -26,8 +26,8 @@ public class ScanExecutionService {
     private final ScanPersistenceService scanPersistenceService;
     private final ScanCompletionService scanCompletionService;
     private final ScanRecoveryService scanRecoveryService;
+    private final ExactArtifactReusePreflight reusePreflight;
 
-    @Autowired
     public ScanExecutionService(
             WardenClientService wardenService,
             StorageService storageService,
@@ -36,12 +36,26 @@ public class ScanExecutionService {
             ScanCompletionService scanCompletionService,
             ScanRecoveryService scanRecoveryService
     ) {
+        this(wardenService,storageService,taskExecutor,scanPersistenceService,scanCompletionService,scanRecoveryService,null);
+    }
+
+    @Autowired
+    public ScanExecutionService(
+            WardenClientService wardenService,
+            StorageService storageService,
+            @Qualifier("taskExecutor") Executor taskExecutor,
+            ScanPersistenceService scanPersistenceService,
+            ScanCompletionService scanCompletionService,
+            ScanRecoveryService scanRecoveryService,
+            ExactArtifactReusePreflight reusePreflight
+    ) {
         this.wardenService = wardenService;
         this.storageService = storageService;
         this.taskExecutor = taskExecutor;
         this.scanPersistenceService = scanPersistenceService;
         this.scanCompletionService = scanCompletionService;
         this.scanRecoveryService = scanRecoveryService;
+        this.reusePreflight = reusePreflight;
     }
 
     public ScanExecutionService(
@@ -79,6 +93,8 @@ public class ScanExecutionService {
                 scanPersistenceService,
                 completionService
         );
+        this.reusePreflight = new ExactArtifactReusePreflight(projectRepository,storageService,wardenService,
+                scanPersistenceService,completionService,new ArtifactReviewReuseService());
     }
 
     public void enqueueBackgroundScan(
@@ -139,6 +155,8 @@ public class ScanExecutionService {
 
         try {
             byte[] fileBytes = storageService.downloadBounded(filePath, StorageService.MAX_REVIEW_ARTIFACT_BYTES);
+            if(reusePreflight!=null && reusePreflight.tryCompleteRunning(projectId,versionId,expectedAttempt,requestId,
+                    filePath,isManualRescan,fileBytes))return;
             var result = wardenService.scanFile(fileBytes, originalFilename);
             if (requestId == null) scanCompletionService.handleCompletedScan(projectId, versionId, expectedAttempt, isManualRescan, result);
             else scanCompletionService.handleCompletedScan(projectId, versionId, expectedAttempt, isManualRescan, result, requestId);

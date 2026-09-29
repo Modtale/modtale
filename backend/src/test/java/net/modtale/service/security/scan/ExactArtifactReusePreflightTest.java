@@ -82,4 +82,32 @@ class ExactArtifactReusePreflightTest {
         assertFalse(preflight.tryComplete("p",project.getVersions().get(1),scannerEvidence().getSecurityEvidence().policyVersion()));
         verifyNoInteractions(storage,scanner,persistence,completion);
     }
+    @Test void alreadyClaimedSynchronousAttemptCanReuseWithoutAnotherDownloadOrClaim() {
+        var project=fixture();var target=project.getVersions().get(1);
+        target.getScanResult().setScanState("SCANNING");var evidence=scannerEvidence();byte[] bytes={1,2,3};
+        when(projects.findById("p")).thenReturn(Optional.of(project));
+        when(scanner.currentPolicyVersion()).thenReturn(evidence.getSecurityEvidence().policyVersion());
+        when(scanner.scanEvidenceFile(bytes,"original.zip")).thenReturn(evidence);
+        when(completion.handleCompletedReuseScan("p","target",1,false,evidence,requestId)).thenReturn(true);
+
+        assertTrue(preflight.tryCompleteRunning("p","target",1,requestId,"original.zip",false,bytes));
+        assertEquals("1.0",evidence.getReusedReviewVersion());
+        verifyNoInteractions(storage,persistence);
+        verify(scanner).scanEvidenceFile(bytes,"original.zip");
+    }
+    @Test void alreadyClaimedAttemptWithChangedStoragePathNeverContactsScanner() {
+        var project=fixture();project.getVersions().get(1).getScanResult().setScanState("SCANNING");
+        when(projects.findById("p")).thenReturn(Optional.of(project));
+        assertFalse(preflight.tryCompleteRunning("p","target",1,requestId,"other.zip",false,new byte[]{1}));
+        verifyNoInteractions(scanner,storage,persistence,completion);
+    }
+    @Test void claimedAttemptWithRemoteOwnershipCannotUseSynchronousReuse() {
+        var project=fixture();var target=project.getVersions().get(1);
+        target.getScanResult().setScanState("SCANNING");
+        target.getScanResult().setRemotePoll(new ScanResult.RemoteReviewPoll(UUID.randomUUID().toString(),
+                new Date(System.currentTimeMillis()+1000),new Date(0)));
+        when(projects.findById("p")).thenReturn(Optional.of(project));
+        assertFalse(preflight.tryCompleteRunning("p","target",1,requestId,"original.zip",false,new byte[]{1}));
+        verifyNoInteractions(scanner,storage,persistence,completion);
+    }
 }
