@@ -247,7 +247,7 @@ class VersionControllerTest {
     }
 
     @Test
-    void authorizedDownloadsVerifyBytesEvenWhenDirectStorageIsAvailable() throws Exception {
+    void authorizedDownloadsVerifyBytesBeforeDelivery() throws Exception {
         Project project = project("project-1", "Sky Tools", ProjectClassification.DATA);
         ProjectVersion version = version("version-1", "1.0.0");
         version.setFileUrl("https://cdn.modtale.net/files/123456789012345678901234567890123456-actual.jar");
@@ -259,8 +259,6 @@ class VersionControllerTest {
         when(projectService.getRawProjectById("project-1")).thenReturn(project);
         when(accessControlService.canReadProject(project, null)).thenReturn(true);
         when(projectVersionAccessService.requireByVersionNumber(eq(project), eq("1.0.0"), eq((String) null), any())).thenReturn(version);
-        java.net.URI signed = java.net.URI.create("https://account.r2.cloudflarestorage.com/bucket/files/actual.jar?signature=test");
-        when(storageService.directDownloadUri(version.getFileUrl(), "actual.jar")).thenReturn(signed);
         when(storageService.downloadBounded(version.getFileUrl(), StorageService.MAX_REVIEW_ARTIFACT_BYTES))
                 .thenReturn(new byte[]{1, 2, 3});
         when(accountService.getCurrentUser((Authentication) isNull())).thenReturn(null);
@@ -274,7 +272,6 @@ class VersionControllerTest {
 
         assertEquals(200, response.getStatusCode().value());
         assertArrayEquals(new byte[]{1, 2, 3}, assertInstanceOf(ByteArrayResource.class, response.getBody()).getByteArray());
-        verify(storageService, never()).directDownloadUri(anyString(), anyString());
         verify(trackingService).logDownload("project-1", "version-1", "Ada", false, "203.0.113.5", false);
     }
 

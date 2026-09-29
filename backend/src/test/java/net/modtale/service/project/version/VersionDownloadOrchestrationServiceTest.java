@@ -266,7 +266,6 @@ class VersionDownloadOrchestrationServiceTest {
                 .thenReturn(new byte[]{4, 5, 6});
 
         assertThrows(IOException.class, () -> service.downloadVersion("token", false, null, null, null, user));
-        verify(storageService, never()).directDownloadUri(org.mockito.Mockito.anyString(), org.mockito.Mockito.anyString());
         org.mockito.Mockito.verifyNoInteractions(trackingService);
     }
 
@@ -379,7 +378,6 @@ class VersionDownloadOrchestrationServiceTest {
         assertThrows(VersionNotFoundException.class, () -> service.downloadVersion("old-token", false, null, null, null, null));
         assertThrows(VersionNotFoundException.class, () -> service.downloadBundle("old-token", false, null, null, null, null));
         verify(storageService, never()).download("files/mod.jar");
-        verify(storageService, never()).directDownloadUri(org.mockito.Mockito.anyString(), org.mockito.Mockito.anyString());
     }
 
     private static DownloadTokenService.DownloadToken token(

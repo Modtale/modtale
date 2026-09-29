@@ -28,9 +28,6 @@ public class StorageService {
     private static final Logger logger = LoggerFactory.getLogger(StorageService.class);
 
     private final S3Client s3Client;
-    private final software.amazon.awssdk.services.s3.presigner.S3Presigner presigner;
-    @org.springframework.beans.factory.annotation.Value("${app.downloads.direct-storage:false}")
-    private boolean directStorageDownloads;
     private final String bucketName;
     private final String artifactBucketName;
     private final String publicDomain;
@@ -56,11 +53,9 @@ public class StorageService {
 
     public StorageService(
             S3Client s3Client,
-            AppR2Properties r2Properties,
-            software.amazon.awssdk.services.s3.presigner.S3Presigner presigner
+            AppR2Properties r2Properties
     ) {
         this.s3Client = s3Client;
-        this.presigner = presigner;
         this.bucketName = r2Properties.bucket();
         this.artifactBucketName = r2Properties.artifactBucket();
         this.publicDomain = r2Properties.publicDomain();
@@ -190,26 +185,6 @@ public class StorageService {
             logger.info("R2: Deleted file " + fileName + " from bucket " + bucketName);
         } catch (SdkException e) {
             logger.error("R2 ERROR: Failed to delete " + fileName + " from bucket " + bucketName, e);
-        }
-    }
-
-    public java.net.URI directDownloadUri(String key, String filename) {
-        if (!directStorageDownloads) return null;
-        if (artifactKey(key)) throw new IllegalArgumentException("Review artifacts require application download checks");
-        try {
-            String targetBucket = bucketForKey(key);
-            String disposition = org.springframework.http.ContentDisposition.attachment()
-                    .filename(filename, java.nio.charset.StandardCharsets.UTF_8).build().toString();
-            return presigner.presignGetObject(request -> request
-                    .signatureDuration(java.time.Duration.ofMinutes(1))
-                    .getObjectRequest(object -> object.bucket(targetBucket).key(key)
-                            .responseContentDisposition(disposition)
-                            .responseContentType("application/octet-stream")
-                            .responseCacheControl("private, no-store")))
-                    .url().toURI();
-        } catch (java.net.URISyntaxException | RuntimeException ex) {
-            logger.warn("Could not prepare direct storage download; using the application download path.");
-            return null;
         }
     }
 

@@ -119,7 +119,7 @@ class DependencyArtifactVerifierTest {
                 .serviceConfiguration(software.amazon.awssdk.services.s3.S3Configuration.builder().pathStyleAccessEnabled(true).build())
                 .credentialsProvider(software.amazon.awssdk.auth.credentials.StaticCredentialsProvider.create(
                         software.amazon.awssdk.auth.credentials.AwsBasicCredentials.create("test-key","test-secret"))).build()) {
-            var storage=new net.modtale.service.storage.StorageService(s3,new net.modtale.config.properties.AppR2Properties("bucket","","","",""),null);
+            var storage=new net.modtale.service.storage.StorageService(s3,new net.modtale.config.properties.AppR2Properties("bucket","","","",""));
             var capacity=new Semaphore(1);var verifier=new DependencyArtifactVerifier(storage::getStream,capacity);
             var input=inventory(node("a","file",bytes));
             assertTrue(verifier.verify(input,10,Duration.ofSeconds(5)).matched());

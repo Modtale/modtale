@@ -12,7 +12,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class BoundedStorageDownloadTest {
     @Test void boundedDownloadChecksDeclaredAndActualLength()throws Exception {
-        var s3=mock(S3Client.class);var storage=new StorageService(s3,new AppR2Properties("bucket","","","",""),null);
+        var s3=mock(S3Client.class);var storage=new StorageService(s3,new AppR2Properties("bucket","","","",""));
         var exact=spy(new ResponseInputStream<>(GetObjectResponse.builder().contentLength(3L).build(),new ByteArrayInputStream(new byte[]{1,2,3})));
         when(s3.getObject(any(GetObjectRequest.class))).thenReturn(exact);assertArrayEquals(new byte[]{1,2,3},storage.downloadBounded("key",3));verify(exact).close();
         var tooLarge=spy(new ResponseInputStream<>(GetObjectResponse.builder().contentLength(4L).build(),new ByteArrayInputStream(new byte[]{1,2,3,4})));
@@ -21,7 +21,7 @@ class BoundedStorageDownloadTest {
         when(s3.getObject(any(GetObjectRequest.class))).thenReturn(truncated);assertThrows(StorageDownloadException.class,()->storage.downloadBounded("key",3));verify(truncated).abort();
     }
     @Test void missingLengthCannotBypassActualByteLimit() {
-        var s3=mock(S3Client.class);var storage=new StorageService(s3,new AppR2Properties("bucket","","","",""),null);
+        var s3=mock(S3Client.class);var storage=new StorageService(s3,new AppR2Properties("bucket","","","",""));
         var response=spy(new ResponseInputStream<>(GetObjectResponse.builder().build(),new ByteArrayInputStream(new byte[]{1,2,3,4})));
         when(s3.getObject(any(GetObjectRequest.class))).thenReturn(response);assertThrows(StorageDownloadException.class,()->storage.downloadBounded("key",3));verify(response).abort();
         assertThrows(IllegalArgumentException.class,()->storage.downloadBounded("key",0));

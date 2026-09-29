@@ -14,7 +14,7 @@ class ProjectMediaOwnershipTest {
     private final String key = "project-media/project-1/images/01234567-89ab-cdef-0123-456789abcdef-icon.png";
     private final String domain = "https://cdn.example.test";
     private StorageService storage(S3Client client) {
-        return new StorageService(client, new AppR2Properties("bucket", "", "", "", domain + "/"), null);
+        return new StorageService(client, new AppR2Properties("bucket", "", "", "", domain + "/"));
     }
     @Test void onlyCanonicalOwnedKeysCanAuthorizeDeletion() {
         for (String value : List.of(key, domain + "/" + key, "/api/files/proxy/" + key)) {
