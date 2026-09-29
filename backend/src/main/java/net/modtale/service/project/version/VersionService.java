@@ -78,10 +78,20 @@ public class VersionService {
     }
 
     public Optional<ProjectVersion> getVersionByHash(String hash) {
-        Query query = new Query(Criteria.where("versions.hash").is(hash));
-        query.fields().include("versions.$");
+        if (hash == null || hash.isBlank()) return Optional.empty();
+        Criteria publicVersion = Criteria.where("hash").is(hash)
+                .and("reviewStatus").is(ProjectVersion.ReviewStatus.APPROVED);
+        Query query = new Query(Criteria.where("status")
+                .in(ProjectStatus.PUBLISHED, ProjectStatus.UNLISTED, ProjectStatus.ARCHIVED)
+                .and("deletedAt").is(null).and("versions").elemMatch(publicVersion));
+        query.fields().include("status").elemMatch("versions", publicVersion);
         Project project = mongoTemplate.findOne(query, Project.class);
-        return project != null && !project.getVersions().isEmpty() ? Optional.of(project.getVersions().get(0)) : Optional.empty();
+        if (project == null || project.getVersions() == null || project.getVersions().isEmpty()) return Optional.empty();
+        ProjectVersion version = project.getVersions().getFirst();
+        return (project.getStatus() == ProjectStatus.PUBLISHED || project.getStatus() == ProjectStatus.UNLISTED
+                || project.getStatus() == ProjectStatus.ARCHIVED)
+                && version.getReviewStatus() == ProjectVersion.ReviewStatus.APPROVED && hash.equals(version.getHash())
+                ? Optional.of(version) : Optional.empty();
     }
 
     public void updateVersion(
