@@ -17,17 +17,21 @@ public final class VersionReviewSnapshot {
     }
     private VersionReviewSnapshot() {}
     public static String token(ProjectVersion version) {
-        return token(version, MAPPER);
+        return token(version, MAPPER, false);
+    }
+    public static String modpackArchiveToken(ProjectVersion version) {
+        return token(version, MAPPER, true);
     }
     // Rescan requests need not load the old manifest; approval still uses the full evidence snapshot.
     public static String rescanToken(ProjectVersion version) {
-        return token(version, RESCAN_MAPPER);
+        return token(version, RESCAN_MAPPER, false);
     }
-    private static String token(ProjectVersion version, ObjectMapper mapper) {
+    private static String token(ProjectVersion version, ObjectMapper mapper, boolean omitCachedArchiveUrl) {
         if(version==null) throw new IllegalArgumentException("Missing review version");
         try {
             @SuppressWarnings("unchecked") Map<String,Object> fields=mapper.convertValue(version,Map.class);
             fields.remove("downloadCount");
+            if (omitCachedArchiveUrl) fields.remove("fileUrl");
             fields.put("replacementSecurityHold",version.getReplacementSecurityHold());
             fields.put("reviewReplacement",version.getReviewReplacement());
             fields.put("versionMutation",version.getVersionMutation());

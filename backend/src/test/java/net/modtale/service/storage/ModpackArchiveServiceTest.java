@@ -85,11 +85,41 @@ class ModpackArchiveServiceTest {
         Project pack = pack();
         ProjectVersion version = version("1.0.0", "modpacks/cached.zip");
 
-        byte[] cached = validEmptyArchive();
+        byte[] cached = validEmptyArchive(ModpackArchiveService.cacheBinding(pack, version));
         when(archiveSupport.download("modpacks/cached.zip")).thenReturn(cached);
 
         assertArrayEquals(cached, service.generateModpackZip(pack, version));
         verify(reviewPersistence, never()).cacheModpackArchive(any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void cachedModpackCannotIgnoreAChangedExternalDependency() throws Exception {
+        Project pack = pack();
+        ProjectVersion version = version("1.0.0", "modpacks/cached.zip");
+        byte[] cached = validEmptyArchive(ModpackArchiveService.cacheBinding(pack, version));
+        ProjectDependency dependency = ProjectDependency.external(ProjectDependency.Source.GITHUB,
+                "example/repository", "External Tool", "2.0.0", "https://example.com/download",
+                ProjectDependency.DependencyType.REQUIRED);
+        version.setDependencies(List.of(dependency));
+        when(archiveSupport.download("modpacks/cached.zip")).thenReturn(cached);
+
+        Map<String, String> entries = unzip(service.generateModpackZip(pack, version));
+        JsonNode lock = new ObjectMapper().readTree(entries.get("modtale.lock.json"));
+
+        assertEquals(1, lock.path("entries").size());
+        assertEquals("GITHUB", lock.at("/entries/0/source").asText());
+    }
+
+    @Test
+    void cacheBindingSurvivesCacheWriteButChangesWithPackageInputs() {
+        Project pack = pack();
+        ProjectVersion version = version("1.0.0", null);
+        String beforeCache = ModpackArchiveService.cacheBinding(pack, version);
+
+        version.setFileUrl("modpacks/cached.zip");
+        assertEquals(beforeCache, ModpackArchiveService.cacheBinding(pack, version));
+        pack.setTitle("Renamed Pack");
+        assertFalse(beforeCache.equals(ModpackArchiveService.cacheBinding(pack, version)));
     }
 
     @Test
@@ -451,6 +481,15 @@ class ModpackArchiveServiceTest {
                 "modpack.json", "{\"formatVersion\":1,\"game\":\"hytale\",\"files\":[]}",
                 "manifest.json", "{\"format\":\"modtale-pack\",\"schemaVersion\":1,\"pack\":{},\"game\":{\"id\":\"hytale\",\"versions\":[]},\"dependencies\":[]}",
                 "modtale.lock.json", "{\"format\":\"modtale-lock\",\"lockVersion\":1,\"game\":\"hytale\",\"pack\":{},\"gameVersions\":[],\"entries\":[]}"
+        ));
+    }
+
+    private static byte[] validEmptyArchive(String cacheBinding) throws IOException {
+        return zip(Map.of(
+                "modpack.json", "{\"formatVersion\":1,\"game\":\"hytale\",\"files\":[]}",
+                "manifest.json", "{\"format\":\"modtale-pack\",\"schemaVersion\":1,\"pack\":{},\"game\":{\"id\":\"hytale\",\"versions\":[]},\"dependencies\":[]}",
+                "modtale.lock.json", "{\"format\":\"modtale-lock\",\"lockVersion\":1,\"cacheBinding\":\""
+                        + cacheBinding + "\",\"game\":\"hytale\",\"pack\":{},\"gameVersions\":[],\"entries\":[]}"
         ));
     }
 

@@ -66,7 +66,7 @@ class DownloadServiceTest {
         version.setFileUrl("modpacks/already-built.zip");
         User user = user("user-1");
 
-        byte[] cachedArchive = validEmptyArchive();
+        byte[] cachedArchive = validEmptyArchive(ModpackArchiveService.cacheBinding(pack, version));
         when(storageService.download("modpacks/already-built.zip")).thenReturn(cachedArchive);
 
         byte[] zipBytes = downloadService.generateModpackZip(pack, version, user);
@@ -218,12 +218,13 @@ class DownloadServiceTest {
         return entries;
     }
 
-    private static byte[] validEmptyArchive() throws IOException {
+    private static byte[] validEmptyArchive(String cacheBinding) throws IOException {
         try (ByteArrayOutputStream output = new ByteArrayOutputStream();
              java.util.zip.ZipOutputStream zip = new java.util.zip.ZipOutputStream(output)) {
             writeEntry(zip, "modpack.json", "{\"formatVersion\":1,\"game\":\"hytale\",\"files\":[]}");
             writeEntry(zip, "manifest.json", "{\"format\":\"modtale-pack\",\"schemaVersion\":1,\"pack\":{},\"game\":{\"id\":\"hytale\",\"versions\":[]},\"dependencies\":[]}");
-            writeEntry(zip, "modtale.lock.json", "{\"format\":\"modtale-lock\",\"lockVersion\":1,\"game\":\"hytale\",\"pack\":{},\"gameVersions\":[],\"entries\":[]}");
+            writeEntry(zip, "modtale.lock.json", "{\"format\":\"modtale-lock\",\"lockVersion\":1,\"cacheBinding\":\""
+                    + cacheBinding + "\",\"game\":\"hytale\",\"pack\":{},\"gameVersions\":[],\"entries\":[]}");
             zip.finish();
             return output.toByteArray();
         }

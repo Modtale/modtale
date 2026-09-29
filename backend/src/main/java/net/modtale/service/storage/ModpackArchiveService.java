@@ -97,8 +97,9 @@ final class ModpackArchiveService {
                 try {
                     JsonNode lock = ModpackArchiveValidator.validatedLockfile(cachedArchive,
                             version.getModpackConfigs() != null && !version.getModpackConfigs().isEmpty());
-                    if (cachedDependencyBindingsMatch(lock, dependencyBindings)) return cachedArchive;
-                    logger.warn("Cached modpack archive has stale dependency bindings for project={} version={}. Rebuilding archive.",
+                    if (cacheBinding(pack, version).equals(lock.path("cacheBinding").asText())
+                            && cachedDependencyBindingsMatch(lock, dependencyBindings)) return cachedArchive;
+                    logger.warn("Cached modpack archive has stale package inputs for project={} version={}. Rebuilding archive.",
                             pack.getId(), version.getVersionNumber());
                     version.setFileUrl(null);
                     return null;
@@ -297,6 +298,7 @@ final class ModpackArchiveService {
     ) {
         Map<String, Object> lock = new LinkedHashMap<>();
         lock.put("format", "modtale-lock");
+        lock.put("cacheBinding", cacheBinding(pack, version));
         boolean hasConfigOwners = version.getModpackConfigs() != null && !version.getModpackConfigs().isEmpty();
         lock.put("lockVersion", hasConfigOwners ? 2 : 1);
         lock.put("game", "hytale");
@@ -384,6 +386,21 @@ final class ModpackArchiveService {
         identity.put("versionNumber", nullToEmpty(version.getVersionNumber()));
         identity.put("name", nullToEmpty(pack.getTitle()));
         return identity;
+    }
+
+    static String cacheBinding(Project pack, ProjectVersion version) {
+        Map<String, Object> inputs = new LinkedHashMap<>();
+        inputs.put("schema", 1);
+        inputs.put("projectId", pack.getId());
+        inputs.put("projectTitle", pack.getTitle());
+        inputs.put("projectSlug", pack.getSlug());
+        inputs.put("projectClassification", pack.getClassification());
+        inputs.put("versionSnapshot", VersionReviewSnapshot.modpackArchiveToken(version));
+        try {
+            return sha256(OBJECT_MAPPER.writeValueAsBytes(inputs));
+        } catch (IOException ex) {
+            throw new IllegalStateException("Could not bind modpack cache inputs.", ex);
+        }
     }
 
     private Map<String, Object> baseDependency(ProjectDependency dependency) {
@@ -476,7 +493,7 @@ final class ModpackArchiveService {
         return null;
     }
 
-    private String sha256(byte[] bytes) {
+    private static String sha256(byte[] bytes) {
         try {
             return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));
         } catch (NoSuchAlgorithmException ex) {
