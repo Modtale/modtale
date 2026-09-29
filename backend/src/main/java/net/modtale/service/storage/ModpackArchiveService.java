@@ -168,7 +168,7 @@ final class ModpackArchiveService {
         if (overrideFileUrl == null) return List.of();
         byte[] archive;
         try {
-            archive = archiveSupport.download(overrideFileUrl);
+            archive = ApprovedArtifactBytes.requireExact(version, archiveSupport.downloadBounded(overrideFileUrl));
         } catch (StorageDownloadException ex) {
             throw new IOException("Cannot download the modpack override bundle.", ex);
         }
@@ -210,7 +210,7 @@ final class ModpackArchiveService {
 
         byte[] bytes;
         try {
-            bytes = archiveSupport.download(resolved.version().getFileUrl());
+            bytes = archiveSupport.downloadApproved(resolved.version());
         } catch (StorageDownloadException ex) {
             throw new IOException("Cannot download bundled Modtale dependency " + dependencyLabel(dependency) + ".", ex);
         }
@@ -390,7 +390,7 @@ final class ModpackArchiveService {
 
     static String cacheBinding(Project pack, ProjectVersion version) {
         Map<String, Object> inputs = new LinkedHashMap<>();
-        inputs.put("schema", 1);
+        inputs.put("schema", 2);
         inputs.put("projectId", pack.getId());
         inputs.put("projectTitle", pack.getTitle());
         inputs.put("projectSlug", pack.getSlug());

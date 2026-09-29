@@ -24,6 +24,7 @@ import net.modtale.service.project.query.ProjectService;
 import net.modtale.service.security.access.AccessControlService;
 import net.modtale.service.storage.DownloadService;
 import net.modtale.service.storage.DownloadTokenService;
+import net.modtale.service.storage.ApprovedArtifactBytes;
 import net.modtale.service.storage.StorageService;
 import org.springframework.stereotype.Service;
 
@@ -142,28 +143,22 @@ public class VersionDownloadOrchestrationService {
                 "We couldn't find the version requested by this download link.");
         ensureDownloadable(project, targetVersion, launcherClient);
 
-        trackDownload(project, targetVersion.getId(), context);
-
         if (project.getClassification() == ProjectClassification.MODPACK) {
+            byte[] zipData = downloadService.generateModpackZip(project, targetVersion, context.currentUser());
+            trackDownload(project, targetVersion.getId(), context);
             if (targetVersion.getDependencies() != null) {
                 targetVersion.getDependencies().stream()
                         .forEach(dep -> trackDependencyDownload(dep, context));
             }
-            byte[] zipData = downloadService.generateModpackZip(project, targetVersion, context.currentUser());
             String filename = buildModpackFilename(project, targetVersion);
-            java.net.URI directUri = targetVersion.getFileUrl() == null ? null
-                    : storageService.directDownloadUri(targetVersion.getFileUrl(), filename);
-            return directUri == null ? new VersionDownloadPayload(filename, zipData)
-                    : new VersionDownloadPayload(filename, null, directUri);
+            return new VersionDownloadPayload(filename, zipData);
         }
 
         String filename = extractFilename(targetVersion.getFileUrl());
-        java.net.URI directUri = storageService.directDownloadUri(targetVersion.getFileUrl(), filename);
-        if (directUri != null) {
-            return new VersionDownloadPayload(filename, null, directUri);
-        }
-        byte[] data = storageService.download(targetVersion.getFileUrl());
-        return new VersionDownloadPayload(extractFilename(targetVersion.getFileUrl()), data);
+        byte[] data = ApprovedArtifactBytes.requireExact(targetVersion,
+                storageService.downloadBounded(targetVersion.getFileUrl(), StorageService.MAX_REVIEW_ARTIFACT_BYTES));
+        trackDownload(project, targetVersion.getId(), context);
+        return new VersionDownloadPayload(filename, data);
     }
 
     public VersionDownloadPayload downloadBundle(
@@ -199,6 +194,7 @@ public class VersionDownloadOrchestrationService {
         List<String> selectedDependencies = downloadToken.getSelectedDependencies();
         requireNonModpackBundle(project);
         ensureBundleDownloadable(targetVersion, selectedDependencies, launcherClient, new HashSet<>());
+        byte[] zipData = downloadService.generateBundleZip(project, targetVersion, selectedDependencies, context.currentUser());
         trackDownload(project, targetVersion.getId(), context);
         if (targetVersion.getDependencies() != null) {
             targetVersion.getDependencies().forEach(dep -> {
@@ -214,7 +210,6 @@ public class VersionDownloadOrchestrationService {
             });
         }
 
-        byte[] zipData = downloadService.generateBundleZip(project, targetVersion, selectedDependencies, context.currentUser());
         return new VersionDownloadPayload(sanitizeProjectName(project.getTitle()) + "-UNZIP-ME.zip", zipData);
     }
 

@@ -41,10 +41,12 @@ class ModpackArchiveServiceTest {
     private ModpackArchiveService service;
 
     @BeforeEach
-    void setUp() {
+    void setUp() throws Exception {
         reviewPersistence = mock(ProjectReviewPersistence.class);
         when(reviewPersistence.cacheModpackArchive(any(), any(), any(), any(), any())).thenReturn(true);
         archiveSupport = mock(DownloadArchiveSupport.class);
+        when(archiveSupport.downloadApproved(any(ProjectVersion.class)))
+                .thenAnswer(invocation -> archiveSupport.download(((ProjectVersion) invocation.getArgument(0)).getFileUrl()));
         service = new ModpackArchiveService(reviewPersistence, archiveSupport);
     }
 
@@ -60,7 +62,9 @@ class ModpackArchiveServiceTest {
         version.setModpackConfigs(List.of(reference));
         version.setOverrideFileUrl("configs.zip");
         String manifest = new ObjectMapper().writeValueAsString(Map.of("format", "modtale-configs", "formatVersion", 1, "configs", List.of(reference)));
-        when(archiveSupport.download("configs.zip")).thenReturn(zip(Map.of(path, "{}", "modtale.configs.json", manifest)));
+        byte[] overrides = zip(Map.of(path, "{}", "modtale.configs.json", manifest));
+        version.setHash(sha256(overrides));
+        when(archiveSupport.downloadBounded("configs.zip")).thenReturn(overrides);
         when(archiveSupport.resolveDependency(dependency)).thenReturn(new DownloadArchiveSupport.ResolvedDependency(
                 dependencyProject("plugin", ProjectClassification.PLUGIN), version("2.0.0", "plugin.jar")));
         when(archiveSupport.download("plugin.jar")).thenReturn(bytes("plugin-binary"));
@@ -297,11 +301,26 @@ class ModpackArchiveServiceTest {
         Project pack = pack();
         ProjectVersion version = version("1.0.0", null);
         version.setOverrideFileUrl("modpack-overrides/source.zip");
-        when(archiveSupport.download("modpack-overrides/source.zip")).thenReturn(zip(Map.of(
+        byte[] overrides = zip(Map.of(
                 "overrides/Mods/example/game.json", "{}",
                 "overrides/Saves/My World/mods/Example_Plugin/config.json", "{}"
-        )));
+        ));
+        version.setHash(sha256(overrides));
+        when(archiveSupport.downloadBounded("modpack-overrides/source.zip")).thenReturn(overrides);
         assertThrows(java.io.IOException.class, () -> service.generateModpackZip(pack, version));
+    }
+
+    @Test
+    void changedOverrideBytesCannotBePackaged() throws Exception {
+        Project pack = pack();
+        ProjectVersion version = version("1.0.0", null);
+        version.setOverrideFileUrl("modpack-overrides/source.zip");
+        version.setHash(sha256(bytes("reviewed override")));
+        when(archiveSupport.downloadBounded("modpack-overrides/source.zip"))
+                .thenReturn(zip(Map.of("overrides/Universe/mods/Example_Plugin/config.json", "{}")));
+
+        assertThrows(IOException.class, () -> service.generateModpackZip(pack, version));
+        verify(archiveSupport, never()).upload(any(), any());
     }
 
     @Test
@@ -469,7 +488,12 @@ class ModpackArchiveServiceTest {
         ProjectVersion version = new ProjectVersion();
         version.setVersionNumber(versionNumber);
         version.setFileUrl(fileUrl);
+        version.setReviewStatus(ProjectVersion.ReviewStatus.APPROVED);
         return version;
+    }
+
+    private static String sha256(byte[] bytes) throws Exception {
+        return java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(bytes));
     }
 
     private static byte[] bytes(String value) {

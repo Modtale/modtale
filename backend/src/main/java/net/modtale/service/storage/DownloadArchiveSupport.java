@@ -43,6 +43,15 @@ final class DownloadArchiveSupport {
         return storageService.download(fileUrl);
     }
 
+    byte[] downloadBounded(String fileUrl) {
+        return storageService.downloadBounded(fileUrl, StorageService.MAX_REVIEW_ARTIFACT_BYTES);
+    }
+
+    byte[] downloadApproved(ProjectVersion version) throws IOException {
+        return ApprovedArtifactBytes.requireExact(version,
+                storageService.downloadBounded(version.getFileUrl(), StorageService.MAX_REVIEW_ARTIFACT_BYTES));
+    }
+
     String upload(MultipartFile file, String directory) {
         return storageService.upload(file, directory);
     }

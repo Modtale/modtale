@@ -43,11 +43,11 @@ class BundlePackagingServiceTest {
         ProjectVersion depVersion = new ProjectVersion();
         depVersion.setFileUrl("files/dep-one.jar");
 
-        when(archiveSupport.download("files/main.jar")).thenReturn(bytes("main"));
+        when(archiveSupport.downloadApproved(mainVersion)).thenReturn(bytes("main"));
         when(archiveSupport.extractOriginalFilename("files/main.jar")).thenReturn("main.jar");
         when(archiveSupport.resolveDependency(mainVersion.getDependencies().getFirst()))
                 .thenReturn(new DownloadArchiveSupport.ResolvedDependency(new Project(), depVersion));
-        when(archiveSupport.download("files/dep-one.jar")).thenReturn(bytes("dep-one"));
+        when(archiveSupport.downloadApproved(depVersion)).thenReturn(bytes("dep-one"));
         when(archiveSupport.extractOriginalFilename("files/dep-one.jar")).thenReturn("dep-one.jar");
 
         Map<String, String> entries = unzip(service.generateBundleZip(new Project(), mainVersion, List.of("dep-1")));

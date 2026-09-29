@@ -17,6 +17,7 @@ import net.modtale.model.worldlist.WorldModList;
 import net.modtale.service.project.query.ProjectService;
 import net.modtale.service.security.access.AccessControlService;
 import net.modtale.service.storage.DownloadService;
+import net.modtale.service.storage.ApprovedArtifactBytes;
 import net.modtale.service.storage.StorageService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -64,7 +65,8 @@ public class WorldModListArchiveService {
                 try {
                     byte[] file = approved.project().getClassification() == ProjectClassification.MODPACK
                             ? downloadService.generateModpackZip(approved.project(), approved.version(), null)
-                            : storageService.download(item.getFileUrl());
+                            : ApprovedArtifactBytes.requireExact(approved.version(),
+                                    storageService.downloadBounded(item.getFileUrl(), StorageService.MAX_REVIEW_ARTIFACT_BYTES));
                     writeEntry(zip, entries, filename(item), file);
                 } catch (StorageDownloadException | IOException ex) {
                     logger.warn("Skipping unavailable world list file {} for list {}", item.getFileUrl(), list.getId(), ex);

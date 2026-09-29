@@ -1,6 +1,9 @@
 package net.modtale.service.storage;
 
 import java.nio.charset.StandardCharsets;
+import java.io.IOException;
+import java.security.MessageDigest;
+import java.util.HexFormat;
 import java.util.List;
 import net.modtale.model.project.Project;
 import net.modtale.model.project.ProjectDependency;
@@ -14,6 +17,7 @@ import org.springframework.web.multipart.MultipartFile;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -64,6 +68,17 @@ class DownloadArchiveSupportTest {
         when(projectService.getRawProjectById("project-1")).thenReturn(project);
 
         assertNull(service.resolveDependency(new ProjectDependency("project-1", "Project", "1.0.0")));
+    }
+
+    @Test
+    void approvedDependencyDownloadRejectsReplacedStorageBytes() throws Exception {
+        ProjectVersion version = version("1.0.0", "files/plugin.jar");
+        version.setHash(HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
+                .digest("reviewed".getBytes(StandardCharsets.UTF_8))));
+        when(storageService.downloadBounded("files/plugin.jar", StorageService.MAX_REVIEW_ARTIFACT_BYTES))
+                .thenReturn("replaced".getBytes(StandardCharsets.UTF_8));
+
+        assertThrows(IOException.class, () -> service.downloadApproved(version));
     }
 
     @Test

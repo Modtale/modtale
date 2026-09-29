@@ -9,6 +9,8 @@ import static org.mockito.Mockito.when;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.util.HexFormat;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
@@ -34,13 +36,15 @@ class WorldModListArchiveServiceTest {
         StorageService storageService = mock(StorageService.class);
         ProjectService projectService = mock(ProjectService.class);
         AccessControlService accessControlService = mock(AccessControlService.class);
-        when(storageService.download("storage/cool.jar")).thenReturn("cool-bytes".getBytes(StandardCharsets.UTF_8));
+        when(storageService.downloadBounded("storage/cool.jar", StorageService.MAX_REVIEW_ARTIFACT_BYTES))
+                .thenReturn("cool-bytes".getBytes(StandardCharsets.UTF_8));
         Project project = new Project();
         project.setId("project-1");
         ProjectVersion approved = new ProjectVersion();
         approved.setVersionNumber("1.0.0");
         approved.setFileUrl("storage/cool.jar");
         approved.setReviewStatus(ProjectVersion.ReviewStatus.APPROVED);
+        approved.setHash(sha256("cool-bytes"));
         project.setVersions(List.of(approved));
         when(projectService.getRawProjectById("project-1")).thenReturn(project);
         when(accessControlService.isPubliclyReadable(project)).thenReturn(true);
@@ -94,6 +98,35 @@ class WorldModListArchiveServiceTest {
         Map<String, String> entries = entries(new WorldModListArchiveService(storageService, new ObjectMapper(), projectService, accessControlService, mock(DownloadService.class)).generateZip(list));
 
         assertFalse(entries.containsKey("Withdrawn-Mod-2.0.0.jar"));
+    }
+
+    @Test
+    void changedStorageBytesAreOmittedFromSharedListZip() throws IOException {
+        StorageService storageService = mock(StorageService.class);
+        ProjectService projectService = mock(ProjectService.class);
+        AccessControlService accessControlService = mock(AccessControlService.class);
+        WorldModList.Item item = item("Reviewed Mod", "1.0.0", true, "storage/mod.jar");
+        item.setProjectId("project-1");
+        WorldModList list = new WorldModList();
+        list.setId("list-1");
+        list.setMods(List.of(item));
+        Project project = new Project();
+        project.setId("project-1");
+        ProjectVersion version = new ProjectVersion();
+        version.setVersionNumber("1.0.0");
+        version.setFileUrl("storage/mod.jar");
+        version.setHash(sha256("reviewed"));
+        version.setReviewStatus(ProjectVersion.ReviewStatus.APPROVED);
+        project.setVersions(List.of(version));
+        when(projectService.getRawProjectById("project-1")).thenReturn(project);
+        when(accessControlService.isPubliclyReadable(project)).thenReturn(true);
+        when(storageService.downloadBounded("storage/mod.jar", StorageService.MAX_REVIEW_ARTIFACT_BYTES))
+                .thenReturn("replaced".getBytes(StandardCharsets.UTF_8));
+
+        Map<String, String> entries = entries(new WorldModListArchiveService(storageService, new ObjectMapper(),
+                projectService, accessControlService, mock(DownloadService.class)).generateZip(list));
+
+        assertFalse(entries.containsKey("Reviewed-Mod-1.0.0.jar"));
     }
 
     @Test
@@ -211,5 +244,14 @@ class WorldModListArchiveServiceTest {
             }
         }
         return entries;
+    }
+
+    private static String sha256(String value) {
+        try {
+            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
+                    .digest(value.getBytes(StandardCharsets.UTF_8)));
+        } catch (java.security.NoSuchAlgorithmException impossible) {
+            throw new IllegalStateException(impossible);
+        }
     }
 }

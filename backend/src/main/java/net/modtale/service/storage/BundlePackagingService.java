@@ -31,7 +31,7 @@ final class BundlePackagingService {
             return;
         }
 
-        byte[] mainData = archiveSupport.download(mainVersion.getFileUrl());
+        byte[] mainData = archiveSupport.downloadApproved(mainVersion);
         String originalFilename = archiveSupport.extractOriginalFilename(mainVersion.getFileUrl());
         zos.putNextEntry(new ZipEntry(originalFilename));
         zos.write(mainData);
@@ -63,7 +63,7 @@ final class BundlePackagingService {
                 continue;
             }
 
-            byte[] fileData = archiveSupport.download(resolvedDependency.version().getFileUrl());
+            byte[] fileData = archiveSupport.downloadApproved(resolvedDependency.version());
             String originalFilename = archiveSupport.extractOriginalFilename(resolvedDependency.version().getFileUrl());
             zos.putNextEntry(new ZipEntry(originalFilename));
             zos.write(fileData);

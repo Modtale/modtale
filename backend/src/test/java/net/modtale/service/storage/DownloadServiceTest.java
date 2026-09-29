@@ -6,6 +6,8 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -89,6 +91,8 @@ class DownloadServiceTest {
 
         Project pluginProject = dependencyProject("plugin-1", ProjectClassification.PLUGIN, "2.0.0", "files/123456789012345678901234567890123456-plugin.jar");
         Project assetProject = dependencyProject("asset-1", ProjectClassification.DATA, "3.0.0", "files/123456789012345678901234567890123456-assets.zip");
+        pluginProject.getVersions().getFirst().setHash(sha256("plugin-binary"));
+        assetProject.getVersions().getFirst().setHash(sha256("asset-binary"));
 
         when(storageService.download("modpacks/missing.zip"))
                 .thenThrow(new StorageDownloadException("missing", new IOException("missing")));
@@ -96,9 +100,9 @@ class DownloadServiceTest {
         when(projectService.getRawProjectById("asset-1")).thenReturn(assetProject);
         when(accessControlService.isPubliclyReadable(pluginProject)).thenReturn(true);
         when(accessControlService.isPubliclyReadable(assetProject)).thenReturn(true);
-        when(storageService.download("files/123456789012345678901234567890123456-plugin.jar"))
+        when(storageService.downloadBounded("files/123456789012345678901234567890123456-plugin.jar", StorageService.MAX_REVIEW_ARTIFACT_BYTES))
                 .thenReturn("plugin-binary".getBytes(StandardCharsets.UTF_8));
-        when(storageService.download("files/123456789012345678901234567890123456-assets.zip"))
+        when(storageService.downloadBounded("files/123456789012345678901234567890123456-assets.zip", StorageService.MAX_REVIEW_ARTIFACT_BYTES))
                 .thenReturn("asset-binary".getBytes(StandardCharsets.UTF_8));
         when(storageService.upload(any(MultipartFile.class), eq("modpacks"))).thenReturn("modpacks/generated.zip");
 
@@ -142,6 +146,8 @@ class DownloadServiceTest {
         Project mainProject = pack("pack-1", "sky-pack", "Sky Pack");
         ProjectVersion mainVersion = version("1.0.0");
         mainVersion.setFileUrl("files/123456789012345678901234567890123456-main.jar");
+        mainVersion.setHash(sha256("main-binary"));
+        mainVersion.setReviewStatus(ProjectVersion.ReviewStatus.APPROVED);
         mainVersion.setDependencies(List.of(
                 new ProjectDependency("dep-a", "Dependency A", "1.0.0"),
                 new ProjectDependency("dep-b", "Dependency B", "2.0.0"),
@@ -149,12 +155,13 @@ class DownloadServiceTest {
         ));
 
         Project dependencyB = dependencyProject("dep-b", ProjectClassification.DATA, "2.0.0", "files/123456789012345678901234567890123456-depb.jar");
+        dependencyB.getVersions().getFirst().setHash(sha256("depb-binary"));
 
-        when(storageService.download("files/123456789012345678901234567890123456-main.jar"))
+        when(storageService.downloadBounded("files/123456789012345678901234567890123456-main.jar", StorageService.MAX_REVIEW_ARTIFACT_BYTES))
                 .thenReturn("main-binary".getBytes(StandardCharsets.UTF_8));
         when(projectService.getRawProjectById("dep-b")).thenReturn(dependencyB);
         when(accessControlService.isPubliclyReadable(dependencyB)).thenReturn(true);
-        when(storageService.download("files/123456789012345678901234567890123456-depb.jar"))
+        when(storageService.downloadBounded("files/123456789012345678901234567890123456-depb.jar", StorageService.MAX_REVIEW_ARTIFACT_BYTES))
                 .thenReturn("depb-binary".getBytes(StandardCharsets.UTF_8));
 
         byte[] zipBytes = downloadService.generateBundleZip(mainProject, mainVersion, List.of("dep-b"), user("user-1"));
@@ -234,5 +241,10 @@ class DownloadServiceTest {
         zip.putNextEntry(new ZipEntry(name));
         zip.write(value.getBytes(StandardCharsets.UTF_8));
         zip.closeEntry();
+    }
+
+    private static String sha256(String value) throws Exception {
+        return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
+                .digest(value.getBytes(StandardCharsets.UTF_8)));
     }
 }

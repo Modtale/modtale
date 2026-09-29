@@ -1,6 +1,9 @@
 package net.modtale.service.project.version;
 
+import java.io.IOException;
+import java.security.MessageDigest;
 import java.time.Instant;
+import java.util.HexFormat;
 import java.util.List;
 import net.modtale.config.properties.AppFrontendProperties;
 import net.modtale.exception.InvalidDownloadTokenException;
@@ -230,7 +233,9 @@ class VersionDownloadOrchestrationServiceTest {
         when(projectVersionAccessService.requireByVersionNumber(org.mockito.Mockito.eq(project), org.mockito.Mockito.eq("1.0.0"), org.mockito.Mockito.eq("1.21.0"), org.mockito.Mockito.any()))
                 .thenReturn(version);
         when(analyticsEligibilityService.shouldCountProjectEngagement(project, user)).thenReturn(true);
-        when(storageService.download(version.getFileUrl())).thenReturn(new byte[]{1, 2, 3});
+        version.setHash(sha256(new byte[]{1, 2, 3}));
+        when(storageService.downloadBounded(version.getFileUrl(), StorageService.MAX_REVIEW_ARTIFACT_BYTES))
+                .thenReturn(new byte[]{1, 2, 3});
 
         VersionDownloadPayload payload = service.downloadVersion(
                 "token",
@@ -244,6 +249,25 @@ class VersionDownloadOrchestrationServiceTest {
         assertEquals("sky-tools.jar", payload.filename());
         assertArrayEquals(new byte[]{1, 2, 3}, payload.bytes());
         verify(trackingService).logDownload("project-1", "version-1", "author-name", false, "203.0.113.1", false);
+    }
+
+    @Test
+    void changedStorageBytesCannotBeDeliveredOrCounted() throws Exception {
+        User user = new User();
+        Project project = project("project-1", "Sky Tools", ProjectClassification.PLUGIN);
+        ProjectVersion version = version("version-1", "1.0.0", "files/mod.jar");
+        version.setHash(sha256(new byte[]{1, 2, 3}));
+        when(downloadTokenService.validateAndConsume("token")).thenReturn(token("project-1", "1.0.0", null, null));
+        when(projectService.getRawProjectById("project-1")).thenReturn(project);
+        when(accessControlService.canReadProject(project, user)).thenReturn(true);
+        when(projectVersionAccessService.requireByVersionNumber(org.mockito.Mockito.eq(project), org.mockito.Mockito.eq("1.0.0"),
+                org.mockito.Mockito.isNull(), org.mockito.Mockito.any())).thenReturn(version);
+        when(storageService.downloadBounded(version.getFileUrl(), StorageService.MAX_REVIEW_ARTIFACT_BYTES))
+                .thenReturn(new byte[]{4, 5, 6});
+
+        assertThrows(IOException.class, () -> service.downloadVersion("token", false, null, null, null, user));
+        verify(storageService, never()).directDownloadUri(org.mockito.Mockito.anyString(), org.mockito.Mockito.anyString());
+        org.mockito.Mockito.verifyNoInteractions(trackingService);
     }
 
     @ParameterizedTest
@@ -389,5 +413,9 @@ class VersionDownloadOrchestrationServiceTest {
         version.setFileUrl(fileUrl);
         version.setReviewStatus(ProjectVersion.ReviewStatus.APPROVED);
         return version;
+    }
+
+    private static String sha256(byte[] bytes) throws Exception {
+        return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));
     }
 }

@@ -72,7 +72,7 @@ class CurseForgeModpackFlowTest {
         ProjectVersion hostedVersion = hostedProject.getVersions().getFirst();
         when(archiveSupport.resolveDependency(resolved.dependencies().getFirst()))
                 .thenReturn(new DownloadArchiveSupport.ResolvedDependency(hostedProject, hostedVersion));
-        when(archiveSupport.download("files/hosted.jar")).thenReturn("hosted-binary".getBytes(StandardCharsets.UTF_8));
+        when(archiveSupport.downloadApproved(hostedVersion)).thenReturn("hosted-binary".getBytes(StandardCharsets.UTF_8));
         when(archiveSupport.extractOriginalFilename("files/hosted.jar")).thenReturn("hosted.jar");
         when(archiveSupport.newZipMultipartFile(eq("test-pack-2.0.0.zip"), any()))
                 .thenAnswer(invocation -> mock(MultipartFile.class));
