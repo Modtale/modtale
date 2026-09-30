@@ -24,10 +24,11 @@ class RecurringSupportServiceTest {
     private Map<String, Object> invoice;
     @BeforeEach void setup() {
         subscriptions = mock(CreatorSupportSubscriptionRepository.class); ledger = mock(FinanceLedgerEntryRepository.class); gateway = mock(StripeGatewayService.class);
+        when(gateway.isTestMode()).thenReturn(true); when(gateway.getPlatformAccountId()).thenReturn("acct_platform");
         service = new RecurringSupportService(subscriptions, mock(DonationIntentRepository.class), ledger, gateway, new RevenueOpsSupport(), mock(net.modtale.service.project.query.ProjectService.class));
         var subscription = new CreatorSupportSubscription(); subscription.setId("sub_test"); subscription.setProviderAccountId("acct_platform"); subscription.setDonorUserId("donor"); subscription.setCreatorId("creator"); subscription.setProjectId("project"); subscription.setCustomerId("cus_test"); subscription.setAmountCents(500); subscription.setPlatformCutBps(1000); subscription.setCurrency("usd"); subscription.setTestMode(true); subscription.setStatus("active");
         when(subscriptions.findById("sub_test")).thenReturn(Optional.of(subscription));
-        when(gateway.getSubscription("sub_test")).thenReturn(Map.of("id", "sub_test", "customer", "cus_test", "status", "active"));
+        when(gateway.getSubscription("sub_test")).thenReturn(Map.of("id", "sub_test", "customer", "cus_test", "status", "active", "livemode", false));
         invoice = Map.of("id", "in_test", "status", "paid", "parent", Map.of("type", "subscription_details", "subscription_details", Map.of("subscription", "sub_test")),
                 "currency", "usd", "customer", "cus_test", "livemode", false, "amount_paid", 500);
     }
@@ -53,9 +54,33 @@ class RecurringSupportServiceTest {
         verifyNoInteractions(gateway);
     }
     @Test void subscriptionUpdatesRetrieveCurrentProviderStateInsteadOfRegressingFromOldEvents() {
-        when(gateway.getSubscription("sub_test")).thenReturn(Map.of("id", "sub_test", "customer", "cus_test", "status", "canceled", "cancel_at_period_end", false));
+        when(gateway.getSubscription("sub_test")).thenReturn(Map.of("id", "sub_test", "customer", "cus_test", "status", "canceled", "cancel_at_period_end", false, "livemode", false));
         service.refreshSubscription("sub_test");
         var captured = ArgumentCaptor.forClass(CreatorSupportSubscription.class); verify(subscriptions).save(captured.capture());
         assertEquals("canceled", captured.getValue().getStatus());
+    }
+    @Test void invoicesNeedExplicitModeAndMatchingProviderScope() {
+        var missingMode = new java.util.HashMap<>(invoice); missingMode.remove("livemode");
+        assertThrows(IllegalArgumentException.class, () -> service.handlePaidInvoice(missingMode));
+        when(gateway.getPlatformAccountId()).thenReturn("acct_other");
+        assertThrows(IllegalArgumentException.class, () -> service.handlePaidInvoice(invoice));
+        verifyNoInteractions(ledger);
+        verify(gateway, never()).getInvoicePayments(anyString());
+    }
+    @Test void absentInvoiceModeMustNotBeInterpretedAsLive() {
+        subscriptions.findById("sub_test").orElseThrow().setTestMode(false);
+        when(gateway.isTestMode()).thenReturn(false);
+        var missingMode = new java.util.HashMap<>(invoice); missingMode.remove("livemode");
+        assertThrows(IllegalArgumentException.class, () -> service.handlePaidInvoice(missingMode));
+        verify(gateway, never()).getInvoicePayments(anyString());
+        verifyNoInteractions(ledger);
+    }
+    @Test void subscriptionRefreshCannotTreatAbsentModeAsLiveOrReadAnotherAccount() {
+        when(gateway.getSubscription("sub_test")).thenReturn(Map.of("id", "sub_test", "customer", "cus_test", "status", "active"));
+        assertThrows(IllegalArgumentException.class, () -> service.refreshSubscription("sub_test"));
+        when(gateway.getPlatformAccountId()).thenReturn("acct_other");
+        assertThrows(IllegalArgumentException.class, () -> service.refreshSubscription("sub_test"));
+        verify(gateway, times(1)).getSubscription("sub_test");
+        verify(subscriptions, never()).save(any());
     }
 }

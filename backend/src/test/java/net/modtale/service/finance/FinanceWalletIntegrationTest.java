@@ -74,6 +74,8 @@ class FinanceWalletIntegrationTest {
         var replay = wallets.reserve("creator", "creator", "usd", true, key, 1000, 1000, recipients(1000));
         assertEquals(request.getId(), replay.getId());
         assertEquals(1500, wallets.getWallet("creator", "usd", true).getAvailableCents());
+        assertEquals(1500, wallets.getTotalAvailable("usd", true));
+        assertEquals(0, wallets.getTotalAvailable("usd", false));
         wallets.markAttempted(request.getId());
         assertThrows(IllegalStateException.class, () -> wallets.completeTransfers(request.getId()));
         wallets.recordTransfer(request.getId(), 0, "tr_test");

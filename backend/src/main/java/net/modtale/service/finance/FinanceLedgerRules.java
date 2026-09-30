@@ -21,7 +21,16 @@ public final class FinanceLedgerRules {
     }
 
     public static boolean isRecognizedRevenue(FinanceLedgerEntry entry) {
-        return isReal(entry) && isRevenue(entry)
+        return isReal(entry) && isSettledRevenue(entry);
+    }
+
+    public static boolean isInMode(FinanceLedgerEntry entry, boolean testMode) {
+        if (entry.getMetadata() != null && "true".equals(entry.getMetadata().get("simulated"))) return false;
+        return testMode ? entry.getMetadata() != null && "true".equals(entry.getMetadata().get("testMode")) : isReal(entry);
+    }
+
+    public static boolean isSettledRevenue(FinanceLedgerEntry entry) {
+        return isRevenue(entry)
                 && (entry.getStatus() == FinanceLedgerEntry.EntryStatus.AVAILABLE
                 || entry.getStatus() == FinanceLedgerEntry.EntryStatus.PAID)
                 && entry.getMetadata() != null && "settled".equals(entry.getMetadata().get("settlement"));

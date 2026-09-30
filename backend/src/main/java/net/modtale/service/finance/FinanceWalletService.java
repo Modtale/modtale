@@ -48,6 +48,15 @@ public class FinanceWalletService {
         return wallet;
     }
 
+    public long getTotalAvailable(String currency, boolean testMode) {
+        var aggregation = org.springframework.data.mongodb.core.aggregation.Aggregation.newAggregation(
+                org.springframework.data.mongodb.core.aggregation.Aggregation.match(Criteria.where("currency").is(currency)
+                        .and("testMode").is(testMode).and("availableCents").gt(0)),
+                org.springframework.data.mongodb.core.aggregation.Aggregation.group().sum("availableCents").as("amount"));
+        var result = mongo.aggregate(aggregation, CreatorWallet.class, org.bson.Document.class).getUniqueMappedResult();
+        return result == null ? 0 : ((Number) result.get("amount")).longValue();
+    }
+
     public void postSettledCredit(FinanceLedgerEntry credit, boolean testMode) {
         if (credit.getId() == null || credit.getId().isBlank() || credit.getCreatorCents() < 0
                 || credit.getStatus() != FinanceLedgerEntry.EntryStatus.AVAILABLE

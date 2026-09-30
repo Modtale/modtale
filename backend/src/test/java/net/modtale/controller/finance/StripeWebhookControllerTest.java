@@ -20,6 +20,7 @@ class StripeWebhookControllerTest {
     @BeforeEach void setup() {
         donations = mock(DonationCheckoutService.class); receipts = mock(PaymentWebhookReceiptRepository.class); gateway = mock(StripeGatewayService.class);
         when(gateway.isTestMode()).thenReturn(true); when(gateway.isReconciliationEnabled()).thenReturn(true);
+        when(gateway.getPlatformAccountId()).thenReturn("acct_platform");
         controller = new StripeWebhookController(donations, receipts, gateway, mock(RecurringSupportService.class), mock(PaymentAdjustmentService.class), "secret");
     }
     private String signature(String body) throws Exception {
@@ -33,11 +34,19 @@ class StripeWebhookControllerTest {
         verifyNoInteractions(donations, receipts);
     }
     @Test void duplicateEventDoesNotRunFulfillmentTwice() throws Exception {
-        when(receipts.existsById("evt_test")).thenReturn(false, true);
+        when(receipts.existsById("stripe:test:acct_platform:event:evt_test")).thenReturn(false, true);
         String body = body(false);
         assertEquals(200, controller.receive(body.getBytes(StandardCharsets.UTF_8), signature(body)).getStatusCode().value());
         assertEquals(200, controller.receive(body.getBytes(StandardCharsets.UTF_8), signature(body)).getStatusCode().value());
         verify(donations, times(1)).handlePaidCheckout(anyMap()); verify(receipts, times(1)).insert(any(net.modtale.model.finance.PaymentWebhookReceipt.class));
+    }
+    @Test void eventReceiptsAreScopedToConfiguredProviderAccount() throws Exception {
+        String body = body(false);
+        controller.receive(body.getBytes(StandardCharsets.UTF_8), signature(body));
+        verify(receipts).existsById("stripe:test:acct_platform:event:evt_test");
+        when(gateway.getPlatformAccountId()).thenReturn("acct_other");
+        controller.receive(body.getBytes(StandardCharsets.UTF_8), signature(body));
+        verify(receipts).existsById("stripe:test:acct_other:event:evt_test");
     }
     @Test void liveEventsFailClosedAndFailedFulfillmentIsNotAcknowledged() throws Exception {
         String body = body(true);

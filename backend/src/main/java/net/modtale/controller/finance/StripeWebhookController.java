@@ -12,6 +12,7 @@ import net.modtale.service.finance.StripeGatewayService;
 import net.modtale.service.finance.RecurringSupportService;
 import net.modtale.service.finance.PaymentAdjustmentService;
 import net.modtale.service.finance.StripeWebhookSignature;
+import net.modtale.service.finance.FinanceSourceKey;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.ResponseEntity;
@@ -54,10 +55,11 @@ public class StripeWebhookController {
         }
         if (!(event.get("id") instanceof String eventId) || !eventId.startsWith("evt_")
                 || !(event.get("type") instanceof String type)) return ResponseEntity.badRequest().build();
-        // Do not acknowledge live events as fulfilled until the full live-money lifecycle is enabled.
+        // Existing obligations keep reconciling even when new checkout creation is paused.
         if (!(event.get("livemode") instanceof Boolean live) || !gateway.isReconciliationEnabled() || live == gateway.isTestMode()) return ResponseEntity.status(503).build();
         if (!StripeGatewayService.API_VERSION.equals(event.get("api_version"))) return ResponseEntity.status(503).build();
-        if (receipts.existsById(eventId)) return ResponseEntity.ok(Map.of("received", true));
+        String receiptId = FinanceSourceKey.stripe(!live, gateway.getPlatformAccountId(), "event:" + eventId);
+        if (receipts.existsById(receiptId)) return ResponseEntity.ok(Map.of("received", true));
         if (List.of("checkout.session.completed", "checkout.session.async_payment_succeeded", "invoice.paid", "invoice.payment_failed", "customer.subscription.updated", "customer.subscription.deleted", "charge.refunded", "refund.created", "refund.updated", "charge.dispute.created", "charge.dispute.updated", "charge.dispute.closed", "charge.dispute.funds_withdrawn", "charge.dispute.funds_reinstated").contains(type)) {
             if (!(event.get("data") instanceof Map<?, ?> data) || !(data.get("object") instanceof Map<?, ?> object)) {
                 return ResponseEntity.badRequest().build();
@@ -78,7 +80,7 @@ public class StripeWebhookController {
         }
         // Mark only after fulfillment: crashes/retries cannot lose a payment between receipt and credit.
         try {
-            receipts.insert(new PaymentWebhookReceipt(eventId, type, Instant.now()));
+            receipts.insert(new PaymentWebhookReceipt(receiptId, type, Instant.now()));
         } catch (DuplicateKeyException alreadyProcessed) {
             // The deterministic payment ledger ID also deduplicates separate events for one session.
         }

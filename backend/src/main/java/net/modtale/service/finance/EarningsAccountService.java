@@ -82,14 +82,13 @@ public class EarningsAccountService {
     public Map<String, Object> getCreatorOverview(User requester, String ownerId, String range) {
         User creator = core.resolveFinanceOwner(requester, ownerId, false);
         PlatformFinanceSettings settings = getSettings();
+        boolean testMode = stripeGatewayService.isTestMode() || stripeGatewayService.isMockEnabled();
+        var liveWallet = wallets.getWallet(creator.getId(), settings.getCurrency(), false);
+        var testWallet = wallets.getWallet(creator.getId(), settings.getCurrency(), true);
+        var activeWallet = testMode ? testWallet : liveWallet;
         List<FinanceLedgerEntry> entries = ledgerRepository.findByCreatorId(creator.getId()).stream()
-                .filter(FinanceLedgerRules::isReal).collect(Collectors.toList());
-
-        long available = entries.stream()
-                .filter(FinanceLedgerRules::isRecognizedRevenue)
-                .filter(e -> e.getStatus() == FinanceLedgerEntry.EntryStatus.AVAILABLE)
-                .mapToLong(FinanceLedgerEntry::getCreatorCents)
-                .sum();
+                .filter(entry -> settings.getCurrency().equalsIgnoreCase(entry.getCurrency()))
+                .filter(entry -> FinanceLedgerRules.isInMode(entry, testMode)).collect(Collectors.toList());
 
         long pending = entries.stream()
                 .filter(e -> e.getStatus() == FinanceLedgerEntry.EntryStatus.PENDING)
@@ -106,14 +105,6 @@ public class EarningsAccountService {
                 .mapToLong(FinanceLedgerEntry::getCreatorCents)
                 .sum();
 
-        LocalDateTime expiringSoonThreshold = LocalDateTime.now().plusDays(30);
-        long expiringSoon = entries.stream()
-                .filter(FinanceLedgerRules::isRecognizedRevenue)
-                .filter(e -> e.getStatus() == FinanceLedgerEntry.EntryStatus.AVAILABLE)
-                .filter(e -> e.getExpiresAt() != null && e.getExpiresAt().isBefore(expiringSoonThreshold))
-                .mapToLong(FinanceLedgerEntry::getCreatorCents)
-                .sum();
-
         int days = core.parseRangeDays(range);
         LocalDate start = LocalDate.now().minusDays(days - 1);
         LocalDate end = LocalDate.now();
@@ -121,34 +112,36 @@ public class EarningsAccountService {
         Predicate<FinanceLedgerEntry> inRange = e -> e.getCreatedAt() != null && !e.getCreatedAt().toLocalDate().isBefore(start) && !e.getCreatedAt().toLocalDate().isAfter(end);
 
         long periodAdRevenue = entries.stream()
-                .filter(FinanceLedgerRules::isRecognizedRevenue)
+                .filter(FinanceLedgerRules::isSettledRevenue)
                 .filter(inRange)
                 .filter(e -> e.getType() == FinanceLedgerEntry.LedgerType.AD_CLICK || e.getType() == FinanceLedgerEntry.LedgerType.AD_IMPRESSION)
                 .mapToLong(FinanceLedgerEntry::getCreatorCents)
                 .sum();
 
         long periodDonationRevenue = entries.stream()
-                .filter(FinanceLedgerRules::isRecognizedRevenue)
+                .filter(FinanceLedgerRules::isSettledRevenue)
                 .filter(inRange)
-                .filter(e -> e.getType() == FinanceLedgerEntry.LedgerType.DONATION)
+                .filter(e -> e.getType() == FinanceLedgerEntry.LedgerType.DONATION || e.getType() == FinanceLedgerEntry.LedgerType.REFUND_ADJUSTMENT || e.getType() == FinanceLedgerEntry.LedgerType.DISPUTE_ADJUSTMENT)
                 .mapToLong(FinanceLedgerEntry::getCreatorCents)
                 .sum();
 
         List<Map<String, Object>> earningsChart = core.buildDailySeries(entries, start, end, Set.of(
                         FinanceLedgerEntry.LedgerType.DONATION,
+                        FinanceLedgerEntry.LedgerType.REFUND_ADJUSTMENT,
+                        FinanceLedgerEntry.LedgerType.DISPUTE_ADJUSTMENT,
                         FinanceLedgerEntry.LedgerType.AD_CLICK,
                         FinanceLedgerEntry.LedgerType.AD_IMPRESSION
                 ),
                 FinanceLedgerEntry::getCreatorCents,
-                FinanceLedgerRules::isRecognizedRevenue
+                FinanceLedgerRules::isSettledRevenue
         );
 
-        List<Map<String, Object>> donationsChart = core.buildDailySeries(entries, start, end, Set.of(FinanceLedgerEntry.LedgerType.DONATION), FinanceLedgerEntry::getCreatorCents, FinanceLedgerRules::isRecognizedRevenue);
-        List<Map<String, Object>> adsChart = core.buildDailySeries(entries, start, end, Set.of(FinanceLedgerEntry.LedgerType.AD_CLICK, FinanceLedgerEntry.LedgerType.AD_IMPRESSION), FinanceLedgerEntry::getCreatorCents, FinanceLedgerRules::isRecognizedRevenue);
+        List<Map<String, Object>> donationsChart = core.buildDailySeries(entries, start, end, Set.of(FinanceLedgerEntry.LedgerType.DONATION, FinanceLedgerEntry.LedgerType.REFUND_ADJUSTMENT, FinanceLedgerEntry.LedgerType.DISPUTE_ADJUSTMENT), FinanceLedgerEntry::getCreatorCents, FinanceLedgerRules::isSettledRevenue);
+        List<Map<String, Object>> adsChart = core.buildDailySeries(entries, start, end, Set.of(FinanceLedgerEntry.LedgerType.AD_CLICK, FinanceLedgerEntry.LedgerType.AD_IMPRESSION), FinanceLedgerEntry::getCreatorCents, FinanceLedgerRules::isSettledRevenue);
         List<Map<String, Object>> expiredChart = core.buildDailySeries(entries, start, end, Set.of(FinanceLedgerEntry.LedgerType.EXPIRED_TRANSFER), FinanceLedgerEntry::getPlatformCents, e -> true);
 
         Map<String, Long> revenueByProject = entries.stream()
-                .filter(FinanceLedgerRules::isRecognizedRevenue)
+                .filter(FinanceLedgerRules::isSettledRevenue)
                 .filter(e -> e.getProjectId() != null)
                 .collect(Collectors.groupingBy(FinanceLedgerEntry::getProjectId, Collectors.summingLong(FinanceLedgerEntry::getCreatorCents)));
 
@@ -192,11 +185,11 @@ public class EarningsAccountService {
         response.put("fundsExpire", false);
         response.put("adCreatorSplitPercent", settings.getAdCreatorSplitBps() / 100.0);
         response.put("defaultDonationPlatformCutPercent", settings.getDonationPlatformCutBps() / 100.0);
-        response.put("availableCents", Math.max(0, wallets.getWallet(creator.getId(), settings.getCurrency(), false).getAvailableCents()));
-        response.put("reservedCents", wallets.getWallet(creator.getId(), settings.getCurrency(), false).getReservedCents());
-        response.put("adjustmentOwedCents", Math.max(0, -wallets.getWallet(creator.getId(), settings.getCurrency(), false).getAvailableCents()));
-        response.put("payoutHold", wallets.getWallet(creator.getId(), settings.getCurrency(), stripeGatewayService.isTestMode()).isPayoutHold());
-        response.put("testAvailableCents", wallets.getWallet(creator.getId(), settings.getCurrency(), true).getAvailableCents());
+        response.put("availableCents", Math.max(0, liveWallet.getAvailableCents()));
+        response.put("reservedCents", activeWallet.getReservedCents());
+        response.put("adjustmentOwedCents", Math.max(0, -activeWallet.getAvailableCents()));
+        response.put("payoutHold", activeWallet.isPayoutHold());
+        response.put("testAvailableCents", Math.max(0, testWallet.getAvailableCents()));
         response.put("pendingCents", Math.max(0, pending));
         response.put("paidOutCents", Math.max(0, paidOut));
         response.put("expiredCents", Math.max(0, expired));
@@ -205,7 +198,7 @@ public class EarningsAccountService {
         response.put("onboardingEnabled", stripeGatewayService.isOperational());
         response.put("onboardingCountries", getCreatorCountries());
         response.put("stripeAccountCountry", creator.getStripeAccountCountry());
-        response.put("testMode", stripeGatewayService.isTestMode() || stripeGatewayService.isMockEnabled());
+        response.put("testMode", testMode);
         response.put("availabilityMessage", stripeGatewayService.getAvailabilityMessage());
         response.put("periodAdRevenueCents", periodAdRevenue);
         response.put("periodDonationRevenueCents", periodDonationRevenue);
@@ -215,7 +208,7 @@ public class EarningsAccountService {
         response.put("expiredChart", expiredChart);
         response.put("projects", monetizationProjects);
         response.put("payouts", payouts);
-        response.put("payoutRequests", wallets.getRecentRequests(creator.getId(), stripeGatewayService.isTestMode()).stream().map(request -> {
+        response.put("payoutRequests", wallets.getRecentRequests(creator.getId(), testMode).stream().map(request -> {
             Map<String, Object> row = new HashMap<>(); row.put("id", request.getId()); row.put("amountCents", request.getAmountCents());
             row.put("status", request.getStatus()); row.put("createdAt", request.getCreatedAt()); row.put("reviewReason", request.getReviewReason());
             return row;
@@ -256,6 +249,8 @@ public class EarningsAccountService {
 
         List<Map<String, Object>> platformRevenueChart = core.buildDailySeries(entries, chartStart, chartEnd, Set.of(
                         FinanceLedgerEntry.LedgerType.DONATION,
+                        FinanceLedgerEntry.LedgerType.REFUND_ADJUSTMENT,
+                        FinanceLedgerEntry.LedgerType.DISPUTE_ADJUSTMENT,
                         FinanceLedgerEntry.LedgerType.AD_CLICK,
                         FinanceLedgerEntry.LedgerType.EXPIRED_TRANSFER,
                         FinanceLedgerEntry.LedgerType.PLATFORM_CUT
@@ -266,6 +261,8 @@ public class EarningsAccountService {
 
         List<Map<String, Object>> creatorRevenueChart = core.buildDailySeries(entries, chartStart, chartEnd, Set.of(
                         FinanceLedgerEntry.LedgerType.DONATION,
+                        FinanceLedgerEntry.LedgerType.REFUND_ADJUSTMENT,
+                        FinanceLedgerEntry.LedgerType.DISPUTE_ADJUSTMENT,
                         FinanceLedgerEntry.LedgerType.AD_CLICK,
                         FinanceLedgerEntry.LedgerType.AD_IMPRESSION
                 ),
@@ -291,13 +288,7 @@ public class EarningsAccountService {
                 })
                 .collect(Collectors.toList());
 
-        List<FinanceLedgerEntry> allEntries = ledgerRepository.findAll().stream()
-                .filter(FinanceLedgerRules::isReal).collect(Collectors.toList());
-        long totalCreatorAvailable = allEntries.stream()
-                .filter(FinanceLedgerRules::isRecognizedRevenue)
-                .filter(e -> e.getStatus() == FinanceLedgerEntry.EntryStatus.AVAILABLE)
-                .mapToLong(FinanceLedgerEntry::getCreatorCents)
-                .sum();
+        long totalCreatorAvailable = wallets.getTotalAvailable(settings.getCurrency(), false);
 
         Map<String, Object> response = new HashMap<>();
         response.put("currency", settings.getCurrency());

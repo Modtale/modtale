@@ -59,7 +59,9 @@ public class RecurringSupportService {
             registerCheckout(intent, checkout);
             subscription = subscriptions.findById(subscriptionId).orElseThrow();
         }
-        if (!subscription.getCurrency().equals(invoice.get("currency")) || !subscription.getCustomerId().equals(invoice.get("customer"))
+        if (!(invoice.get("livemode") instanceof Boolean) || subscription.isTestMode() != gateway.isTestMode()
+                || !subscription.getProviderAccountId().equals(gateway.getPlatformAccountId())
+                || !subscription.getCurrency().equals(invoice.get("currency")) || !subscription.getCustomerId().equals(invoice.get("customer"))
                 || subscription.isTestMode() != Boolean.FALSE.equals(invoice.get("livemode"))
                 || number(invoice.get("amount_paid")) != subscription.getAmountCents()) throw new IllegalArgumentException("Subscription invoice needs reconciliation.");
         Map<String, Object> payments = gateway.getInvoicePayments(invoiceId);
@@ -87,8 +89,13 @@ public class RecurringSupportService {
     public void refreshSubscription(String id) {
         CreatorSupportSubscription subscription = subscriptions.findById(id).orElse(null);
         if (subscription == null) return;
+        if (subscription.isTestMode() != gateway.isTestMode() || !subscription.getProviderAccountId().equals(gateway.getPlatformAccountId())) {
+            throw new IllegalArgumentException("Subscription account mode or scope changed.");
+        }
         Map<String, Object> current = gateway.getSubscription(id);
-        if (!id.equals(current.get("id")) || !subscription.getCustomerId().equals(current.get("customer"))) {
+        if (!(current.get("livemode") instanceof Boolean) || subscription.isTestMode() != Boolean.FALSE.equals(current.get("livemode"))
+                || !id.equals(current.get("id")) || !subscription.getCustomerId().equals(current.get("customer"))
+                || !(current.get("status") instanceof String)) {
             throw new IllegalArgumentException("Could not refresh subscription state.");
         }
         subscription.setStatus(String.valueOf(current.get("status")));
