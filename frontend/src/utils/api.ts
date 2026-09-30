@@ -133,10 +133,12 @@ api.interceptors.response.use(
                 }
                 setCsrfHeader(config, token);
             }
-            return await api.request(config);
         } catch {
             return Promise.reject(error);
         }
+        // A retried request can now reach validation or changed-terms handling.
+        // Preserve its actual response instead of replacing it with the stale CSRF 403.
+        return api.request(config);
     }
 );
 

@@ -149,6 +149,47 @@ jobs:
       - name: Run backend tests
         run: ./gradlew test
 
+  finance-frontend-integration:
+    name: Finance Frontend Session Tests
+    needs: detect-changes
+    if: needs.detect-changes.outputs.backend == 'true' || needs.detect-changes.outputs.frontend == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.12.0
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 26
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v3
+      - name: Exercise frontend cookies and finance routes on loopback
+        working-directory: backend
+        run: ./gradlew financeFrontendIntegrationTest
+      - name: Upload session integration reports
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: finance-frontend-session-reports
+          path: |
+            backend/build/reports/tests/financeFrontendIntegrationTest
+            backend/build/test-results/financeFrontendIntegrationTest
+            backend/build/test-results/finance-frontend-ui.xml
+          if-no-files-found: error
+
   finance-transactions:
     name: Finance Transaction Tests
     needs: detect-changes
