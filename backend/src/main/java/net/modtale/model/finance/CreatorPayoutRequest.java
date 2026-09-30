@@ -15,12 +15,15 @@ public class CreatorPayoutRequest {
         private String accountId;
         private long amountCents;
         private String transferId;
+        private Instant authorizedAt;
         public String getUserId() { return userId; }
         public void setUserId(String id) { userId = id; }
         public String getAccountId() { return accountId; }
         public void setAccountId(String id) { accountId = id; }
         public long getAmountCents() { return amountCents; }
         public void setAmountCents(long amount) { amountCents = amount; }
+        public Instant getAuthorizedAt() { return authorizedAt; }
+        public void setAuthorizedAt(Instant value) { authorizedAt = value; }
         public String getTransferId() { return transferId; }
         public void setTransferId(String id) { transferId = id; }
     }

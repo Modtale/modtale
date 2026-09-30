@@ -265,6 +265,8 @@ public class FinanceWalletService {
                     root = root.getCause();
                 }
                 if (!retryable || attempt >= 4) throw failure;
+                try { Thread.sleep(5L << attempt); }
+                catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); throw new IllegalStateException("Financial transaction retry interrupted.", interrupted); }
             }
         }
     }
