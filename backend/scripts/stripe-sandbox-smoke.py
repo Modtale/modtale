@@ -75,6 +75,7 @@ class SandboxRun:
             self.report["last_request"]["status"] = "OUTCOME_UNKNOWN"
             self.save()
             raise ValueError("Provider response unavailable. Inspect this saved run before any retry; no automatic retry was made.") from None
+        if not isinstance(body, dict): raise ValueError("Provider response is not the expected JSON object; stopping.")
         self.report["last_request"]["status"] = status
         self.save()
         if status not in expected:
@@ -167,18 +168,26 @@ class SandboxRun:
         if not re.fullmatch(r"pi_[A-Za-z0-9]+", str(pi)): raise ValueError("Invoice payment identity is invalid.")
         _, intent = self.request("GET", "payment_intents/" + pi)
         self.test_object(intent, "pi_")
-        passed = invoice.get("status") == "paid" and invoice.get("amount_paid") == 500 and rows[0].get("amount_paid") == 500 and intent.get("status") == "succeeded" and intent.get("amount_received") == 500
+        parent = invoice.get("parent", {})
+        passed = (invoice.get("id") == invoice_id and invoice.get("status") == "paid" and invoice.get("currency") == "usd" and invoice.get("amount_paid") == 500
+                  and parent.get("type") == "subscription_details" and parent.get("subscription_details", {}).get("metadata", {}).get("intentId") == self.report["run_id"]
+                  and rows[0].get("invoice") == invoice_id and rows[0].get("amount_paid") == 500
+                  and intent.get("id") == pi and intent.get("currency") == "usd" and intent.get("status") == "succeeded" and intent.get("amount_received") == 500)
         self.record(label, passed, invoice_id=invoice_id, payment_id=pi)
         if not passed: raise ValueError("Expected exact paid cash invoice was not verified.")
 
-    def execute_billing(self):
+    def execute_billing(self, use_clock=True):
         self.verify_account()
-        now = int(time.time())
-        _, clock = self.request("POST", "test_helpers/test_clocks", {"frozen_time": str(now), "name": self.report["run_id"]})
-        clock_id = self.test_object(clock, "clock_"); self.record("test_clock", True, object_id=clock_id)
+        clock_id = None
+        if use_clock:
+            now = int(time.time())
+            _, clock = self.request("POST", "test_helpers/test_clocks", {"frozen_time": str(now), "name": self.report["run_id"]})
+            clock_id = self.test_object(clock, "clock_"); self.record("test_clock", True, object_id=clock_id)
         _, method = self.request("POST", "payment_methods", {"type": "card", "card[token]": "tok_visa"})
         method_id = self.test_object(method, "pm_")
-        _, customer = self.request("POST", "customers", {"test_clock": clock_id, "payment_method": method_id, "invoice_settings[default_payment_method]": method_id, "metadata[modtale_sandbox_run]": self.report["run_id"]})
+        customer_fields = {"payment_method": method_id, "invoice_settings[default_payment_method]": method_id, "metadata[modtale_sandbox_run]": self.report["run_id"]}
+        if clock_id: customer_fields["test_clock"] = clock_id
+        _, customer = self.request("POST", "customers", customer_fields)
         customer_id = self.test_object(customer, "cus_"); self.record("fictional_customer", True, object_id=customer_id)
         _, product = self.request("POST", "products", {"name": "Modtale fictional recurring support", "metadata[modtale_sandbox_run]": self.report["run_id"]})
         product_id = self.test_object(product, "prod_")
@@ -189,35 +198,44 @@ class SandboxRun:
         self.record("recurring_subscription", subscription.get("status") == "active", object_id=subscription_id)
         first_invoice = subscription.get("latest_invoice")
         self.verify_invoice_cash(first_invoice, "initial_recurring_cash_payment")
-        items = subscription.get("items", {}).get("data", [])
-        if len(items) != 1 or not isinstance(items[0].get("current_period_end"), int): raise ValueError("Unexpected subscription item period shape.")
-        self.advance_clock(clock_id, items[0]["current_period_end"] + 7200)
-        _, renewed = self.request("GET", "subscriptions/" + subscription_id)
-        self.test_object(renewed, "sub_")
-        renewal_invoice = renewed.get("latest_invoice")
-        if renewal_invoice == first_invoice: raise ValueError("Clock advance did not generate a new renewal invoice.")
-        self.verify_invoice_cash(renewal_invoice, "renewal_cash_payment")
+        if use_clock:
+            items = subscription.get("items", {}).get("data", [])
+            if len(items) != 1 or not isinstance(items[0].get("current_period_end"), int): raise ValueError("Unexpected subscription item period shape.")
+            self.advance_clock(clock_id, items[0]["current_period_end"] + 7200)
+            _, renewed = self.request("GET", "subscriptions/" + subscription_id)
+            self.test_object(renewed, "sub_")
+            renewal_invoice = renewed.get("latest_invoice")
+            if renewal_invoice == first_invoice: raise ValueError("Clock advance did not generate a new renewal invoice.")
+            self.verify_invoice_cash(renewal_invoice, "renewal_cash_payment")
         _, configuration = self.request("POST", "billing_portal/configurations", {"features[subscription_cancel][enabled]": "true", "features[subscription_cancel][mode]": "at_period_end", "features[payment_method_update][enabled]": "true"})
         configuration_id = self.test_object(configuration, "bpc_")
         _, portal = self.request("POST", "billing_portal/sessions", {"customer": customer_id, "configuration": configuration_id, "return_url": "https://example.invalid/modtale-test/return"})
+        self.test_object(portal, "bps_")
         self.record("billing_portal_session", portal.get("configuration") == configuration_id and portal.get("customer") == customer_id and isinstance(portal.get("url"), str), configuration_id=configuration_id,
                     limitation="Portal URL is intentionally not saved. This tests session creation; interactive cancellation remains separate.")
-        _, canceled = self.request("POST", "subscriptions/" + subscription_id, {"cancel_at_period_end": "true"})
-        self.test_object(canceled, "sub_")
-        self.record("cancellation_scheduled", canceled.get("cancel_at_period_end") is True and canceled.get("status") == "active", object_id=subscription_id)
-        self.advance_clock(clock_id, canceled["items"]["data"][0]["current_period_end"] + 7200)
-        _, ended = self.request("GET", "subscriptions/" + subscription_id)
-        self.test_object(ended, "sub_")
-        self.record("cancellation_at_period_end", ended.get("status") == "canceled", object_id=subscription_id)
+        if use_clock:
+            _, canceled = self.request("POST", "subscriptions/" + subscription_id, {"cancel_at_period_end": "true"})
+            self.test_object(canceled, "sub_")
+            self.record("cancellation_scheduled", canceled.get("cancel_at_period_end") is True and canceled.get("status") == "active", object_id=subscription_id)
+            self.advance_clock(clock_id, canceled["items"]["data"][0]["current_period_end"] + 7200)
+            _, ended = self.request("GET", "subscriptions/" + subscription_id)
+            self.test_object(ended, "sub_")
+            self.record("cancellation_at_period_end", ended.get("status") == "canceled", object_id=subscription_id)
+        else:
+            _, ended = self.request("DELETE", "subscriptions/" + subscription_id + "?invoice_now=false&prorate=false")
+            self.test_object(ended, "sub_")
+            self.record("immediate_test_cancellation", ended.get("status") == "canceled", object_id=subscription_id)
+            self.record("clock_based_renewal", False, limitation="Not attempted in the initial-only scenario. This does not substitute for test-clock renewal and period-end cancellation coverage.")
         self.report["finished_at"] = int(time.time())
         self.report["remaining"] = ["Interactive hosted Checkout and portal completion", "Authenticated application and persisted webhook fulfillment", "Connect and payout verification", "Live approvals and actual later fees"]
+        if not use_clock: self.report["remaining"].append("Clock-based renewal and period-end cancellation")
         self.save()
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--state-dir", required=True, type=Path, help="New private directory outside the repository; contains sanitized audit results, never API keys")
-    parser.add_argument("--scenario", choices=("payments", "billing"), default="payments")
+    parser.add_argument("--scenario", choices=("payments", "billing", "billing-initial"), default="payments")
     args = parser.parse_args()
     try:
         key, account = validate_environment(os.environ)
@@ -227,7 +245,7 @@ def main():
         if directory.exists(): raise ValueError("Run directory already exists. Review its outcome; this runner never blindly repeats an uncertain run.")
         os.umask(0o077); directory.mkdir(mode=0o700, parents=True)
         run = SandboxRun(key, account, directory); run.report["scenario"] = args.scenario; run.save()
-        if args.scenario == "billing": run.execute_billing()
+        if args.scenario in ("billing", "billing-initial"): run.execute_billing(use_clock=args.scenario == "billing")
         else: run.execute()
         print(json.dumps(run.report, indent=2))
     except ValueError as error:

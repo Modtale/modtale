@@ -78,4 +78,45 @@ class SandboxTransportGuardTest(unittest.TestCase):
  def test_pending_fee_is_not_a_pass_or_substituted_estimate(self):
   source=pathlib.Path(runner.__file__).read_text()
   self.assertIn('No estimated fee is substituted',source)
+class InitialBillingContractTest(unittest.TestCase):
+ def fixture(self, run):
+  def request(method,path,fields=None,expected=(200,)):
+   if path=='account':return 200,{'id':'acct_fixture','object':'account'}
+   if path=='payment_methods':return 200,{'id':'pm_fixture','livemode':False}
+   if path=='customers':
+    self.assertNotIn('test_clock',fields);self.assertNotIn('email',fields);self.assertNotIn('name',fields)
+    return 200,{'id':'cus_fixture','livemode':False}
+   if path=='products':return 200,{'id':'prod_fixture','livemode':False}
+   if path=='prices':return 200,{'id':'price_fixture','livemode':False}
+   if path=='subscriptions':return 200,{'id':'sub_fixture','livemode':False,'status':'active','latest_invoice':'in_fixture'}
+   if path=='invoices/in_fixture':return 200,{'id':'in_fixture','livemode':False,'status':'paid','currency':'usd','amount_paid':500,'parent':{'type':'subscription_details','subscription_details':{'metadata':{'intentId':run.report['run_id']}}}}
+   if path=='invoice_payments?invoice=in_fixture&status=paid&limit=100':return 200,{'has_more':False,'data':[{'invoice':'in_fixture','amount_paid':500,'payment':{'type':'payment_intent','payment_intent':'pi_fixture'}}]}
+   if path=='payment_intents/pi_fixture':return 200,{'id':'pi_fixture','livemode':False,'currency':'usd','status':'succeeded','amount_received':500}
+   if path=='billing_portal/configurations':return 200,{'id':'bpc_fixture','livemode':False}
+   if path=='billing_portal/sessions':return 200,{'id':'bps_fixture','livemode':False,'configuration':'bpc_fixture','customer':'cus_fixture','url':'https://billing.stripe.test/never-save-session-url'}
+   if path=='subscriptions/sub_fixture?invoice_now=false&prorate=false':
+    self.assertEqual('DELETE',method);return 200,{'id':'sub_fixture','livemode':False,'status':'canceled'}
+   raise AssertionError('Unexpected provider path: '+path)
+  return request
+ def test_initial_billing_never_calls_clock_or_creates_manual_renewal(self):
+  with tempfile.TemporaryDirectory() as directory:
+   run=runner.SandboxRun('sk_test_fixture','acct_fixture',pathlib.Path(directory))
+   with patch.object(run,'request',side_effect=self.fixture(run)) as request:
+    run.execute_billing(use_clock=False)
+    self.assertFalse(any('test_clocks' in call.args[1] for call in request.call_args_list))
+    self.assertFalse(any(call.args[:2]==('POST','invoices') for call in request.call_args_list))
+   checks={row['check']:row for row in run.report['checks']}
+   self.assertTrue(checks['initial_recurring_cash_payment']['passed']);self.assertTrue(checks['immediate_test_cancellation']['passed'])
+   self.assertFalse(checks['clock_based_renewal']['passed'])
+   self.assertNotIn('never-save-session-url',(pathlib.Path(directory)/'report.json').read_text())
+ def test_denied_ordinary_billing_api_stops_without_trying_another_route(self):
+  with tempfile.TemporaryDirectory() as directory:
+   run=runner.SandboxRun('sk_test_fixture','acct_fixture',pathlib.Path(directory))
+   fixture=self.fixture(run)
+   def request(method,path,*args,**kwargs):
+    if path=='subscriptions':raise ValueError('Permission denied fixture')
+    return fixture(method,path,*args,**kwargs)
+   with patch.object(run,'request',side_effect=request) as transport:
+    with self.assertRaises(ValueError):run.execute_billing(use_clock=False)
+    self.assertEqual('subscriptions',transport.call_args.args[1])
 if __name__=='__main__':unittest.main()
