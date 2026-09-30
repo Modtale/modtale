@@ -4,6 +4,7 @@ import { DonationPromptModal } from '@/modules/project/components/dialogs/Donati
 import { financeClient } from '@/modules/finance/api/financeClient';
 import { api } from '@/utils/api';
 import { AdSettlementReview } from '@/modules/finance/components/AdSettlementReview';
+import { PayoutReconciliationReview } from '@/modules/finance/components/PayoutReconciliationReview';
 import { createAdSettlementFixture } from './adSettlementFixture';
 import { createDemoDonationConfig, DEMO_MONETIZATION_POLICY } from './financeDemoConfiguration';
 import type { DonationConfig } from '@/modules/finance/api/financeTypes';
@@ -30,6 +31,12 @@ export default function FinanceShowcase() {
         financeClient.getDonationConfig = async () => createDemoDonationConfig();
         void financeClient.getDonationConfig('demo-project').then(config => { if (active) setSupportConfig(config); });
         let queuedTransfer: { id: string; amountCents: number; status: string; createdAt: string } | null = null;
+        let transferReviewed = false;
+        financeClient.getPayoutReconciliationQueue = async () => transferReviewed ? [] : [{ id: 'demo-transfer-review', creatorId: 'demo-creator', providerAccountId: 'acct_demo', testMode: true, currency: 'usd', amountCents: 2500, status: 'REQUIRES_REVIEW', transferGroup: 'demo-original-transfer-group', createdAt: '2026-09-30T09:00:00Z', reviewReason: 'Synthetic lost provider response. Use tr_demo to exercise this form without any provider request.', recipients: [{ userId: 'demo-creator', accountId: 'acct_recipient', amountCents: 2500, authorizedAt: '2026-09-30T09:01:00Z' }] }];
+        financeClient.confirmExistingPayoutTransfer = async evidence => {
+            if (evidence.transferId !== 'tr_demo') throw new Error('Synthetic mismatch. Use tr_demo for this fixture. No real transfer was queried.');
+            transferReviewed = true; return { ok: true, status: 'TRANSFERRED', testMode: true };
+        };
         let adStage = createAdSettlementFixture();
         financeClient.getAdSettlementStages = async () => [{ ...adStage, ...adStage.snapshots.at(-1), snapshots: undefined, audit: undefined }];
         financeClient.getAdSettlementStage = async () => adStage;
@@ -80,13 +87,14 @@ export default function FinanceShowcase() {
                 <h1 className="font-black">Finance demo · No payments</h1><p className="mt-1 text-sm">Synthetic component showcase. Account and payment network requests are disabled. This page is excluded from normal production access.</p>
                 <div className="mt-4 flex flex-wrap gap-2">
                     <button type="button" className="rounded border px-3 py-2 text-sm" onClick={() => setView(value => value === 'creator' ? 'admin' : 'creator')}>{view === 'creator' ? 'Show ad review' : 'Show creator dashboard'}</button>
+                    <button type="button" className="rounded border px-3 py-2 text-sm" onClick={() => setView('payout')}>Show transfer review</button>
                     <label className="text-sm">Dashboard state <select value={scenario} onChange={event => setScenario(event.target.value)} className="rounded border bg-white px-2 py-2 text-slate-900"><option value="unavailable">Unavailable</option><option value="pending">Pending earnings</option><option value="settled">Settled earnings</option><option value="refund">Refund adjustment</option><option value="error">Service error</option></select></label>
                     <button className="rounded border px-3 py-2 text-sm" onClick={() => setDark(value => !value)}>Toggle theme</button>
                     <button disabled={!supportConfig} className="rounded bg-blue-600 px-3 py-2 text-sm text-white" onClick={() => { setNotice(''); setShowSupport(true); }}>Open support dialog</button>
                 </div>
             </header>
             {notice && <p role="status" className="mb-4 rounded-xl border border-blue-300 p-3 text-sm">{notice}</p>}
-            {view === 'creator' ? <FinanceManager key={scenario} /> : <AdSettlementReview />}
+            {view === 'creator' ? <FinanceManager key={scenario} /> : view === 'payout' ? <PayoutReconciliationReview /> : <AdSettlementReview />}
             <DonationPromptModal show={showSupport} suggestedAmountCents={supportConfig?.suggestedDonationCents ?? 500} recurringDefault={false} allowRecurring={supportConfig?.recurringEnabled} platformCutBps={supportConfig?.donationPlatformCutBps} testMode isProcessing={processing}
                 onClose={() => { setShowSupport(false); setNotice('Demo: dialog closed; the free download continues.'); }}
                 onSkip={() => { setShowSupport(false); setNotice('Demo: download continues without a tip.'); }}

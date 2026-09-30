@@ -27,6 +27,10 @@ class CreatorPayoutServiceTest {
         when(gateway.isTestMode()).thenReturn(true); when(gateway.isOperational()).thenReturn(true); when(wallets.authorizeRecipientTransfer(anyString(), anyInt())).thenReturn(true); when(wallets.getRequest(request.getId())).thenReturn(request);
         when(wallets.getWallet("creator", "usd", true)).thenReturn(new CreatorWallet());
     }
+    @Test void reviewQueueRemainsVisibleWhileProviderAccessIsUnavailable() {
+        when(gateway.isReconciliationEnabled()).thenReturn(false); when(wallets.getReviewRequests()).thenReturn(List.of(request));
+        assertEquals(List.of(request), service.getReviewRequests()); verify(gateway, never()).getPlatformAccountId();
+    }
     @Test void missingOrFractionalTransferNumbersCannotPassVerification() {
         var transfer = new java.util.HashMap<String, Object>(); transfer.put("id", "tr_verified"); transfer.put("object", "transfer");
         transfer.put("livemode", false); transfer.put("destination", "acct_recipient"); transfer.put("currency", "usd"); transfer.put("amount", 1000);

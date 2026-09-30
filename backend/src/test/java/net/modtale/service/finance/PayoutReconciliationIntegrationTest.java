@@ -115,6 +115,8 @@ class PayoutReconciliationIntegrationTest extends FinancePipelineFixture {
         settleOneTime(); var request = reserve(1000); var service = payouts(); when(gateway.verifyPlatformAccountId("acct_platform")).thenReturn(false);
         service.dispatch(request.getId()); assertEquals(CreatorPayoutRequest.Status.REQUIRES_REVIEW, wallets.getRequest(request.getId()).getStatus());
         assertEquals(1000, wallets.getWallet("creator", "usd", true).getReservedCents());
+        mongo.updateFirst(Query.query(Criteria.where("_id").is(request.getId())), new Update().unset("providerAccountId"), CreatorPayoutRequest.class);
+        assertEquals(request.getId(), wallets.getReviewRequests().getFirst().getId());
         mongo.updateFirst(Query.query(Criteria.where("_id").is(FinanceWalletService.walletId("creator", "usd", true))), new Update().unset("providerAccountId"), CreatorWallet.class);
         assertThrows(IllegalStateException.class, () -> reserve(1000)); assertEquals(7445, available());
         var next = credit("pi_first"); next.setId("new-source");

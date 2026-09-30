@@ -143,8 +143,9 @@ public class CreatorPayoutService {
     }
 
     public List<CreatorPayoutRequest> getReviewRequests() {
-        if (!gateway.isReconciliationEnabled()) return List.of();
-        return wallets.getReviewRequests(gateway.isTestMode(), gateway.getPlatformAccountId());
+        // Review remains visible when credentials are unavailable or a legacy account scope differs.
+        // Any provider lookup or accounting confirmation still requires exact saved scope verification.
+        return wallets.getReviewRequests();
     }
 
     static boolean matchesTransfer(CreatorPayoutRequest request, int index, String transferId, Map<String, Object> transfer, Instant now) {

@@ -302,9 +302,8 @@ public class FinanceWalletService {
         return request;
     }
 
-    public List<CreatorPayoutRequest> getReviewRequests(boolean testMode, String providerAccountId) {
-        return mongo.find(Query.query(Criteria.where("testMode").is(testMode).and("providerAccountId").is(providerAccountId)
-                .and("status").in(CreatorPayoutRequest.Status.PROCESSING, CreatorPayoutRequest.Status.REQUIRES_REVIEW))
+    public List<CreatorPayoutRequest> getReviewRequests() {
+        return mongo.find(Query.query(Criteria.where("status").in(CreatorPayoutRequest.Status.PROCESSING, CreatorPayoutRequest.Status.REQUIRES_REVIEW))
                 .with(org.springframework.data.domain.Sort.by("createdAt")).limit(100), CreatorPayoutRequest.class);
     }
 

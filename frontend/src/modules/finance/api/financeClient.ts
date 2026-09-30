@@ -2,6 +2,8 @@ import { api } from '@/utils/api';
 import type { AdStageReport } from '@/modules/finance/components/AdSettlementReview';
 
 export const financeClient = {
+    getPayoutReconciliationQueue: async () => (await api.get('/admin/finance/payout-reconciliation')).data,
+    confirmExistingPayoutTransfer: async (evidence: { requestId: string; recipientIndex: number; transferId: string; reason: string }) => (await api.post('/admin/finance/payout-reconciliation/confirm-existing-transfer', evidence)).data,
     getAdSettlementStages: async () => (await api.get('/finance/admin/ad-settlements')).data,
     getAdSettlementStage: async (id: string) => (await api.get(`/finance/admin/ad-settlements/${encodeURIComponent(id)}`)).data,
     stageAdSettlement: async (report: AdStageReport) => (await api.post('/finance/admin/ad-settlements', report)).data,

@@ -25,6 +25,14 @@ describe('synthetic finance showcase', () => {
         expect(request).not.toHaveBeenCalled();
         await expect(api.get('/never-send')).rejects.toThrow('Network access is disabled');
     });
+    it('renders the transfer review fixture without provider or account calls', async () => {
+        const get = vi.spyOn(api, 'get'); const post = vi.spyOn(api, 'post');
+        await act(async () => root.render(<FinanceShowcase />));
+        await act(async () => [...host.querySelectorAll('button')].find(button => button.textContent === 'Show transfer review')!.click());
+        expect(host.textContent).toContain('Transfer reconciliation'); expect(host.textContent).toContain('Synthetic lost provider response');
+        await act(async () => [...host.querySelectorAll('button')].find(button => button.textContent === 'Review recipient 1')!.click());
+        expect(host.textContent).toContain('Existing Stripe transfer ID'); expect(get).not.toHaveBeenCalled(); expect(post).not.toHaveBeenCalled();
+    });
     it('shows settled synthetic amounts as currency rather than raw cents', async () => {
         await act(async () => root.render(<FinanceShowcase />));
         const state = host.querySelector('select')!;
