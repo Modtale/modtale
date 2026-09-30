@@ -23,15 +23,23 @@ export default function FinanceShowcase() {
         financeClient.getCreatorOverview = async () => {
         const scenario = scenarioRef.current;
         const disabled = scenario === 'unavailable';
+        const settledEarnings = (scenario === 'settled' ? [1000, 1200, 1500, 2800] : scenario === 'pending' ? [250, 750] : [])
+            .map((count, index) => ({ date: `2026-09-${26 + index}`, count }));
+        const ads = settledEarnings.map(point => ({ ...point, count: scenario === 'settled' ? 375 : 125 }));
+        const support = settledEarnings.map((point, index) => ({ ...point, count: point.count - ads[index].count }));
         if (scenario === 'error') throw new Error('Synthetic finance service interruption.');
         return { ownerId: 'synthetic-creator', ownerAccountType: 'PERSONAL', currency: 'usd', testMode: true,
             withdrawalsEnabled: !disabled, onboardingEnabled: false, stripeConnected: false, stripePayoutsEnabled: false,
             availableCents: 0, testAvailableCents: scenario === 'settled' ? 2500 : 0,
-            pendingCents: scenario === 'pending' ? 1850 : 0, paidOutCents: scenario === 'settled' ? 4000 : 0,
+            pendingCents: scenario === 'pending' ? 1850 : 0, paidOutCents: scenario === 'settled' ? 4000 : scenario === 'pending' ? 1000 : 0,
             adjustmentOwedCents: scenario === 'refund' ? 45 : 0, payoutHold: scenario === 'refund',
-            minPayoutCents: 1000, adCreatorSplitPercent: 75, periodAdRevenueCents: 0, periodDonationRevenueCents: 0,
+            minPayoutCents: 1000, adCreatorSplitPercent: 75,
+            periodAdRevenueCents: ads.reduce((total, point) => total + point.count, 0),
+            periodDonationRevenueCents: support.reduce((total, point) => total + point.count, 0),
             availabilityMessage: 'Synthetic preview data only. No account, payment, bank transfer or reminder email is created.',
-            earningsChart: [], donationsChart: [], adsChart: [] };
+            payoutRequests: scenario === 'settled' || scenario === 'pending' ? [{ id: 'demo-transfer', amountCents: scenario === 'settled' ? 4000 : 1000, status: 'TRANSFERRED', createdAt: '2026-09-29T15:00:00Z' }]
+                : scenario === 'refund' ? [{ id: 'demo-held-transfer', amountCents: 1000, status: 'REQUIRES_REVIEW', createdAt: '2026-09-29T15:00:00Z', reviewReason: 'Synthetic provider reconciliation is still in progress.' }] : [],
+            earningsChart: settledEarnings, donationsChart: support, adsChart: ads };
         };
         setReady(true);
         return () => { Object.assign(financeClient, previous); api.interceptors.request.eject(interceptor); };

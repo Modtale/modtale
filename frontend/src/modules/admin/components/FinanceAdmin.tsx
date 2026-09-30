@@ -246,18 +246,18 @@ export function FinanceAdmin({ canManageFinance }: FinanceAdminProps) {
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
                 <Card title="Platform Revenue" value={formatMoney(data?.periodPlatformRevenueCents || 0)} icon={Coins} color="text-blue-500" />
                 <Card title="Creator Revenue" value={formatMoney(data?.periodCreatorRevenueCents || 0)} icon={HandCoins} color="text-emerald-500" />
-                <Card title="Payouts" value={formatMoney(data?.periodPayoutsCents || 0)} icon={Building2} color="text-purple-500" />
+                <Card title="Transferred" value={formatMoney(data?.periodPayoutsCents || 0)} icon={Building2} color="text-purple-500" />
                 <Card title="Creator Available" value={formatMoney(data?.totalCreatorAvailableCents || 0)} icon={Coins} color="text-amber-500" />
             </div>
 
             <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
                 <div className={theme.components.panel + ' p-5'}>
                     <h3 className="mb-4 text-sm font-black uppercase tracking-wide text-slate-600 dark:text-slate-300">Platform Daily Revenue</h3>
-                    <div className="h-[320px]"><LineChart datasets={chartDatasets.platform} /></div>
+                    <div className="h-[320px]"><LineChart datasets={chartDatasets.platform} yAxisFormatter={formatMoney} emptyMessage="No earnings yet." /></div>
                 </div>
                 <div className={theme.components.panel + ' p-5'}>
                     <h3 className="mb-4 text-sm font-black uppercase tracking-wide text-slate-600 dark:text-slate-300">Creator Daily Revenue</h3>
-                    <div className="h-[320px]"><LineChart datasets={chartDatasets.creator} /></div>
+                    <div className="h-[320px]"><LineChart datasets={chartDatasets.creator} yAxisFormatter={formatMoney} emptyMessage="No earnings yet." /></div>
                 </div>
             </div>
 

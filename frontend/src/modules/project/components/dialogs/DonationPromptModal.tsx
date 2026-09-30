@@ -84,7 +84,7 @@ export const DonationPromptModal: React.FC<DonationPromptModalProps> = ({
                     <div>
                         <div className="mb-2 inline-flex rounded-lg bg-modtale-accent/10 p-2 text-modtale-accent"><HeartHandshake className="h-5 w-5" /></div>
                         <h2 id={titleId} className="text-xl font-black text-slate-900 dark:text-white">Support this creator</h2>
-                        <p id={descriptionId} className="mt-1 text-sm text-slate-600 dark:text-slate-300">Your download is free. A one-time tip helps the creator keep building.</p>
+                        <p id={descriptionId} className="mt-1 text-sm text-slate-600 dark:text-slate-300">Your download is free. Optional support helps the creator keep building.</p>
                     </div>
                     <button type="button" onClick={dismiss} disabled={isProcessing} aria-label="Close support dialog" className="p-2 rounded-full text-slate-500 hover:bg-slate-100 dark:hover:bg-white/10 disabled:opacity-50"><X className="h-5 w-5" /></button>
                 </div>

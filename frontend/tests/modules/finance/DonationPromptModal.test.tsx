@@ -46,6 +46,8 @@ describe('optional creator support dialog', () => {
         await render();
         await act(async () => [...host.querySelectorAll('button')].find(button => button.textContent === 'Monthly')!.click());
         expect(host.textContent).toContain('Renews monthly until cancelled');
+        expect(host.textContent).toContain('Optional support helps the creator');
+        expect(host.textContent).not.toContain('A one-time tip');
         await act(async () => [...host.querySelectorAll('button')].find(button => button.textContent?.includes('/month & download'))!.click());
         expect(onDonate).toHaveBeenCalledWith(500, true, false);
     });

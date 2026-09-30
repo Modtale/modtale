@@ -192,7 +192,7 @@ export const FinanceManager: React.FC = () => {
         const mapSeries = (series: any[]) => (series || []).map(point => ({ date: point.date, value: Number(point.count || 0) }));
         return {
             earnings: [{ id: 'earnings', label: 'Creator Earnings', color: '#2563eb', data: mapSeries(data?.earningsChart) }],
-            donations: [{ id: 'donations', label: 'Donations', color: '#16a34a', data: mapSeries(data?.donationsChart) }],
+            donations: [{ id: 'donations', label: 'Creator support', color: '#16a34a', data: mapSeries(data?.donationsChart) }],
             ads: [{ id: 'ads', label: 'Ads', color: '#f97316', data: mapSeries(data?.adsChart) }]
         };
     }, [data]);
@@ -364,11 +364,11 @@ export const FinanceManager: React.FC = () => {
             <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
                 <div className={theme.components.panel + ' p-5'}>
                     <h3 className="mb-4 text-sm font-black uppercase tracking-wide text-slate-600 dark:text-slate-300">Earnings Over Time</h3>
-                    <div className="h-[320px]"><LineChart datasets={chartData.earnings} /></div>
+                    <div className="h-[320px]"><LineChart datasets={chartData.earnings} yAxisFormatter={formatMoney} emptyMessage="No earnings yet." /></div>
                 </div>
                 <div className={theme.components.panel + ' p-5'}>
                     <h3 className="mb-4 text-sm font-black uppercase tracking-wide text-slate-600 dark:text-slate-300">Revenue Mix</h3>
-                    <div className="h-[320px]"><LineChart datasets={[...chartData.donations, ...chartData.ads]} /></div>
+                    <div className="h-[320px]"><LineChart datasets={[...chartData.donations, ...chartData.ads]} yAxisFormatter={formatMoney} emptyMessage="No earnings yet." /></div>
                 </div>
             </div>
 

@@ -17,9 +17,10 @@ interface LineChartProps {
     datasets: Dataset[];
     onToggle?: (id: string, hidden: boolean) => void;
     yAxisFormatter?: (val: number) => string;
+    emptyMessage?: string;
 }
 
-export const LineChart: React.FC<LineChartProps> = ({ datasets, onToggle, yAxisFormatter }) => {
+export const LineChart: React.FC<LineChartProps> = ({ datasets, onToggle, yAxisFormatter, emptyMessage = 'No data yet.' }) => {
     const [hoverIndex, setHoverIndex] = useState<number | null>(null);
     const chartId = useId();
 
@@ -162,11 +163,12 @@ export const LineChart: React.FC<LineChartProps> = ({ datasets, onToggle, yAxisF
 
             {!hasData ? (
                 <div className="flex-1 flex items-center justify-center text-slate-400 font-medium bg-slate-50/50 dark:bg-white/[0.02] rounded-2xl border border-dashed border-slate-200 dark:border-white/10">
-                    No data selected. Toggle items above.
+                    {normalizedDatasets.length > 0 && activeDatasets.length === 0
+                        ? 'No data selected. Toggle items above.' : emptyMessage}
                 </div>
             ) : (
                 <div className="flex flex-1 min-h-0 relative">
-                    <div className="w-9 relative h-full shrink-0 mr-3">
+                    <div className={`${yAxisFormatter ? 'w-16' : 'w-9'} relative h-full shrink-0 mr-3`}>
                         {ticks.map(val => {
                             const topPerc = (getY(val) / height) * 100;
                             return (

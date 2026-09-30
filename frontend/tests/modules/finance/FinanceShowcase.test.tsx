@@ -24,4 +24,12 @@ describe('synthetic finance showcase', () => {
         expect(request).not.toHaveBeenCalled();
         await expect(api.get('/never-send')).rejects.toThrow('Network access is disabled');
     });
+    it('shows settled synthetic amounts as currency rather than raw cents', async () => {
+        await act(async () => root.render(<FinanceShowcase />));
+        const state = host.querySelector('select')!;
+        await act(async () => { state.value = 'settled'; state.dispatchEvent(new Event('change', { bubbles: true })); });
+        expect(host.textContent).toContain('$65.00');
+        expect(host.textContent).toContain('$30.00');
+        expect(host.textContent).not.toContain('No data selected');
+    });
 });
