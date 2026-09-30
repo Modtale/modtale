@@ -145,6 +145,7 @@ public class TrackingFlushService {
         for (TrackingBufferService.DownloadEvent event : batch.downloads()) {
             ProjectAgg projectAgg = projectAggs.computeIfAbsent(event.projectId(), ignored -> new ProjectAgg(event.authorId()));
             projectAgg.total++;
+            if (event.isLauncher()) projectAgg.launcher++;
             platformAgg.total++;
 
             if (event.isApi()) {
@@ -175,9 +176,11 @@ public class TrackingFlushService {
                     .inc("totalDownloads", aggregate.total)
                     .inc("apiDownloads", aggregate.api)
                     .inc("frontendDownloads", aggregate.frontend)
+                    .inc("launcherDownloads", aggregate.launcher)
                     .inc("days." + day + ".d", aggregate.total)
                     .inc("days." + day + ".a", aggregate.api)
-                    .inc("days." + day + ".f", aggregate.frontend);
+                    .inc("days." + day + ".f", aggregate.frontend)
+                    .inc("days." + day + ".l", aggregate.launcher);
 
             for (Map.Entry<String, Integer> versionEntry : aggregate.versions.entrySet()) {
                 update.inc("versionDownloads." + versionEntry.getKey().replace(".", "_") + "." + day, versionEntry.getValue());
@@ -278,6 +281,7 @@ public class TrackingFlushService {
 
     private static class ProjectAgg {
         private final String authorId;
+        private int launcher = 0;
         private int total = 0;
         private int api = 0;
         private int frontend = 0;

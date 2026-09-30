@@ -2,6 +2,7 @@ package net.modtale.service.analytics;
 
 import java.time.LocalDate;
 import net.modtale.model.analytics.PlatformMonthlyStats;
+import net.modtale.model.analytics.ProjectMonthlyStats;
 import net.modtale.service.project.query.ProjectService;
 import org.bson.Document;
 import org.junit.jupiter.api.Test;
@@ -37,5 +38,10 @@ class TrackingFlushServiceTest {
         assertEquals(1, increments.get("frontendDownloads"));
         assertEquals(2, increments.get("launcherDownloads"));
         assertEquals(2, increments.get("days." + LocalDate.now().getDayOfMonth() + ".l"));
+        var projectUpdate = ArgumentCaptor.forClass(Update.class);
+        verify(mongo).upsert(any(Query.class), projectUpdate.capture(), eq(ProjectMonthlyStats.class));
+        Document projectIncrements = (Document) projectUpdate.getValue().getUpdateObject().get("$inc");
+        assertEquals(2, projectIncrements.get("launcherDownloads"));
+        assertEquals(2, projectIncrements.get("days." + LocalDate.now().getDayOfMonth() + ".l"));
     }
 }
