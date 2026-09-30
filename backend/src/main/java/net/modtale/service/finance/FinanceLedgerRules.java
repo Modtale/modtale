@@ -14,6 +14,8 @@ public final class FinanceLedgerRules {
 
     public static boolean isRevenue(FinanceLedgerEntry entry) {
         return entry.getType() == FinanceLedgerEntry.LedgerType.DONATION
+                || entry.getType() == FinanceLedgerEntry.LedgerType.REFUND_ADJUSTMENT
+                || entry.getType() == FinanceLedgerEntry.LedgerType.DISPUTE_ADJUSTMENT
                 || entry.getType() == FinanceLedgerEntry.LedgerType.AD_CLICK
                 || entry.getType() == FinanceLedgerEntry.LedgerType.AD_IMPRESSION;
     }

@@ -13,6 +13,7 @@ public class CreatorWallet {
     private long availableCents;
     private long reservedCents;
     private boolean payoutHold;
+    private java.util.List<String> openRiskIds = new java.util.ArrayList<>();
 
     public String getId() { return id; }
     public void setId(String id) { this.id = id; }
@@ -26,6 +27,8 @@ public class CreatorWallet {
     public void setAvailableCents(long amount) { availableCents = amount; }
     public long getReservedCents() { return reservedCents; }
     public void setReservedCents(long amount) { reservedCents = amount; }
-    public boolean isPayoutHold() { return payoutHold; }
+    public boolean isPayoutHold() { return payoutHold || (openRiskIds != null && !openRiskIds.isEmpty()); }
+    public java.util.List<String> getOpenRiskIds() { return openRiskIds; }
+    public void setOpenRiskIds(java.util.List<String> ids) { openRiskIds = ids; }
     public void setPayoutHold(boolean payoutHold) { this.payoutHold = payoutHold; }
 }

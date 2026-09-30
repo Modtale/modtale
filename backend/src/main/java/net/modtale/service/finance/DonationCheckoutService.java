@@ -26,6 +26,7 @@ public class DonationCheckoutService {
     @Autowired private ProjectService projectService;
     @Autowired private StripeGatewayService stripeGatewayService;
     @Autowired private RevenueOpsSupport core;
+    @Autowired private RecurringSupportService recurringSupport;
 
     public Map<String, Object> getDonationConfig(String projectId) {
         Project project = projectService.getProjectById(projectId);
@@ -37,8 +38,8 @@ public class DonationCheckoutService {
         response.put("projectId", project.getId());
         response.put("donationsEnabled", project.isDonationsEnabled());
         response.put("checkoutEnabled", project.isDonationsEnabled() && stripeGatewayService.isCheckoutAvailable());
-        response.put("recurringEnabled", false);
-        response.put("testMode", stripeGatewayService.isCheckoutAvailable());
+        response.put("recurringEnabled", stripeGatewayService.isOperational());
+        response.put("testMode", stripeGatewayService.isTestMode() || stripeGatewayService.isMockEnabled());
         response.put("availabilityMessage", stripeGatewayService.getAvailabilityMessage());
         response.put("suggestedDonationCents", Math.max(100, project.getSuggestedDonationCents()));
         response.put("donationRecurringDefault", false);
@@ -61,7 +62,7 @@ public class DonationCheckoutService {
         if (!stripeGatewayService.isCheckoutAvailable()) {
             throw new IllegalStateException(stripeGatewayService.getAvailabilityMessage());
         }
-        if (recurring) throw new IllegalArgumentException("Monthly support is not available yet.");
+        if (recurring && (donor == null || guestCheckout || !stripeGatewayService.isOperational())) throw new IllegalArgumentException("Sign in to start monthly support.");
         PlatformFinanceSettings settings = financeAccountService.getSettings();
         if (!"usd".equalsIgnoreCase(settings.getCurrency())) {
             throw new IllegalStateException("This checkout currently supports USD only.");
@@ -73,6 +74,7 @@ public class DonationCheckoutService {
 
         DonationIntent intent = new DonationIntent();
         intent.setId(UUID.randomUUID().toString());
+        if (!stripeGatewayService.isMockEnabled()) intent.setStripePlatformAccountId(stripeGatewayService.getPlatformAccountId());
         intent.setProjectId(project.getId());
         intent.setCreatorId(project.getAuthorId());
         intent.setDonorUserId(donor != null ? donor.getId() : null);
@@ -81,6 +83,7 @@ public class DonationCheckoutService {
         intent.setCreatorCents(creatorCut);
         intent.setPlatformCents(platformCut);
         intent.setRecurring(recurring);
+        intent.setPlatformCutBps(project.getDonationPlatformCutBps());
         intent.setCurrency(settings.getCurrency());
         intent.setStatus(DonationIntent.DonationStatus.PENDING);
         intent = donationIntentRepository.save(intent);
@@ -137,8 +140,9 @@ public class DonationCheckoutService {
                 intent.getStripeSessionId(),
                 stripeGatewayService.isMockEnabled()
         );
-        if (isVerifiedPayment(intent, session)) {
-            completeDonationIntent(intent, session);
+        if (isMatchingPaidSession(intent, session)) {
+            if (intent.isRecurring()) recurringSupport.registerCheckout(intent, session);
+            else if (isVerifiedPayment(intent, session)) completeDonationIntent(intent, session);
             return Map.of("ok", true, "status", "COMPLETED");
         }
 
@@ -151,7 +155,7 @@ public class DonationCheckoutService {
         FinanceLedgerEntry entry = new FinanceLedgerEntry();
         // MongoDB's unique _id makes repeated/concurrent confirmation and webhook delivery safe.
         // Insert before marking the intent complete: retries repair a crash between these writes.
-        entry.setId("donation:" + intent.getStripeSessionId());
+        entry.setId(FinanceSourceKey.stripe(Boolean.FALSE.equals(sessionData.get("livemode")), intent.getStripePlatformAccountId(), "checkout:" + intent.getStripeSessionId()));
         entry.setCreatorId(intent.getCreatorId());
         entry.setProjectId(intent.getProjectId());
         entry.setType(FinanceLedgerEntry.LedgerType.DONATION);
@@ -169,6 +173,7 @@ public class DonationCheckoutService {
             entry.getMetadata().put("simulated", String.valueOf(sessionData.get("simulated")));
         }
         entry.getMetadata().put("settlement", "awaiting_reconciliation");
+        entry.getMetadata().put("providerAccountId", intent.getStripePlatformAccountId());
         Object paymentIntent = sessionData.get("payment_intent");
         if (paymentIntent instanceof String paymentId && paymentId.startsWith("pi_")) entry.getMetadata().put("paymentIntentId", paymentId);
         entry.setCreatorGrossCents(intent.getCreatorCents());
@@ -187,17 +192,26 @@ public class DonationCheckoutService {
         String sessionId = String.valueOf(session.get("id"));
         DonationIntent intent = donationIntentRepository.findByStripeSessionId(sessionId).orElse(null);
         if (intent == null) throw new IllegalArgumentException("Checkout session is not recorded yet.");
-        if (isVerifiedPayment(intent, session)) completeDonationIntent(intent, session);
+        if (!"paid".equals(session.get("payment_status"))) return;
+        if (!isMatchingPaidSession(intent, session)) throw new IllegalArgumentException("Paid checkout does not match its recorded intent.");
+        if (intent.isRecurring()) recurringSupport.registerCheckout(intent, session);
+        else if (isVerifiedPayment(intent, session)) completeDonationIntent(intent, session);
     }
 
     static boolean isVerifiedPayment(DonationIntent intent, Map<String, Object> session) {
+        return session != null && !intent.isRecurring() && "payment".equals(session.get("mode")) && isMatchingPaidSession(intent, session);
+    }
+
+    static boolean isMatchingPaidSession(DonationIntent intent, Map<String, Object> session) {
         if (session == null || Boolean.TRUE.equals(session.get("simulated"))) return false;
         if (!(session.get("livemode") instanceof Boolean)) return false;
         if (!"paid".equals(session.get("payment_status")) || !"complete".equals(session.get("status"))) return false;
-        if (!"payment".equals(session.get("mode")) || intent.isRecurring()) return false;
+        if (!(intent.isRecurring() ? "subscription" : "payment").equals(session.get("mode"))) return false;
         if (intent.getStripeSessionId() == null || !intent.getStripeSessionId().equals(session.get("id"))) return false;
         if (!intent.getCurrency().equalsIgnoreCase(String.valueOf(session.get("currency")))) return false;
-        if (!(session.get("amount_total") instanceof Number amount) || amount.longValue() != intent.getAmountCents()) return false;
+        if (!(session.get("amount_total") instanceof Number amount)) return false;
+        try { if (new java.math.BigDecimal(amount.toString()).longValueExact() != intent.getAmountCents()) return false; }
+        catch (ArithmeticException invalid) { return false; }
         if (!(session.get("metadata") instanceof Map<?, ?> metadata) || !intent.getId().equals(metadata.get("intentId"))) return false;
         return true;
     }

@@ -4,6 +4,7 @@ import { AlertTriangle, BadgeDollarSign, Building2, CalendarClock, ChevronDown, 
 import { financeClient } from '@/modules/finance/api/financeClient';
 import { extractApiErrorMessage } from '@/utils/api';
 import { parseSupportAmount } from '@/modules/finance/api/financeTypes';
+import { SupportSubscriptions } from '@/modules/finance/components/SupportSubscriptions';
 import { LineChart } from '@/components/ui/charts/LineChart';
 import { StatusModal } from '@/components/ui/StatusModal';
 import { theme } from '@/styles/theme';
@@ -96,8 +97,10 @@ export const FinanceManager: React.FC = () => {
     const [payoutAmount, setPayoutAmount] = useState('');
     const [loadError, setLoadError] = useState('');
     const [busyAction, setBusyAction] = useState('');
+    const [onboardingCountry, setOnboardingCountry] = useState('');
     const requestVersionRef = useRef(0);
     const actionInFlightRef = useRef(false);
+    const payoutRequestKeyRef = useRef<string | null>(null);
     const [contexts, setContexts] = useState<any[]>([]);
     const [selectedOwnerId, setSelectedOwnerId] = useState('');
     const [isContextDropdownOpen, setIsContextDropdownOpen] = useState(false);
@@ -109,6 +112,7 @@ export const FinanceManager: React.FC = () => {
     const contextDropdownRef = useRef<HTMLDivElement>(null);
 
     const currency = (data?.currency || 'usd').toUpperCase();
+    const availableCents = Number(data?.testMode ? data?.testAvailableCents || 0 : data?.availableCents || 0);
     const isOrgContext = data?.ownerAccountType === 'ORGANIZATION';
 
     const formatMoney = (cents: number) => new Intl.NumberFormat(undefined, {
@@ -132,6 +136,11 @@ export const FinanceManager: React.FC = () => {
             const overview = await financeClient.getCreatorOverview(selectedRange, ownerId);
             if (requestVersion !== requestVersionRef.current) return;
             setData(overview);
+            const storageKey = `finance-payout-request:${ownerId}`;
+            const unresolvedKey = sessionStorage.getItem(storageKey);
+            if (unresolvedKey && (overview?.payoutRequests || []).some((request: any) => request.id?.endsWith(`:${unresolvedKey}`))) {
+                sessionStorage.removeItem(storageKey); payoutRequestKeyRef.current = null;
+            }
 
             if (overview?.ownerAccountType === 'ORGANIZATION') {
                 const policy = await financeClient.getOrgPayoutPolicy(ownerId);
@@ -164,6 +173,8 @@ export const FinanceManager: React.FC = () => {
     }, []);
 
     useEffect(() => {
+        payoutRequestKeyRef.current = null;
+        setPayoutAmount('');
         if (selectedOwnerId) load(range, selectedOwnerId);
     }, [range, selectedOwnerId]);
 
@@ -192,7 +203,7 @@ export const FinanceManager: React.FC = () => {
         const onboardingWindow = window.open('about:blank', '_blank');
         if (onboardingWindow) onboardingWindow.opener = null;
         try {
-            const res = await financeClient.createStripeOnboardingLink('/dashboard/finance', selectedOwnerId || undefined);
+            const res = await financeClient.createStripeOnboardingLink('/dashboard/finance', selectedOwnerId || undefined, onboardingCountry);
             if (!res?.onboardingUrl || !onboardingWindow) throw new Error('Allow a new tab to complete onboarding.');
             const url = new URL(res.onboardingUrl);
             if (url.protocol !== 'https:' || url.hostname !== 'connect.stripe.com') throw new Error('The provider returned an invalid onboarding link.');
@@ -216,12 +227,17 @@ export const FinanceManager: React.FC = () => {
 
     const handleRequestPayout = async () => {
         if (actionInFlightRef.current || !data?.withdrawalsEnabled) return;
-        const parsed = payoutAmount.trim() ? parseSupportAmount(payoutAmount, data?.minPayoutCents || 1000, data?.availableCents || 0) : undefined;
+        const parsed = payoutAmount.trim() ? parseSupportAmount(payoutAmount, data?.minPayoutCents || 1000, availableCents) : undefined;
         if (parsed === null) { setStatus({ type: 'warning', title: 'Check Amount', msg: 'Enter a valid amount between the minimum payout and your available balance.' }); return; }
         actionInFlightRef.current = true; setBusyAction('payout');
         try {
-            const res = await financeClient.requestPayout(parsed, selectedOwnerId || undefined);
-            setStatus({ type: 'success', title: 'Payout Requested', msg: `Requested ${formatMoney(res.amountCents || 0)} payout.` });
+            const storageKey = `finance-payout-request:${selectedOwnerId}`;
+            payoutRequestKeyRef.current = payoutRequestKeyRef.current || sessionStorage.getItem(storageKey) || crypto.randomUUID();
+            sessionStorage.setItem(storageKey, payoutRequestKeyRef.current);
+            const res = await financeClient.requestPayout(parsed, selectedOwnerId || undefined, payoutRequestKeyRef.current);
+            sessionStorage.removeItem(storageKey);
+            payoutRequestKeyRef.current = null;
+            setStatus({ type: 'success', title: 'Transfer Queued', msg: `${formatMoney(res.amountCents || 0)} reserved for transfer to your payout account. This is not a confirmation of bank receipt.` });
             setPayoutAmount('');
             await load(range, selectedOwnerId);
         } catch (e: any) {
@@ -336,9 +352,10 @@ export const FinanceManager: React.FC = () => {
                 </div>
             </div>
 
-            {!data?.withdrawalsEnabled && <div role="status" className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950 dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-100"><p className="font-bold">{data?.testMode ? 'Finance preview' : 'Creator payments are being prepared'}</p><p className="mt-1">{data?.availabilityMessage || 'Withdrawals are currently unavailable.'} Earned balances do not expire.</p></div>}
+            {(!data?.withdrawalsEnabled || data?.testMode) && <div role="status" className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950 dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-100"><p className="font-bold">{data?.testMode ? 'Finance preview' : 'Creator payments are being prepared'}</p><p className="mt-1">{data?.availabilityMessage || 'Withdrawals are currently unavailable.'} Earned balances do not expire.</p></div>}
+            {(data?.payoutHold || Number(data?.adjustmentOwedCents || 0) > 0) && <div role="status" className="rounded-2xl border border-amber-300 p-4 text-sm text-amber-900 dark:text-amber-100"><p className="font-bold">Payouts paused for reconciliation</p><p className="mt-1">{Number(data?.adjustmentOwedCents || 0) > 0 ? `${formatMoney(data.adjustmentOwedCents)} will be offset against future earnings after a payment adjustment. ` : ''}Funds stay recorded while the account is reviewed. No automatic debit is made to your bank account.</p></div>}
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-                <SummaryCard title="Available" value={formatMoney(data?.availableCents || 0)} subtitle="Settled funds" icon={Wallet} color="text-emerald-500" />
+                <SummaryCard title={data?.testMode ? "Test Balance" : "Available"} value={formatMoney(availableCents)} subtitle="Settled funds" icon={Wallet} color="text-emerald-500" />
                 <SummaryCard title="Pending Estimate" value={formatMoney(data?.pendingCents || 0)} subtitle="Awaiting settlement" icon={CalendarClock} color="text-amber-500" />
                 <SummaryCard title="This Period" value={formatMoney((data?.periodAdRevenueCents || 0) + (data?.periodDonationRevenueCents || 0))} subtitle="Ads and creator support" icon={BadgeDollarSign} color="text-violet-500" />
                 <SummaryCard title="Transferred" value={formatMoney(data?.paidOutCents || 0)} subtitle="Sent to payout provider" icon={BadgeDollarSign} color="text-blue-500" />
@@ -435,11 +452,15 @@ export const FinanceManager: React.FC = () => {
                         <p className="text-sm text-slate-500 dark:text-slate-400">Payouts run through Stripe Connect. Refresh status after onboarding.</p>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
-                        <button onClick={handleConnectStripe} disabled={!!busyAction || !data?.onboardingEnabled} className={theme.components.buttonPrimary}>Connect / Continue Stripe</button>
+                        <button onClick={handleConnectStripe} disabled={!!busyAction || !data?.onboardingEnabled || (!data?.stripeConnected && !onboardingCountry)} className={theme.components.buttonPrimary}>Connect / Continue Stripe</button>
                         <button onClick={handleRefreshStripe} disabled={!!busyAction || !data?.stripeConnected} className={theme.components.buttonSecondary}><RefreshCw className="h-4 w-4" />Refresh Stripe Status</button>
                     </div>
                 </div>
 
+                {!data?.stripeConnected && <label className="block text-sm font-bold text-slate-700 dark:text-slate-200">Country of the payout account owner
+                    <select value={onboardingCountry} disabled={!data?.onboardingEnabled || !!busyAction} onChange={event => setOnboardingCountry(event.target.value)} className={theme.components.inputField + ' mt-2'}><option value="">Choose country</option>{(data?.onboardingCountries || []).map((country: string) => <option key={country} value={country}>{new Intl.DisplayNames(undefined, { type: 'region' }).of(country) || country}</option>)}</select>
+                    <span className="mt-2 block text-xs font-normal text-slate-500 dark:text-slate-400">Available countries depend on Stripe approval, identity verification, and local payout requirements. Use the legal account owner’s country.</span>
+                </label>}
                 <div className="grid grid-cols-1 gap-3 text-sm md:grid-cols-3">
                     <div className={theme.components.panel + ' p-3'}><div className="text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400">Connected</div><div className="mt-1 font-bold text-slate-900 dark:text-white">{data?.stripeConnected ? 'Yes' : 'No'}</div></div>
                     <div className={theme.components.panel + ' p-3'}><div className="text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400">Onboarding Complete</div><div className="mt-1 font-bold text-slate-900 dark:text-white">{data?.stripeOnboardingComplete ? 'Yes' : 'No'}</div></div>
@@ -459,13 +480,19 @@ export const FinanceManager: React.FC = () => {
                             className={inputNoNativeUi}
                         />
                     </div>
-                    <button onClick={handleRequestPayout} disabled={!!busyAction || !data?.withdrawalsEnabled || Number(data?.availableCents || 0) < Number(data?.minPayoutCents || 1000)} className={theme.components.buttonPrimary + ' h-[46px]'}>
+                    <button onClick={handleRequestPayout} disabled={!!busyAction || !data?.withdrawalsEnabled || data?.payoutHold || Number(availableCents) < Number(data?.minPayoutCents || 1000)} className={theme.components.buttonPrimary + ' h-[46px]'}>
                         <CreditCard className="h-4 w-4" /> Request Payout
                     </button>
                 </div>
                 <p className="text-xs text-slate-500 dark:text-slate-400">Minimum payout: {formatMoney(data?.minPayoutCents || 1000)}</p>
             </div>
 
+            <section className={theme.components.panel + ' p-5'} aria-labelledby="payout-history-title">
+                <h2 id="payout-history-title" className="text-xl font-black text-slate-900 dark:text-white">Transfer history</h2>
+                <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Funds are reserved while a transfer is queued. Transfer completion means funds reached the payout provider, not necessarily your bank.</p>
+                {(data?.payoutRequests || []).length === 0 ? <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">No transfers requested yet.</p> : <div className="mt-4 space-y-3">{data.payoutRequests.map((request: any) => <div key={request.id} className="rounded-xl border border-slate-200 p-3 dark:border-white/10"><div className="flex flex-wrap items-center justify-between gap-2"><span className="font-bold text-slate-900 dark:text-white">{formatMoney(request.amountCents)}</span><span className="text-xs font-bold text-slate-600 dark:text-slate-300">{String(request.status).replaceAll('_', ' ')}</span></div><p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{new Date(request.createdAt).toLocaleString()}</p>{request.reviewReason && <p className="mt-2 text-sm text-amber-700 dark:text-amber-300">{request.reviewReason} The reserved balance has not been released for another withdrawal.</p>}</div>)}</div>}
+            </section>
+            {!isOrgContext && <SupportSubscriptions />}
         </div>
     );
 };

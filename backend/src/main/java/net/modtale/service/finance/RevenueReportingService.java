@@ -37,10 +37,10 @@ public class RevenueReportingService {
             if (entry.getCreatedAt() == null || !FinanceLedgerRules.isRecognizedRevenue(entry)) continue;
             LocalDate date = entry.getCreatedAt().toLocalDate();
             long[] sums = buckets.computeIfAbsent(date, key -> new long[4]);
-            sums[0] += Math.max(0, entry.getGrossCents());
-            sums[1] += Math.max(0, entry.getCreatorCents());
-            sums[2] += Math.max(0, entry.getPlatformCents());
-            sums[3] += Math.max(0, entry.getProcessorFeeCents() == null ? 0 : entry.getProcessorFeeCents());
+            sums[0] += entry.getGrossCents();
+            sums[1] += entry.getCreatorCents();
+            sums[2] += entry.getPlatformCents();
+            sums[3] += (entry.getProcessorFeeCents() == null ? 0 : entry.getProcessorFeeCents());
         }
 
         List<Map<String, Object>> response = new ArrayList<>();

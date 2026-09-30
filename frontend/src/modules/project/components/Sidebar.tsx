@@ -158,11 +158,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
                 </SidebarSection>
             )}
 
-            {project.adsEnabled !== false && (
-                <SidebarSection title="Sponsored">
-                    <SponsoredAdCard projectId={project.id} />
-                </SidebarSection>
-            )}
+            {project.adsEnabled !== false && <SponsoredAdCard projectId={project.id} />}
 
             <SidebarSection title="Project ID" icon={Hash}>
                 <div className="flex items-center justify-between group bg-white dark:bg-slate-900/50 p-3 rounded-xl border border-slate-200 dark:border-white/5">

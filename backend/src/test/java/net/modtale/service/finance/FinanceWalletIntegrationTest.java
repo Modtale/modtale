@@ -91,4 +91,41 @@ class FinanceWalletIntegrationTest {
         assertEquals(CreatorPayoutRequest.Status.REQUIRES_REVIEW, wallets.getRequest(request.getId()).getStatus());
         assertThrows(IllegalStateException.class, () -> wallets.completeTransfers(request.getId()));
     }
+    @Test void riskArrivingAfterReservationBlocksDispatchAuthorization() {
+        wallets.postSettledCredit(credit("source-1", 1000), true);
+        var request = wallets.reserve("creator", "creator", "usd", true, UUID.randomUUID().toString(), 1000, 1000, recipients(1000));
+        wallets.markAttempted(request.getId());
+        wallets.holdForRisk("creator", "usd", true, "dispute:dp_test");
+        assertFalse(wallets.authorizeRecipientTransfer(request.getId(), 0));
+        assertTrue(wallets.getWallet("creator", "usd", true).isPayoutHold());
+        assertEquals(1000, wallets.getWallet("creator", "usd", true).getReservedCents());
+    }
+    @Test void conflictingReplayCannotCrossModesOrChangeFees() {
+        wallets.postSettledCredit(credit("source-1", 1000), true);
+        assertThrows(IllegalStateException.class, () -> wallets.postSettledCredit(credit("source-1", 1000), false));
+        var changed = credit("source-1", 1000); changed.setProcessorFeeCents(5L);
+        assertThrows(IllegalStateException.class, () -> wallets.postSettledCredit(changed, true));
+        assertEquals(0, wallets.getWallet("creator", "usd", false).getAvailableCents());
+    }
+    @Test void fullRefundRetainsOriginalFeeOnlyOnceAndOffsetsFutureEarnings() {
+        var original = credit("source-1", 500); original.setCreatorCents(405); original.setPlatformCents(50); original.setProcessorFeeCents(45L);
+        wallets.postSettledCredit(original, true);
+        wallets.postRefund("source-1", "refund-1", 500, 0, "txn_refund", true);
+        wallets.postRefund("source-1", "refund-1", 500, 0, "txn_refund", true);
+        assertEquals(-45, wallets.getWallet("creator", "usd", true).getAvailableCents());
+        wallets.postSettledCredit(credit("future-earning", 1000), true);
+        assertEquals(955, wallets.getWallet("creator", "usd", true).getAvailableCents());
+        assertEquals(-50, mongo.findById("refund-1", FinanceLedgerEntry.class).getPlatformCents());
+    }
+    @Test void partialRefundsConservePlatformRoundingAndNeverDoubleChargeOriginalFees() {
+        var original = credit("source-1", 101); original.setCreatorCents(87); original.setPlatformCents(10); original.setProcessorFeeCents(4L);
+        wallets.postSettledCredit(original, true);
+        wallets.postRefund("source-1", "refund-1", 34, 0, "txn_1", true);
+        wallets.postRefund("source-1", "refund-2", 33, 0, "txn_2", true);
+        wallets.postRefund("source-1", "refund-3", 34, 0, "txn_3", true);
+        assertEquals(-4, wallets.getWallet("creator", "usd", true).getAvailableCents());
+        assertThrows(IllegalArgumentException.class, () -> wallets.postRefund("source-1", "refund-too-much", 1, 0, "txn_4", true));
+        assertEquals(-4, wallets.getWallet("creator", "usd", true).getAvailableCents());
+    }
+
 }

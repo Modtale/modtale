@@ -27,7 +27,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 class FinanceSafetyTest {
     private DonationIntent intent() {
         var intent = new DonationIntent();
-        intent.setId("intent-1"); intent.setStripeSessionId("cs_test_1");
+        intent.setId("intent-1"); intent.setStripePlatformAccountId("acct_platform"); intent.setStripeSessionId("cs_test_1");
         intent.setAmountCents(500); intent.setCreatorCents(450); intent.setPlatformCents(50);
         intent.setCreatorId("creator"); intent.setProjectId("project");
         return intent;
@@ -81,7 +81,7 @@ class FinanceSafetyTest {
         assertEquals(DonationIntent.DonationStatus.COMPLETED, intent.getStatus());
         var captured = ArgumentCaptor.forClass(FinanceLedgerEntry.class);
         verify(ledger).insert(captured.capture());
-        assertEquals("donation:cs_test_1", captured.getValue().getId());
+        assertEquals("stripe:test:acct_platform:checkout:cs_test_1", captured.getValue().getId());
         assertEquals(FinanceLedgerEntry.EntryStatus.PENDING, captured.getValue().getStatus());
         assertNull(captured.getValue().getExpiresAt());
         assertFalse(FinanceLedgerRules.isReal(captured.getValue()));

@@ -62,7 +62,14 @@ public class FinanceWalletService {
                 if (!Objects.equals(existing.getCreatorId(), credit.getCreatorId())
                         || existing.getCreatorCents() != credit.getCreatorCents()
                         || existing.getGrossCents() != credit.getGrossCents()
-                        || !Objects.equals(existing.getCurrency(), credit.getCurrency())) {
+                        || !Objects.equals(existing.getCurrency(), credit.getCurrency())
+                        || existing.getPlatformCents() != credit.getPlatformCents()
+                        || !Objects.equals(existing.getProcessorFeeCents(), credit.getProcessorFeeCents())
+                        || !Objects.equals(existing.getCreatorGrossCents(), credit.getCreatorGrossCents())
+                        || !Objects.equals(existing.getProjectId(), credit.getProjectId())
+                        || !Objects.equals(existing.getExternalReference(), credit.getExternalReference())
+                        || existing.getType() != credit.getType() || existing.getStatus() != credit.getStatus()
+                        || !Objects.equals(existing.getMetadata().get("testMode"), String.valueOf(testMode))) {
                     throw new IllegalStateException("A conflicting settlement already uses this source reference.");
                 }
                 return null;
@@ -100,7 +107,7 @@ public class FinanceWalletService {
                 return existing;
             }
             var wallet = mongo.findAndModify(Query.query(Criteria.where("_id").is(walletId)
-                            .and("availableCents").gte(amountCents).and("payoutHold").ne(true)),
+                            .and("availableCents").gte(amountCents).and("payoutHold").ne(true).and("openRiskIds.0").exists(false)),
                     new Update().inc("availableCents", -amountCents).inc("reservedCents", amountCents),
                     FindAndModifyOptions.options().returnNew(true), CreatorWallet.class);
             if (wallet == null) throw new IllegalStateException("Insufficient settled funds or the account is on a payout hold.");
@@ -112,10 +119,78 @@ public class FinanceWalletService {
         });
     }
 
+    public void holdForRisk(String creatorId, String currency, boolean testMode, String riskId) {
+        String id = walletId(creatorId, currency, testMode);
+        mongo.upsert(Query.query(Criteria.where("_id").is(id)), new Update()
+                .setOnInsert("creatorId", creatorId).setOnInsert("currency", currency).setOnInsert("testMode", testMode)
+                .setOnInsert("availableCents", 0L).setOnInsert("reservedCents", 0L).setOnInsert("payoutHold", false)
+                .addToSet("openRiskIds", riskId), CreatorWallet.class);
+    }
+
+    public void resolveRisk(String creatorId, String currency, boolean testMode, String riskId) {
+        mongo.updateFirst(Query.query(Criteria.where("_id").is(walletId(creatorId, currency, testMode))),
+                new Update().pull("openRiskIds", riskId), CreatorWallet.class);
+    }
+
+    /** Reverses refunded principal once; provider refund fees/rebates are additional actual amounts. */
+    public void postRefund(String originalCreditId, String adjustmentId, long refundedGrossCents,
+            long providerRefundFeeCents, String providerReference, boolean testMode) {
+        postPrincipalAdjustment(originalCreditId, adjustmentId, refundedGrossCents, providerRefundFeeCents, providerReference, testMode, FinanceLedgerEntry.LedgerType.REFUND_ADJUSTMENT);
+    }
+
+    public void postDisputePrincipal(String originalCreditId, String adjustmentId, long disputedCents, String providerReference, boolean testMode) {
+        postPrincipalAdjustment(originalCreditId, adjustmentId, disputedCents, 0, providerReference, testMode, FinanceLedgerEntry.LedgerType.DISPUTE_ADJUSTMENT);
+    }
+
+    private void postPrincipalAdjustment(String originalCreditId, String adjustmentId, long refundedGrossCents,
+            long providerRefundFeeCents, String providerReference, boolean testMode, FinanceLedgerEntry.LedgerType type) {
+        if (adjustmentId == null || refundedGrossCents <= 0) throw new IllegalArgumentException("Invalid principal adjustment.");
+        transact(() -> {
+            FinanceLedgerEntry existing = mongo.findById(adjustmentId, FinanceLedgerEntry.class);
+            if (existing != null) {
+                if (!Objects.equals(existing.getExternalReference(), originalCreditId) || existing.getGrossCents() != -refundedGrossCents
+                        || !Objects.equals(existing.getProcessorFeeCents(), providerRefundFeeCents) || existing.getType() != type) throw new IllegalStateException("Conflicting refund source.");
+                return null;
+            }
+            FinanceLedgerEntry original = mongo.findById(originalCreditId, FinanceLedgerEntry.class);
+            if (original == null || original.getGrossCents() <= 0 || !Boolean.valueOf(original.getMetadata().get("testMode")).equals(testMode)) {
+                throw new IllegalStateException("The original payment must be reconciled before its refund.");
+            }
+            List<FinanceLedgerEntry> prior = mongo.find(Query.query(Criteria.where("externalReference").is(originalCreditId)
+                    .and("type").in(FinanceLedgerEntry.LedgerType.REFUND_ADJUSTMENT, FinanceLedgerEntry.LedgerType.DISPUTE_ADJUSTMENT)), FinanceLedgerEntry.class);
+            long previousGross = prior.stream().mapToLong(entry -> -entry.getGrossCents()).sum();
+            long previousPlatform = prior.stream().mapToLong(entry -> -entry.getPlatformCents()).sum();
+            long cumulativeGross = Math.addExact(previousGross, refundedGrossCents);
+            if (cumulativeGross > original.getGrossCents()) throw new IllegalArgumentException("Refunds exceed the recorded charge.");
+            long platformTotal = java.math.BigInteger.valueOf(original.getPlatformCents()).multiply(java.math.BigInteger.valueOf(cumulativeGross))
+                    .add(java.math.BigInteger.valueOf(original.getGrossCents() / 2)).divide(java.math.BigInteger.valueOf(original.getGrossCents())).longValueExact();
+            long platformReversal = platformTotal - previousPlatform;
+            long creatorAdjustment = Math.subtractExact(-refundedGrossCents + platformReversal, providerRefundFeeCents);
+            FinanceLedgerEntry adjustment = new FinanceLedgerEntry(); adjustment.setId(adjustmentId);
+            adjustment.setCreatorId(original.getCreatorId()); adjustment.setProjectId(original.getProjectId());
+            adjustment.setType(type); adjustment.setGrossCents(-refundedGrossCents);
+            adjustment.setCreatorCents(creatorAdjustment); adjustment.setPlatformCents(-platformReversal); adjustment.setProcessorFeeCents(providerRefundFeeCents);
+            adjustment.setCurrency(original.getCurrency()); adjustment.setStatus(FinanceLedgerEntry.EntryStatus.AVAILABLE);
+            adjustment.setExternalReference(originalCreditId); adjustment.setStripeReference(providerReference);
+            adjustment.getMetadata().put("settlement", "settled"); adjustment.getMetadata().put("testMode", String.valueOf(testMode));
+            adjustment.getMetadata().put("adjustmentReason", type == FinanceLedgerEntry.LedgerType.REFUND_ADJUSTMENT ? "provider_confirmed_refund" : "provider_confirmed_dispute_loss");
+            mongo.insert(adjustment);
+            var result = mongo.updateFirst(Query.query(Criteria.where("_id").is(walletId(original.getCreatorId(), original.getCurrency(), testMode))),
+                    new Update().inc("availableCents", creatorAdjustment), CreatorWallet.class);
+            if (result.getMatchedCount() != 1) throw new IllegalStateException("Original creator wallet not found.");
+            return null;
+        });
+    }
+
+    public List<CreatorPayoutRequest> getRecentRequests(String creatorId, boolean testMode) {
+        return mongo.find(Query.query(Criteria.where("creatorId").is(creatorId).and("testMode").is(testMode))
+                .with(org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.DESC, "createdAt")).limit(20), CreatorPayoutRequest.class);
+    }
+
     public CreatorPayoutRequest getRequest(String id) { return mongo.findById(id, CreatorPayoutRequest.class); }
 
-    public List<CreatorPayoutRequest> getUnfinishedRequests() {
-        return mongo.find(Query.query(Criteria.where("status").in(CreatorPayoutRequest.Status.RESERVED, CreatorPayoutRequest.Status.PROCESSING)).limit(100), CreatorPayoutRequest.class);
+    public List<CreatorPayoutRequest> getUnfinishedRequests(boolean testMode) {
+        return mongo.find(Query.query(Criteria.where("status").in(CreatorPayoutRequest.Status.RESERVED, CreatorPayoutRequest.Status.PROCESSING).and("testMode").is(testMode)).limit(100), CreatorPayoutRequest.class);
     }
 
     public CreatorPayoutRequest markAttempted(String id) {
@@ -123,6 +198,23 @@ public class FinanceWalletService {
                         .and("status").is(CreatorPayoutRequest.Status.RESERVED)),
                 new Update().set("firstAttemptAt", Instant.now()).set("status", CreatorPayoutRequest.Status.PROCESSING),
                 FindAndModifyOptions.options().returnNew(true), CreatorPayoutRequest.class);
+    }
+
+    /** Linearizes each outbound authorization against risk holds on the same wallet document. */
+    public boolean authorizeRecipientTransfer(String requestId, int recipientIndex) {
+        return Boolean.TRUE.equals(transact(() -> {
+            CreatorPayoutRequest request = mongo.findById(requestId, CreatorPayoutRequest.class);
+            if (request == null || request.getStatus() != CreatorPayoutRequest.Status.PROCESSING
+                    || recipientIndex < 0 || recipientIndex >= request.getRecipients().size()) return false;
+            if (request.getRecipients().get(recipientIndex).getTransferId() != null) return false;
+            var result = mongo.updateFirst(Query.query(Criteria.where("_id").is(request.getWalletId())
+                            .and("payoutHold").ne(true).and("openRiskIds.0").exists(false).and("availableCents").gte(0)),
+                    new Update().inc("dispatchAuthorizationSequence", 1L), CreatorWallet.class);
+            if (result.getModifiedCount() != 1) return false;
+            mongo.updateFirst(Query.query(Criteria.where("_id").is(requestId).and("status").is(CreatorPayoutRequest.Status.PROCESSING)),
+                    new Update().set("recipients." + recipientIndex + ".authorizedAt", Instant.now()), CreatorPayoutRequest.class);
+            return true;
+        }));
     }
 
     public void recordTransfer(String id, int recipientIndex, String transferId) {

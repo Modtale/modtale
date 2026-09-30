@@ -40,9 +40,19 @@ public class EarningsAccountService {
     @Autowired private AccessControlService accessControlService;
     @Autowired private StripeGatewayService stripeGatewayService;
     @Autowired private RevenueOpsSupport core;
+    @Autowired private FinanceWalletService wallets;
+    @Autowired private CreatorPayoutService payouts;
 
     @Value("${app.finance.ads.test-mode-enabled:false}")
     private boolean defaultAdTestModeEnabled;
+
+    @Value("${app.finance.stripe.creator-countries:US,CA,GB,CH,AT,BE,BG,HR,CY,CZ,DK,EE,FI,FR,DE,GR,HU,IE,IS,IT,LI,LT,LU,LV,MT,NL,NO,PL,PT,RO,SE,SI,SK,ES}")
+    private String creatorCountries;
+
+    public List<String> getCreatorCountries() {
+        return java.util.Arrays.stream(creatorCountries.split(",")).map(String::trim).map(String::toUpperCase)
+                .filter(value -> value.matches("[A-Z]{2}")).distinct().sorted().toList();
+    }
 
     public PlatformFinanceSettings getSettings() {
         PlatformFinanceSettings settings = settingsRepository.findById("platform").orElseGet(() -> {
@@ -182,14 +192,20 @@ public class EarningsAccountService {
         response.put("fundsExpire", false);
         response.put("adCreatorSplitPercent", settings.getAdCreatorSplitBps() / 100.0);
         response.put("defaultDonationPlatformCutPercent", settings.getDonationPlatformCutBps() / 100.0);
-        response.put("availableCents", Math.max(0, available));
+        response.put("availableCents", Math.max(0, wallets.getWallet(creator.getId(), settings.getCurrency(), false).getAvailableCents()));
+        response.put("reservedCents", wallets.getWallet(creator.getId(), settings.getCurrency(), false).getReservedCents());
+        response.put("adjustmentOwedCents", Math.max(0, -wallets.getWallet(creator.getId(), settings.getCurrency(), false).getAvailableCents()));
+        response.put("payoutHold", wallets.getWallet(creator.getId(), settings.getCurrency(), stripeGatewayService.isTestMode()).isPayoutHold());
+        response.put("testAvailableCents", wallets.getWallet(creator.getId(), settings.getCurrency(), true).getAvailableCents());
         response.put("pendingCents", Math.max(0, pending));
         response.put("paidOutCents", Math.max(0, paidOut));
         response.put("expiredCents", Math.max(0, expired));
         response.put("expiringSoonCents", 0);
-        response.put("withdrawalsEnabled", false);
-        response.put("onboardingEnabled", stripeGatewayService.isTestMode());
-        response.put("testMode", stripeGatewayService.isCheckoutAvailable());
+        response.put("withdrawalsEnabled", stripeGatewayService.isOperational());
+        response.put("onboardingEnabled", stripeGatewayService.isOperational());
+        response.put("onboardingCountries", getCreatorCountries());
+        response.put("stripeAccountCountry", creator.getStripeAccountCountry());
+        response.put("testMode", stripeGatewayService.isTestMode() || stripeGatewayService.isMockEnabled());
         response.put("availabilityMessage", stripeGatewayService.getAvailabilityMessage());
         response.put("periodAdRevenueCents", periodAdRevenue);
         response.put("periodDonationRevenueCents", periodDonationRevenue);
@@ -199,6 +215,11 @@ public class EarningsAccountService {
         response.put("expiredChart", expiredChart);
         response.put("projects", monetizationProjects);
         response.put("payouts", payouts);
+        response.put("payoutRequests", wallets.getRecentRequests(creator.getId(), stripeGatewayService.isTestMode()).stream().map(request -> {
+            Map<String, Object> row = new HashMap<>(); row.put("id", request.getId()); row.put("amountCents", request.getAmountCents());
+            row.put("status", request.getStatus()); row.put("createdAt", request.getCreatedAt()); row.put("reviewReason", request.getReviewReason());
+            return row;
+        }).toList());
         response.put("stripeConnected", creator.getStripeConnectAccountId() != null && !creator.getStripeConnectAccountId().isBlank());
         response.put("stripeOnboardingComplete", creator.isStripeOnboardingComplete());
         response.put("stripePayoutsEnabled", creator.isStripePayoutsEnabled());
@@ -313,28 +334,30 @@ public class EarningsAccountService {
         );
     }
 
-    public Map<String, Object> createStripeOnboardingLink(User requester, String ownerId, String returnPath) {
+    public Map<String, Object> createStripeOnboardingLink(User requester, String ownerId, String returnPath, String country) {
         User creator = core.resolveFinanceOwner(requester, ownerId, true);
         if (creator.getAccountType() == User.AccountType.ORGANIZATION) {
             core.requireOrganizationOwner(requester, creator);
         }
+        if (!stripeGatewayService.isOperational()) throw new IllegalStateException(stripeGatewayService.getAvailabilityMessage());
         String accountId = creator.getStripeConnectAccountId();
         if (accountId == null || accountId.isBlank()) {
+            String selectedCountry = country == null ? "" : country.trim().toUpperCase(java.util.Locale.ROOT);
+            if (!getCreatorCountries().contains(selectedCountry)) throw new IllegalArgumentException("Select an eligible country for the payout account owner.");
             StripeGatewayService.StripeResult accountResult = stripeGatewayService.createOrSimulateConnectAccount(
-                    creator.getEmail(),
-                    "US",
-                    stripeGatewayService.isMockEnabled()
-            );
+                    creator.getEmail(), selectedCountry, false,
+                    "connect:" + stripeGatewayService.getPlatformAccountId() + (stripeGatewayService.isTestMode() ? ":test:" : ":live:") + creator.getId() + ":" + selectedCountry);
+
             if (!accountResult.success()) {
                 throw new IllegalStateException("Unable to initialize Stripe account: " + accountResult.error());
             }
             accountId = accountResult.id();
             creator.setStripeConnectAccountId(accountId);
-            creator.setStripeAccountCountry("US");
+            creator.setStripeAccountCountry(selectedCountry);
             userRepository.save(creator);
         }
 
-        String safePath = (returnPath == null || returnPath.isBlank()) ? "/dashboard/finance" : returnPath;
+        String safePath = "/dashboard/finance";
         StripeGatewayService.StripeResult linkResult = stripeGatewayService.createOrSimulateOnboardingLink(
                 accountId,
                 safePath,
@@ -369,7 +392,8 @@ public class EarningsAccountService {
 
         if (status.containsKey("error")) throw new IllegalStateException("Payment provider status is temporarily unavailable. Your saved account status has not changed.");
         boolean detailsSubmitted = core.asBoolean(status.get("details_submitted"));
-        boolean payoutsEnabled = core.asBoolean(status.get("payouts_enabled"));
+        boolean payoutsEnabled = core.asBoolean(status.get("payouts_enabled"))
+                && status.get("capabilities") instanceof Map<?, ?> capabilities && "active".equals(capabilities.get("transfers"));
 
         creator.setStripeOnboardingComplete(detailsSubmitted);
         creator.setStripePayoutsEnabled(payoutsEnabled);
@@ -383,18 +407,17 @@ public class EarningsAccountService {
         response.put("onboardingComplete", detailsSubmitted);
         response.put("payoutsEnabled", payoutsEnabled);
         response.put("ownerId", creator.getId());
-        response.put("raw", status);
+
         return response;
     }
 
-    public Map<String, Object> requestPayout(User requester, String ownerId, Long amountCentsInput) {
+    public Map<String, Object> requestPayout(User requester, String ownerId, Long amountCentsInput, String requestKey) {
         User creator = core.resolveFinanceOwner(requester, ownerId, true);
         if (creator.getAccountType() == User.AccountType.ORGANIZATION) {
             core.requireOrganizationOwner(requester, creator);
         }
-        // The previous code transferred before reserving the balance and could pay twice.
-        // Fail closed until atomic reservations, recipient-level idempotency and reconciliation ship.
-        throw new IllegalStateException("Withdrawals are not available yet. Your earned balance is preserved while payout verification is completed.");
+        PlatformFinanceSettings settings = getSettings();
+        return CreatorPayoutService.toResponse(payouts.request(requester, creator, settings.getCurrency(), amountCentsInput, settings.getMinPayoutCents(), requestKey));
     }
 
     public Map<String, Object> updateProjectMonetization(User requester, Project project, UpdateProjectMonetizationRequest request) {

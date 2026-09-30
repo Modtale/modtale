@@ -9,7 +9,7 @@ import org.junit.jupiter.api.Test;
 class PaymentSettlementServiceTest {
     private FinanceLedgerEntry pending() {
         var pending = new FinanceLedgerEntry(); pending.setId("observation"); pending.setCreatorId("creator"); pending.setGrossCents(500);
-        pending.setPlatformCents(50); pending.getMetadata().put("paymentIntentId", "pi_test"); pending.getMetadata().put("testMode", "true");
+        pending.setPlatformCents(50); pending.getMetadata().put("providerAccountId", "acct_platform"); pending.getMetadata().put("paymentIntentId", "pi_test"); pending.getMetadata().put("testMode", "true");
         return pending;
     }
     private Map<String, Object> payment(long fee, String status) {
@@ -22,7 +22,7 @@ class PaymentSettlementServiceTest {
         assertNotNull(credit); assertEquals(405, credit.getCreatorCents()); assertEquals(50, credit.getPlatformCents());
         assertEquals(45, credit.getProcessorFeeCents()); assertEquals(450, credit.getCreatorGrossCents());
         assertEquals(credit.getGrossCents(), credit.getCreatorCents() + credit.getPlatformCents() + credit.getProcessorFeeCents());
-        assertEquals("settlement:txn_test", credit.getId()); assertNull(credit.getExpiresAt());
+        assertEquals("stripe:test:acct_platform:settlement:txn_test", credit.getId()); assertNull(credit.getExpiresAt());
     }
     @Test void pendingProviderFundsAndFeeDominatedPaymentsAreNotCredited() {
         assertNull(PaymentSettlementService.settledCredit(pending(), payment(45, "pending")));

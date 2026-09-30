@@ -19,7 +19,7 @@ interface DonationPromptModalProps {
 
 export const DonationPromptModal: React.FC<DonationPromptModalProps> = ({
     show, currency = 'USD', suggestedAmountCents, platformCutPercent = 10,
-    testMode = false, onClose, onSkip, onDonate, isProcessing = false
+    allowRecurring = false, testMode = false, onClose, onSkip, onDonate, isProcessing = false
 }) => {
     useScrollLock(show);
     const titleId = useId();
@@ -33,11 +33,13 @@ export const DonationPromptModal: React.FC<DonationPromptModalProps> = ({
     closeRef.current = onClose;
     processingRef.current = isProcessing;
     const [amount, setAmount] = useState('5.00');
+    const [recurring, setRecurring] = useState(false);
 
     useEffect(() => {
         if (!show) return;
         setAmount((Math.max(100, Math.min(100000, suggestedAmountCents)) / 100).toFixed(2));
         submittedRef.current = false;
+        setRecurring(false);
         const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
         dialogRef.current?.focus();
         const onKeyDown = (event: KeyboardEvent) => {
@@ -70,7 +72,7 @@ export const DonationPromptModal: React.FC<DonationPromptModalProps> = ({
     const submit = () => {
         if (cents === null || isProcessing || submittedRef.current) return;
         submittedRef.current = true;
-        onDonate(cents, false, true);
+        onDonate(cents, recurring && allowRecurring, !(recurring && allowRecurring));
     };
     const dismiss = () => { if (!isProcessing) onClose(); };
 
@@ -88,6 +90,10 @@ export const DonationPromptModal: React.FC<DonationPromptModalProps> = ({
                 </div>
                 <div className="px-6 py-5 space-y-4">
                     {testMode && <p role="status" className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:bg-amber-900/20 dark:text-amber-200">Preview checkout. No real money or creator earnings.</p>}
+                    {allowRecurring && <div className="flex rounded-xl border border-slate-200 p-1 dark:border-white/10" role="group" aria-label="Support frequency">
+                        <button type="button" disabled={isProcessing} aria-pressed={!recurring} onClick={() => setRecurring(false)} className={`flex-1 rounded-lg px-4 py-2 text-sm font-bold ${!recurring ? 'bg-modtale-accent text-white' : 'text-slate-600 dark:text-slate-300'}`}>One-time</button>
+                        <button type="button" disabled={isProcessing} aria-pressed={recurring} onClick={() => setRecurring(true)} className={`flex-1 rounded-lg px-4 py-2 text-sm font-bold ${recurring ? 'bg-modtale-accent text-white' : 'text-slate-600 dark:text-slate-300'}`}>Monthly</button>
+                    </div>}
                     <div>
                         <label htmlFor={amountId} className="block text-sm font-bold text-slate-700 dark:text-slate-200">Tip amount ({currency.toUpperCase()})</label>
                         <div className="mt-2 flex gap-2">{[300, 500, 1000].map(preset => <button key={preset} type="button" disabled={isProcessing} aria-pressed={cents === preset} onClick={() => setAmount((preset / 100).toFixed(2))} className={`flex-1 rounded-lg border px-3 py-2 font-bold ${cents === preset ? 'border-modtale-accent bg-modtale-accent/10 text-modtale-accent' : 'border-slate-200 dark:border-white/20 text-slate-600 dark:text-slate-300'}`}>{new Intl.NumberFormat(undefined, { style: 'currency', currency, maximumFractionDigits: 0 }).format(preset / 100)}</button>)}</div>
@@ -96,11 +102,11 @@ export const DonationPromptModal: React.FC<DonationPromptModalProps> = ({
                         {!valid && <p id={errorId} className="mt-2 text-sm text-red-600 dark:text-red-400">Enter 1.00–1,000.00 with no more than two decimal places.</p>}
                     </div>
                     <p className="text-xs leading-relaxed text-slate-500 dark:text-slate-400">{platformCutPercent}% of the tip supports Modtale. Payment processing fees are deducted from the creator’s remaining share. This supports their content and is not a tax-deductible charitable donation.</p>
-                    <p className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400"><ShieldCheck className="h-4 w-4 shrink-0" />One-time payment. No subscription or reminder emails.</p>
+                    <p className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400"><ShieldCheck className="h-4 w-4 shrink-0" />{recurring ? 'Renews monthly until cancelled. Manage or cancel in Finance → Your monthly support.' : 'One-time payment. No subscription.'} No reminder emails.</p>
                 </div>
                 <div className="px-6 py-4 border-t border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-800/50 flex flex-col-reverse sm:flex-row gap-2 sm:justify-end">
                     <button type="button" onClick={onSkip} disabled={isProcessing} className="px-4 py-2.5 rounded-xl border border-slate-300 dark:border-white/20 text-slate-700 dark:text-slate-200 font-bold hover:bg-slate-100 dark:hover:bg-white/10 disabled:opacity-50">Download without tipping</button>
-                    <button type="button" onClick={submit} disabled={isProcessing || !valid} className="px-4 py-2.5 rounded-xl bg-modtale-accent text-white font-bold hover:bg-modtale-accentHover disabled:opacity-50">{isProcessing ? 'Opening checkout…' : valid ? `Tip ${formatted} & download` : 'Tip & download'}</button>
+                    <button type="button" onClick={submit} disabled={isProcessing || !valid} className="px-4 py-2.5 rounded-xl bg-modtale-accent text-white font-bold hover:bg-modtale-accentHover disabled:opacity-50">{isProcessing ? 'Opening checkout…' : valid ? `Tip ${formatted}${recurring ? '/month' : ''} & download` : 'Tip & download'}</button>
                 </div>
             </div>
         </div>

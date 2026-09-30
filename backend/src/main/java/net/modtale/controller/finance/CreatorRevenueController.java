@@ -27,7 +27,7 @@ public class CreatorRevenueController {
     @Autowired private AccessControlService accessControlService;
 
     @GetMapping("/creator/overview")
-    @PreAuthorize("@apiSecurity.hasPersonalPerm('PROFILE_READ', authentication)")
+    @PreAuthorize("!hasAuthority('ROLE_API') && @apiSecurity.hasPersonalPerm('PROFILE_READ', authentication)")
     public ResponseEntity<?> getCreatorOverview(
             @RequestParam(defaultValue = "30d") String range,
             @RequestParam(required = false) String ownerId
@@ -44,7 +44,7 @@ public class CreatorRevenueController {
     }
 
     @GetMapping("/creator/contexts")
-    @PreAuthorize("@apiSecurity.hasPersonalPerm('PROFILE_READ', authentication)")
+    @PreAuthorize("!hasAuthority('ROLE_API') && @apiSecurity.hasPersonalPerm('PROFILE_READ', authentication)")
     public ResponseEntity<?> getFinanceContexts() {
         User user = accountService.getCurrentUser();
         if (user == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
@@ -52,7 +52,7 @@ public class CreatorRevenueController {
     }
 
     @PostMapping("/creator/stripe/onboarding-link")
-    @PreAuthorize("@apiSecurity.hasPersonalPerm('PROFILE_EDIT_BASIC', authentication)")
+    @PreAuthorize("!hasAuthority('ROLE_API') && @apiSecurity.hasPersonalPerm('PROFILE_EDIT_BASIC', authentication)")
     public ResponseEntity<?> createStripeOnboardingLink(@RequestBody(required = false) Map<String, String> payload) {
         User user = accountService.getCurrentUser();
         if (user == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
@@ -60,16 +60,16 @@ public class CreatorRevenueController {
         String returnPath = payload != null ? payload.get("returnPath") : null;
         String ownerId = payload != null ? payload.get("ownerId") : null;
         try {
-            return ResponseEntity.ok(financeAccountService.createStripeOnboardingLink(user, ownerId, returnPath));
+            return ResponseEntity.ok(financeAccountService.createStripeOnboardingLink(user, ownerId, returnPath, payload == null ? null : payload.get("country")));
         } catch (SecurityException e) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
-        } catch (IllegalStateException e) {
+        } catch (IllegalStateException | IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(e.getMessage());
         }
     }
 
     @PostMapping("/creator/stripe/refresh-status")
-    @PreAuthorize("@apiSecurity.hasPersonalPerm('PROFILE_READ', authentication)")
+    @PreAuthorize("!hasAuthority('ROLE_API') && @apiSecurity.hasPersonalPerm('PROFILE_READ', authentication)")
     public ResponseEntity<?> refreshStripeStatus(@RequestBody(required = false) Map<String, String> payload) {
         User user = accountService.getCurrentUser();
         if (user == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
@@ -84,7 +84,7 @@ public class CreatorRevenueController {
     }
 
     @PostMapping("/creator/payouts/request")
-    @PreAuthorize("@apiSecurity.hasPersonalPerm('PROFILE_READ', authentication)")
+    @PreAuthorize("!hasAuthority('ROLE_API') && @apiSecurity.hasPersonalPerm('PROFILE_READ', authentication)")
     public ResponseEntity<?> requestPayout(@RequestBody(required = false) Map<String, Object> payload) {
         User user = accountService.getCurrentUser();
         if (user == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
@@ -94,17 +94,18 @@ public class CreatorRevenueController {
         if (payload != null && payload.get("amountCents") != null) {
             try {
                 amountCents = Long.parseLong(String.valueOf(payload.get("amountCents")));
-            } catch (Exception ignored) {}
+            } catch (Exception invalid) { return ResponseEntity.badRequest().body("Payout amount must be an integer number of cents."); }
         }
+        String requestKey = payload != null && payload.get("requestKey") instanceof String key ? key : null;
         if (payload != null && payload.get("ownerId") != null) {
             ownerId = String.valueOf(payload.get("ownerId"));
         }
 
         try {
-            return ResponseEntity.ok(financeAccountService.requestPayout(user, ownerId, amountCents));
+            return ResponseEntity.ok(financeAccountService.requestPayout(user, ownerId, amountCents, requestKey));
         } catch (SecurityException e) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
-        } catch (IllegalStateException e) {
+        } catch (IllegalStateException | IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(e.getMessage());
         }
     }

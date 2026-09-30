@@ -20,6 +20,8 @@ public class FinanceLedgerEntry {
 
     public enum LedgerType {
         DONATION,
+        REFUND_ADJUSTMENT,
+        DISPUTE_ADJUSTMENT,
         AD_CLICK,
         AD_IMPRESSION,
         PAYOUT,

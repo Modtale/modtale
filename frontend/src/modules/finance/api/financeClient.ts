@@ -5,11 +5,11 @@ export const financeClient = {
         await api.get('/finance/creator/overview', { params: { range, ownerId } })
     ).data,
     getFinanceContexts: async () => (await api.get('/finance/creator/contexts')).data,
-    createStripeOnboardingLink: async (returnPath?: string, ownerId?: string) => (
-        await api.post('/finance/creator/stripe/onboarding-link', { returnPath, ownerId })
+    createStripeOnboardingLink: async (returnPath?: string, ownerId?: string, country?: string) => (
+        await api.post('/finance/creator/stripe/onboarding-link', { returnPath, ownerId, country })
     ).data,
     refreshStripeStatus: async (ownerId?: string) => (await api.post('/finance/creator/stripe/refresh-status', { ownerId })).data,
-    requestPayout: async (amountCents?: number, ownerId?: string) => (await api.post('/finance/creator/payouts/request', { amountCents, ownerId })).data,
+    requestPayout: async (amountCents?: number, ownerId?: string, requestKey?: string) => (await api.post('/finance/creator/payouts/request', { amountCents, ownerId, requestKey })).data,
     getOrgPayoutPolicy: async (orgId: string) => (await api.get(`/finance/creator/orgs/${orgId}/payout-policy`)).data,
     updateOrgPayoutPolicy: async (orgId: string, data: { payoutMode: string; shares: Array<{ userId: string; percent: number }> }) => (
         await api.put(`/finance/creator/orgs/${orgId}/payout-policy`, data)
@@ -23,11 +23,14 @@ export const financeClient = {
         donationPlatformCutBps?: number;
     }) => (await api.put(`/finance/projects/${projectId}/settings`, data)).data,
 
+    getSupportSubscriptions: async () => (await api.get('/finance/support/subscriptions')).data,
+    openSupportBillingPortal: async (subscriptionId: string) => (await api.post(`/finance/support/subscriptions/${encodeURIComponent(subscriptionId)}/billing-portal`)).data,
+
     getDonationConfig: async (projectId: string) => (await api.get(`/finance/projects/${projectId}/donation-config`)).data,
     createDonationCheckout: async (projectId: string, amountCents: number, recurring: boolean, guestCheckout = false) => (
-        await api.post(`/finance/projects/${projectId}/donations/checkout-url`, null, { params: { amountCents, recurring, guestCheckout } })
+        await api.post(`/finance/projects/${projectId}/donations/checkout-url`, { amountCents, recurring, guestCheckout })
     ).data,
-    confirmDonationIntent: async (intentId: string) => (await api.post('/finance/donations/confirm', null, { params: { intentId } })).data,
+    confirmDonationIntent: async (intentId: string) => (await api.post('/finance/donations/confirm', { intentId })).data,
 
     getAdSlot: async (projectId: string, placement?: string) => (await api.get(`/finance/ads/slot/${projectId}`, { params: { placement } })).data,
     trackAdImpression: async (campaignId: string, projectId: string) => (await api.post('/finance/ads/impression', { campaignId, projectId })).data,

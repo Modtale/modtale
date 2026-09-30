@@ -105,18 +105,15 @@ export const Settings: React.FC<SettingsProps> = ({
 
                     <div className="flex items-center justify-between mb-4">
                         <div><p className={`text-sm font-bold ${theme.colors.textPrimary}`}>Ads Enabled</p><p className={`text-xs ${theme.colors.textMuted}`}>Allow ads on this project page.</p></div>
-                        <button type="button" disabled={readOnly || !hasProjectPermission(Permission.PROJECT_EDIT_METADATA)} onClick={() => { markDirty(); setProjectData(prev => prev ? { ...prev, adsEnabled: !prev.adsEnabled } : null); }} className={`transition-colors ${readOnly || !hasProjectPermission(Permission.PROJECT_EDIT_METADATA) ? 'opacity-50' : projectData?.adsEnabled ? 'text-green-500' : theme.colors.textSecondary}`}>{projectData?.adsEnabled ? <ToggleRight className="w-8 h-8" /> : <ToggleLeft className="w-8 h-8" />}</button>
+                        <button type="button" disabled={readOnly || !projectData?.isOwner || !hasProjectPermission(Permission.PROJECT_EDIT_METADATA)} onClick={() => { markDirty(); setProjectData(prev => prev ? { ...prev, adsEnabled: !prev.adsEnabled } : null); }} className={`transition-colors ${readOnly || !projectData?.isOwner || !hasProjectPermission(Permission.PROJECT_EDIT_METADATA) ? 'opacity-50' : projectData?.adsEnabled ? 'text-green-500' : theme.colors.textSecondary}`}>{projectData?.adsEnabled ? <ToggleRight className="w-8 h-8" /> : <ToggleLeft className="w-8 h-8" />}</button>
                     </div>
 
                     <div className="flex items-center justify-between mb-4">
                         <div><p className={`text-sm font-bold ${theme.colors.textPrimary}`}>Creator Support Enabled</p><p className={`text-xs ${theme.colors.textMuted}`}>Offer optional tips during downloads when checkout is available.</p></div>
-                        <button type="button" disabled={readOnly || !hasProjectPermission(Permission.PROJECT_EDIT_METADATA)} onClick={() => { markDirty(); setProjectData(prev => prev ? { ...prev, donationsEnabled: !prev.donationsEnabled } : null); }} className={`transition-colors ${readOnly || !hasProjectPermission(Permission.PROJECT_EDIT_METADATA) ? 'opacity-50' : projectData?.donationsEnabled ? 'text-green-500' : theme.colors.textSecondary}`}>{projectData?.donationsEnabled ? <ToggleRight className="w-8 h-8" /> : <ToggleLeft className="w-8 h-8" />}</button>
+                        <button type="button" disabled={readOnly || !projectData?.isOwner || !hasProjectPermission(Permission.PROJECT_EDIT_METADATA)} onClick={() => { markDirty(); setProjectData(prev => prev ? { ...prev, donationsEnabled: !prev.donationsEnabled } : null); }} className={`transition-colors ${readOnly || !projectData?.isOwner || !hasProjectPermission(Permission.PROJECT_EDIT_METADATA) ? 'opacity-50' : projectData?.donationsEnabled ? 'text-green-500' : theme.colors.textSecondary}`}>{projectData?.donationsEnabled ? <ToggleRight className="w-8 h-8" /> : <ToggleLeft className="w-8 h-8" />}</button>
                     </div>
 
-                    <div className="flex items-center justify-between mb-4">
-                        <div><p className={`text-sm font-bold ${theme.colors.textPrimary}`}>Recurring by Default</p><p className={`text-xs ${theme.colors.textMuted}`}>Monthly support is being prepared and is not offered in checkout yet.</p></div>
-                        <button type="button" disabled={readOnly || !hasProjectPermission(Permission.PROJECT_EDIT_METADATA)} onClick={() => { markDirty(); setProjectData(prev => prev ? { ...prev, donationRecurringDefault: !prev.donationRecurringDefault } : null); }} className={`transition-colors ${readOnly || !hasProjectPermission(Permission.PROJECT_EDIT_METADATA) ? 'opacity-50' : projectData?.donationRecurringDefault ? 'text-green-500' : theme.colors.textSecondary}`}>{projectData?.donationRecurringDefault ? <ToggleRight className="w-8 h-8" /> : <ToggleLeft className="w-8 h-8" />}</button>
-                    </div>
+                    <p className={`mb-4 text-xs ${theme.colors.textMuted}`}>Signed-in supporters can choose monthly support at checkout. One-time support is selected initially.</p>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
@@ -125,7 +122,7 @@ export const Settings: React.FC<SettingsProps> = ({
                                 type="number"
                                 min="1"
                                 step="0.01"
-                                disabled={readOnly || !hasProjectPermission(Permission.PROJECT_EDIT_METADATA)}
+                                disabled={readOnly || !projectData?.isOwner || !hasProjectPermission(Permission.PROJECT_EDIT_METADATA)}
                                 value={(Math.max(100, Number(projectData?.suggestedDonationCents || 500)) / 100).toFixed(2)}
                                 onChange={(e) => {
                                     const cents = Math.max(100, Math.round(Number(e.target.value || 0) * 100));
@@ -142,7 +139,7 @@ export const Settings: React.FC<SettingsProps> = ({
                                 min="0"
                                 max="100"
                                 step="0.1"
-                                disabled={readOnly || !hasProjectPermission(Permission.PROJECT_EDIT_METADATA)}
+                                disabled={readOnly || !projectData?.isOwner || !hasProjectPermission(Permission.PROJECT_EDIT_METADATA)}
                                 value={(Math.max(0, Math.min(10000, Number(projectData?.donationPlatformCutBps || 0))) / 100).toFixed(1)}
                                 onChange={(e) => {
                                     const bps = Math.max(0, Math.min(10000, Math.round(Number(e.target.value || 0) * 100)));

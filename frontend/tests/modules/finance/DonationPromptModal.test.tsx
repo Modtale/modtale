@@ -42,4 +42,12 @@ describe('optional creator support dialog', () => {
         await render(); expect(document.activeElement).toBe(host.querySelector('[role="dialog"]'));
         await render({ show: false }); expect(document.activeElement).toBe(opener); opener.remove();
     });
+    it('requires an explicit monthly choice and explains renewal and cancellation', async () => {
+        await render();
+        await act(async () => [...host.querySelectorAll('button')].find(button => button.textContent === 'Monthly')!.click());
+        expect(host.textContent).toContain('Renews monthly until cancelled');
+        await act(async () => [...host.querySelectorAll('button')].find(button => button.textContent?.includes('/month & download'))!.click());
+        expect(onDonate).toHaveBeenCalledWith(500, true, false);
+    });
+
 });

@@ -16,6 +16,11 @@ public class RevenueAdminController {
 
     @Autowired private EarningsAccountService financeAccountService;
     @Autowired private AdCampaignService financeAdsService;
+    @Autowired private net.modtale.service.finance.PaymentAdjustmentService adjustments;
+
+    @GetMapping("/admin/disputes")
+    @PreAuthorize("@apiSecurity.hasAdminPermission('PLATFORM_FINANCE_MANAGE', authentication)")
+    public ResponseEntity<?> getDisputes() { return ResponseEntity.ok(adjustments.getDisputeCases()); }
 
     @GetMapping("/admin/overview")
     @PreAuthorize("@apiSecurity.hasAdminPermission('PLATFORM_FINANCE_MANAGE', authentication)")

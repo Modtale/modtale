@@ -37,12 +37,14 @@ public class DonationIntent {
     private long creatorCents;
     private long platformCents;
     private boolean recurring;
+    private int platformCutBps;
     private String currency = "usd";
 
     @Indexed
     private DonationStatus status = DonationStatus.PENDING;
 
     private String stripeSessionId;
+    private String stripePlatformAccountId;
     private String checkoutUrl;
 
     private LocalDateTime createdAt = LocalDateTime.now();
@@ -113,6 +115,10 @@ public class DonationIntent {
         this.platformCents = platformCents;
     }
 
+    public int getPlatformCutBps() { return platformCutBps; }
+
+    public void setPlatformCutBps(int bps) { platformCutBps = bps; }
+
     public boolean isRecurring() {
         return recurring;
     }
@@ -136,6 +142,9 @@ public class DonationIntent {
     public void setStatus(DonationStatus status) {
         this.status = status;
     }
+
+    public String getStripePlatformAccountId() { return stripePlatformAccountId; }
+    public void setStripePlatformAccountId(String id) { stripePlatformAccountId = id; }
 
     public String getStripeSessionId() {
         return stripeSessionId;

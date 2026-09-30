@@ -611,7 +611,8 @@ jobs:
           : "${RUNTIME_SERVICE_ACCOUNT:?Set the GitHub environment runtime service account variable for this environment.}"
 
           bash ../.github/scripts/build-container.sh frontend "$TAG" \
-            --build-arg "PUBLIC_API_URL=$API_URL" --build-arg "SSR_API_URL=$SSR_API_URL"
+            --build-arg "PUBLIC_API_URL=$API_URL" --build-arg "SSR_API_URL=$SSR_API_URL" \
+            --build-arg "PUBLIC_FINANCE_DEMO=${{ env.ENV_TYPE == 'preview' && 'true' || 'false' }}"
 
           FRONTEND_ARGS=(
             "--image" "gcr.io/$PROJECT_ID/modtale-frontend:$TAG"

@@ -111,7 +111,7 @@ export const useProjectEditor = (
             };
 
             await api.put(`/projects/${projectData.id}`, payload);
-            await financeClient.updateProjectMonetization(projectData.id, {
+            if (projectData.isOwner) await financeClient.updateProjectMonetization(projectData.id, {
                 adsEnabled: Boolean(projectData.adsEnabled),
                 donationsEnabled: Boolean(projectData.donationsEnabled),
                 suggestedDonationCents: Math.max(100, Math.round(Number(projectData.suggestedDonationCents || 500))),

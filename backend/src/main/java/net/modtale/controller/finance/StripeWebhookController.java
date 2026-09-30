@@ -4,10 +4,13 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Instant;
 import java.util.Map;
+import java.util.List;
 import net.modtale.model.finance.PaymentWebhookReceipt;
 import net.modtale.repository.finance.PaymentWebhookReceiptRepository;
 import net.modtale.service.finance.DonationCheckoutService;
 import net.modtale.service.finance.StripeGatewayService;
+import net.modtale.service.finance.RecurringSupportService;
+import net.modtale.service.finance.PaymentAdjustmentService;
 import net.modtale.service.finance.StripeWebhookSignature;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DuplicateKeyException;
@@ -21,13 +24,17 @@ public class StripeWebhookController {
     private final DonationCheckoutService donations;
     private final PaymentWebhookReceiptRepository receipts;
     private final StripeGatewayService gateway;
+    private final RecurringSupportService recurring;
+    private final PaymentAdjustmentService adjustments;
     private final String webhookSecret;
 
     public StripeWebhookController(DonationCheckoutService donations, PaymentWebhookReceiptRepository receipts,
-            StripeGatewayService gateway, @Value("${app.finance.stripe.webhook-secret:}") String webhookSecret) {
+            StripeGatewayService gateway, RecurringSupportService recurring, PaymentAdjustmentService adjustments, @Value("${app.finance.stripe.webhook-secret:}") String webhookSecret) {
         this.donations = donations;
         this.receipts = receipts;
         this.gateway = gateway;
+        this.recurring = recurring;
+        this.adjustments = adjustments;
         this.webhookSecret = webhookSecret;
     }
 
@@ -48,15 +55,23 @@ public class StripeWebhookController {
         if (!(event.get("id") instanceof String eventId) || !eventId.startsWith("evt_")
                 || !(event.get("type") instanceof String type)) return ResponseEntity.badRequest().build();
         // Do not acknowledge live events as fulfilled until the full live-money lifecycle is enabled.
-        if (!Boolean.FALSE.equals(event.get("livemode")) || !gateway.isTestMode()) return ResponseEntity.status(503).build();
+        if (!(event.get("livemode") instanceof Boolean live) || !gateway.isReconciliationEnabled() || live == gateway.isTestMode()) return ResponseEntity.status(503).build();
+        if (!StripeGatewayService.API_VERSION.equals(event.get("api_version"))) return ResponseEntity.status(503).build();
         if (receipts.existsById(eventId)) return ResponseEntity.ok(Map.of("received", true));
-        if ("checkout.session.completed".equals(type) || "checkout.session.async_payment_succeeded".equals(type)) {
+        if (List.of("checkout.session.completed", "checkout.session.async_payment_succeeded", "invoice.paid", "invoice.payment_failed", "customer.subscription.updated", "customer.subscription.deleted", "charge.refunded", "refund.created", "refund.updated", "charge.dispute.created", "charge.dispute.updated", "charge.dispute.closed", "charge.dispute.funds_withdrawn", "charge.dispute.funds_reinstated").contains(type)) {
             if (!(event.get("data") instanceof Map<?, ?> data) || !(data.get("object") instanceof Map<?, ?> object)) {
                 return ResponseEntity.badRequest().build();
             }
             @SuppressWarnings("unchecked") Map<String, Object> session = (Map<String, Object>) object;
             try {
-                donations.handlePaidCheckout(session);
+                if (type.startsWith("charge.dispute.") && session.get("id") instanceof String disputeId && session.get("charge") instanceof String chargeId) adjustments.synchronizeDispute(disputeId, chargeId);
+                else if ("charge.refunded".equals(type) && session.get("id") instanceof String chargeId) adjustments.synchronizeCharge(chargeId, eventId + ":" + chargeId);
+                else if (type.startsWith("refund.") && session.get("charge") instanceof String chargeId) adjustments.synchronizeCharge(chargeId, eventId + ":" + chargeId);
+                else if (type.startsWith("checkout.session.")) donations.handlePaidCheckout(session);
+                else if ("invoice.paid".equals(type)) recurring.handlePaidInvoice(session);
+                else if (type.startsWith("customer.subscription.") && session.get("id") instanceof String id) recurring.refreshSubscription(id);
+                else if ("invoice.payment_failed".equals(type) && session.get("parent") instanceof Map<?, ?> parent
+                        && parent.get("subscription_details") instanceof Map<?, ?> details && details.get("subscription") instanceof String id) recurring.refreshSubscription(id);
             } catch (IllegalArgumentException notRecordedYet) {
                 return ResponseEntity.status(503).build();
             }
