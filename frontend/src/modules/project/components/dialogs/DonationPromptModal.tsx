@@ -1,5 +1,5 @@
 import React, { useEffect, useId, useRef, useState } from 'react';
-import { HeartHandshake, ShieldCheck, X } from 'lucide-react';
+import { HeartHandshake, X } from 'lucide-react';
 import { useScrollLock } from '@/hooks/useScrollLock';
 import { parseSupportAmount } from '@/modules/finance/api/financeTypes';
 
@@ -79,34 +79,36 @@ export const DonationPromptModal: React.FC<DonationPromptModalProps> = ({
     return (
         <div className="fixed inset-0 z-[110] bg-black/55 backdrop-blur-sm flex items-center justify-center p-4" onClick={dismiss}>
             <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby={titleId} aria-describedby={descriptionId} aria-busy={isProcessing} tabIndex={-1}
-                className="w-full max-w-lg max-h-[calc(100dvh-2rem)] overflow-y-auto rounded-2xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900 shadow-2xl outline-none" onClick={e => e.stopPropagation()}>
-                <div className="px-6 py-5 border-b border-slate-200 dark:border-white/10 flex items-start justify-between gap-3">
+                className="w-full max-w-md max-h-[calc(100dvh-2rem)] overflow-y-auto rounded-2xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900 shadow-2xl outline-none" onClick={e => e.stopPropagation()}>
+                <div className="flex items-start justify-between gap-3 px-5 pt-5">
                     <div>
-                        <div className="mb-2 inline-flex rounded-lg bg-modtale-accent/10 p-2 text-modtale-accent"><HeartHandshake className="h-5 w-5" /></div>
-                        <h2 id={titleId} className="text-xl font-black text-slate-900 dark:text-white">Support this creator</h2>
-                        <p id={descriptionId} className="mt-1 text-sm text-slate-600 dark:text-slate-300">Your download is free. Optional support helps the creator keep building.</p>
+                        <h2 id={titleId} className="flex items-center gap-2 text-lg font-black text-slate-900 dark:text-white"><HeartHandshake className="h-5 w-5 text-modtale-accent" />Support this creator</h2>
+                        <p id={descriptionId} className="mt-1 text-sm text-slate-500 dark:text-slate-400">Optional. Your download is free.</p>
                     </div>
-                    <button type="button" onClick={dismiss} disabled={isProcessing} aria-label="Close support dialog" className="p-2 rounded-full text-slate-500 hover:bg-slate-100 dark:hover:bg-white/10 disabled:opacity-50"><X className="h-5 w-5" /></button>
+                    <button type="button" onClick={dismiss} disabled={isProcessing} aria-label="Close support dialog" className="-mr-1 -mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-white/10 disabled:opacity-50"><X className="h-4 w-4" /></button>
                 </div>
-                <div className="px-6 py-5 space-y-4">
-                    {testMode && <p role="status" className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:bg-amber-900/20 dark:text-amber-200">Preview checkout. No real money or creator earnings.</p>}
-                    {allowRecurring && <div className="flex rounded-xl border border-slate-200 p-1 dark:border-white/10" role="group" aria-label="Support frequency">
-                        <button type="button" disabled={isProcessing} aria-pressed={!recurring} onClick={() => setRecurring(false)} className={`flex-1 rounded-lg px-4 py-2 text-sm font-bold ${!recurring ? 'bg-modtale-accent text-white' : 'text-slate-600 dark:text-slate-300'}`}>One-time</button>
-                        <button type="button" disabled={isProcessing} aria-pressed={recurring} onClick={() => setRecurring(true)} className={`flex-1 rounded-lg px-4 py-2 text-sm font-bold ${recurring ? 'bg-modtale-accent text-white' : 'text-slate-600 dark:text-slate-300'}`}>Monthly</button>
+                <div className="space-y-4 px-5 py-5">
+                    {testMode && <p role="status" className="text-xs font-semibold text-amber-700 dark:text-amber-300">Test mode · No real charge</p>}
+                    {allowRecurring && <div className="flex gap-1 rounded-lg bg-slate-100 p-1 dark:bg-slate-950/70" role="group" aria-label="Support frequency">
+                        <button type="button" disabled={isProcessing} aria-pressed={!recurring} onClick={() => setRecurring(false)} className={`flex-1 rounded-md px-3 py-2 text-sm font-bold ${!recurring ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-700 dark:text-white' : 'text-slate-500 dark:text-slate-400'}`}>One-time</button>
+                        <button type="button" disabled={isProcessing} aria-pressed={recurring} onClick={() => setRecurring(true)} className={`flex-1 rounded-md px-3 py-2 text-sm font-bold ${recurring ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-700 dark:text-white' : 'text-slate-500 dark:text-slate-400'}`}>Monthly</button>
                     </div>}
                     <div>
-                        <label htmlFor={amountId} className="block text-sm font-bold text-slate-700 dark:text-slate-200">Tip amount ({currency.toUpperCase()})</label>
-                        <div className="mt-2 flex gap-2">{[300, 500, 1000].map(preset => <button key={preset} type="button" disabled={isProcessing} aria-pressed={cents === preset} onClick={() => setAmount((preset / 100).toFixed(2))} className={`flex-1 rounded-lg border px-3 py-2 font-bold ${cents === preset ? 'border-modtale-accent bg-modtale-accent/10 text-modtale-accent' : 'border-slate-200 dark:border-white/20 text-slate-600 dark:text-slate-300'}`}>{new Intl.NumberFormat(undefined, { style: 'currency', currency, maximumFractionDigits: 0 }).format(preset / 100)}</button>)}</div>
-                        <input id={amountId} type="text" inputMode="decimal" value={amount} disabled={isProcessing} onChange={event => setAmount(event.target.value)} aria-invalid={!valid} aria-describedby={!valid ? errorId : undefined}
-                            className="mt-3 w-full rounded-lg border border-slate-300 dark:border-white/20 bg-white dark:bg-slate-950 px-3 py-2.5 text-slate-900 dark:text-white font-bold" />
-                        {!valid && <p id={errorId} className="mt-2 text-sm text-red-600 dark:text-red-400">Enter 1.00–1,000.00 with no more than two decimal places.</p>}
+                        <label htmlFor={amountId} className="block text-xs font-bold text-slate-500 dark:text-slate-400">Amount · {currency.toUpperCase()}</label>
+                        <div className="mt-2 flex gap-2">{[300, 500, 1000].map(preset => <button key={preset} type="button" disabled={isProcessing} aria-pressed={cents === preset} onClick={() => setAmount((preset / 100).toFixed(2))} className={`h-11 min-w-0 flex-1 rounded-lg border px-2 text-sm font-bold ${cents === preset ? 'border-modtale-accent bg-modtale-accent/10 text-modtale-accent' : 'border-slate-200 text-slate-600 hover:bg-slate-50 dark:border-white/15 dark:text-slate-300 dark:hover:bg-white/5'}`}>{new Intl.NumberFormat(undefined, { style: 'currency', currency, maximumFractionDigits: 0 }).format(preset / 100)}</button>)}
+                            <input id={amountId} aria-label={`Custom amount (${currency.toUpperCase()})`} type="text" inputMode="decimal" value={amount} disabled={isProcessing} onChange={event => setAmount(event.target.value)} aria-invalid={!valid} aria-describedby={!valid ? errorId : undefined}
+                                className="h-11 w-24 rounded-lg border border-slate-300 bg-white px-3 text-center text-sm font-bold text-slate-900 focus:border-modtale-accent focus:outline-none focus:ring-2 focus:ring-modtale-accent/20 dark:border-white/20 dark:bg-slate-950 dark:text-white" />
+                        </div>
+                        {!valid && <p id={errorId} className="mt-2 text-xs text-red-600 dark:text-red-400">Enter 1.00–1,000.00, up to two decimal places.</p>}
                     </div>
-                    <p className="text-xs leading-relaxed text-slate-500 dark:text-slate-400">{platformCutPercent}% of the tip supports Modtale. Payment processing fees are deducted from the creator’s remaining share. This supports their content and is not a tax-deductible charitable donation.</p>
-                    <p className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400"><ShieldCheck className="h-4 w-4 shrink-0" />{recurring ? 'Renews monthly until cancelled. Manage or cancel in Finance → Your monthly support.' : 'One-time payment. No subscription.'} No reminder emails.</p>
+                    <div className="space-y-1.5 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
+                        <p>{platformCutPercent}% supports Modtale. Payment processing fees come from the creator’s remaining share.</p>
+                        <p>{recurring ? 'Renews monthly until cancelled. Manage in Finance.' : 'One-time payment.'} Not a charitable donation.</p>
+                    </div>
                 </div>
-                <div className="px-6 py-4 border-t border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-800/50 flex flex-col-reverse sm:flex-row gap-2 sm:justify-end">
-                    <button type="button" onClick={onSkip} disabled={isProcessing} className="px-4 py-2.5 rounded-xl border border-slate-300 dark:border-white/20 text-slate-700 dark:text-slate-200 font-bold hover:bg-slate-100 dark:hover:bg-white/10 disabled:opacity-50">Download without tipping</button>
-                    <button type="button" onClick={submit} disabled={isProcessing || !valid} className="px-4 py-2.5 rounded-xl bg-modtale-accent text-white font-bold hover:bg-modtale-accentHover disabled:opacity-50">{isProcessing ? 'Opening checkout…' : valid ? `Tip ${formatted}${recurring ? '/month' : ''} & download` : 'Tip & download'}</button>
+                <div className="grid grid-cols-2 gap-2 border-t border-slate-200 px-5 py-4 dark:border-white/10">
+                    <button type="button" onClick={onSkip} disabled={isProcessing} className="flex h-11 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 px-2 text-sm font-bold text-slate-700 hover:bg-slate-100 disabled:opacity-50 dark:border-white/15 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10">Download free</button>
+                    <button type="button" onClick={submit} disabled={isProcessing || !valid} className="flex h-11 items-center justify-center whitespace-nowrap rounded-lg bg-modtale-accent px-2 text-sm font-bold text-white hover:bg-modtale-accentHover disabled:opacity-50">{isProcessing ? 'Opening…' : valid ? `Tip ${formatted}${recurring ? '/mo' : ''}` : 'Choose amount'}</button>
                 </div>
             </div>
         </div>

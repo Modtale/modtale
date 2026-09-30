@@ -18,15 +18,15 @@ describe('optional creator support dialog', () => {
         await render();
         expect(host.querySelector('[role="dialog"]')?.getAttribute('aria-modal')).toBe('true');
         expect(host.textContent).toContain('Payment processing fees');
-        expect(host.textContent).toContain('not a tax-deductible charitable donation');
-        const button = [...host.querySelectorAll('button')].find(b => b.textContent?.includes('& download'))!;
+        expect(host.textContent).toContain('Not a charitable donation');
+        const button = [...host.querySelectorAll('button')].find(b => b.textContent === 'Tip $5.00')!;
         await act(async () => { button.click(); button.click(); });
         expect(onDonate).toHaveBeenCalledTimes(1);
         expect(onDonate).toHaveBeenCalledWith(500, false, true);
     });
     it('allows skipping and Escape without a payment', async () => {
         await render();
-        await act(async () => [...host.querySelectorAll('button')].find(b => b.textContent === 'Download without tipping')!.click());
+        await act(async () => [...host.querySelectorAll('button')].find(b => b.textContent === 'Download free')!.click());
         expect(onSkip).toHaveBeenCalledOnce(); expect(onDonate).not.toHaveBeenCalled();
         await act(async () => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
         expect(onClose).toHaveBeenCalledOnce();
@@ -46,9 +46,9 @@ describe('optional creator support dialog', () => {
         await render();
         await act(async () => [...host.querySelectorAll('button')].find(button => button.textContent === 'Monthly')!.click());
         expect(host.textContent).toContain('Renews monthly until cancelled');
-        expect(host.textContent).toContain('Optional support helps the creator');
+        expect(host.textContent).toContain('Optional. Your download is free.');
         expect(host.textContent).not.toContain('A one-time tip');
-        await act(async () => [...host.querySelectorAll('button')].find(button => button.textContent?.includes('/month & download'))!.click());
+        await act(async () => [...host.querySelectorAll('button')].find(button => button.textContent === 'Tip $5.00/mo')!.click());
         expect(onDonate).toHaveBeenCalledWith(500, true, false);
     });
 
