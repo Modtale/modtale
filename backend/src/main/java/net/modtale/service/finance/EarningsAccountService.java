@@ -121,14 +121,14 @@ public class EarningsAccountService {
         long periodDonationRevenue = entries.stream()
                 .filter(FinanceLedgerRules::isSettledRevenue)
                 .filter(inRange)
-                .filter(e -> e.getType() == FinanceLedgerEntry.LedgerType.DONATION || e.getType() == FinanceLedgerEntry.LedgerType.REFUND_ADJUSTMENT || e.getType() == FinanceLedgerEntry.LedgerType.DISPUTE_ADJUSTMENT)
+                .filter(e -> e.getType() == FinanceLedgerEntry.LedgerType.DONATION || e.getType() == FinanceLedgerEntry.LedgerType.REFUND_ADJUSTMENT || e.getType() == FinanceLedgerEntry.LedgerType.DISPUTE_ADJUSTMENT || e.getType() == FinanceLedgerEntry.LedgerType.DISPUTE_FEE_ADJUSTMENT || e.getType() == FinanceLedgerEntry.LedgerType.DISPUTE_REVERSAL)
                 .mapToLong(FinanceLedgerEntry::getCreatorCents)
                 .sum();
 
         List<Map<String, Object>> earningsChart = core.buildDailySeries(entries, start, end, Set.of(
                         FinanceLedgerEntry.LedgerType.DONATION,
                         FinanceLedgerEntry.LedgerType.REFUND_ADJUSTMENT,
-                        FinanceLedgerEntry.LedgerType.DISPUTE_ADJUSTMENT,
+                        FinanceLedgerEntry.LedgerType.DISPUTE_ADJUSTMENT, FinanceLedgerEntry.LedgerType.DISPUTE_FEE_ADJUSTMENT, FinanceLedgerEntry.LedgerType.DISPUTE_REVERSAL,
                         FinanceLedgerEntry.LedgerType.AD_CLICK,
                         FinanceLedgerEntry.LedgerType.AD_IMPRESSION
                 ),
@@ -136,7 +136,7 @@ public class EarningsAccountService {
                 FinanceLedgerRules::isSettledRevenue
         );
 
-        List<Map<String, Object>> donationsChart = core.buildDailySeries(entries, start, end, Set.of(FinanceLedgerEntry.LedgerType.DONATION, FinanceLedgerEntry.LedgerType.REFUND_ADJUSTMENT, FinanceLedgerEntry.LedgerType.DISPUTE_ADJUSTMENT), FinanceLedgerEntry::getCreatorCents, FinanceLedgerRules::isSettledRevenue);
+        List<Map<String, Object>> donationsChart = core.buildDailySeries(entries, start, end, Set.of(FinanceLedgerEntry.LedgerType.DONATION, FinanceLedgerEntry.LedgerType.REFUND_ADJUSTMENT, FinanceLedgerEntry.LedgerType.DISPUTE_ADJUSTMENT, FinanceLedgerEntry.LedgerType.DISPUTE_FEE_ADJUSTMENT, FinanceLedgerEntry.LedgerType.DISPUTE_REVERSAL), FinanceLedgerEntry::getCreatorCents, FinanceLedgerRules::isSettledRevenue);
         List<Map<String, Object>> adsChart = core.buildDailySeries(entries, start, end, Set.of(FinanceLedgerEntry.LedgerType.AD_CLICK, FinanceLedgerEntry.LedgerType.AD_IMPRESSION), FinanceLedgerEntry::getCreatorCents, FinanceLedgerRules::isSettledRevenue);
         List<Map<String, Object>> expiredChart = core.buildDailySeries(entries, start, end, Set.of(FinanceLedgerEntry.LedgerType.EXPIRED_TRANSFER), FinanceLedgerEntry::getPlatformCents, e -> true);
 
@@ -260,7 +260,7 @@ public class EarningsAccountService {
         List<Map<String, Object>> platformRevenueChart = core.buildDailySeries(entries, chartStart, chartEnd, Set.of(
                         FinanceLedgerEntry.LedgerType.DONATION,
                         FinanceLedgerEntry.LedgerType.REFUND_ADJUSTMENT,
-                        FinanceLedgerEntry.LedgerType.DISPUTE_ADJUSTMENT,
+                        FinanceLedgerEntry.LedgerType.DISPUTE_ADJUSTMENT, FinanceLedgerEntry.LedgerType.DISPUTE_FEE_ADJUSTMENT, FinanceLedgerEntry.LedgerType.DISPUTE_REVERSAL,
                         FinanceLedgerEntry.LedgerType.AD_CLICK,
                         FinanceLedgerEntry.LedgerType.EXPIRED_TRANSFER,
                         FinanceLedgerEntry.LedgerType.PLATFORM_CUT
@@ -272,7 +272,7 @@ public class EarningsAccountService {
         List<Map<String, Object>> creatorRevenueChart = core.buildDailySeries(entries, chartStart, chartEnd, Set.of(
                         FinanceLedgerEntry.LedgerType.DONATION,
                         FinanceLedgerEntry.LedgerType.REFUND_ADJUSTMENT,
-                        FinanceLedgerEntry.LedgerType.DISPUTE_ADJUSTMENT,
+                        FinanceLedgerEntry.LedgerType.DISPUTE_ADJUSTMENT, FinanceLedgerEntry.LedgerType.DISPUTE_FEE_ADJUSTMENT, FinanceLedgerEntry.LedgerType.DISPUTE_REVERSAL,
                         FinanceLedgerEntry.LedgerType.AD_CLICK,
                         FinanceLedgerEntry.LedgerType.AD_IMPRESSION
                 ),

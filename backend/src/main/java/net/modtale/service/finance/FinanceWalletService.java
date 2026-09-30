@@ -13,6 +13,8 @@ import net.modtale.model.finance.CreatorPayoutRequest;
 import net.modtale.model.finance.CreatorWallet;
 import net.modtale.model.finance.FinanceLedgerEntry;
 import net.modtale.model.finance.FinanceTransferReceipt;
+import net.modtale.model.finance.FinanceDisputeCase;
+import net.modtale.model.finance.FinanceDisputeResolution;
 import org.springframework.data.mongodb.MongoDatabaseFactory;
 import org.springframework.data.mongodb.MongoTransactionManager;
 import org.springframework.data.mongodb.core.FindAndModifyOptions;
@@ -168,41 +170,154 @@ public class FinanceWalletService {
     private void postPrincipalAdjustment(String originalCreditId, String adjustmentId, long refundedGrossCents,
             long providerRefundFeeCents, String providerReference, boolean testMode, FinanceLedgerEntry.LedgerType type) {
         if (adjustmentId == null || refundedGrossCents <= 0) throw new IllegalArgumentException("Invalid principal adjustment.");
+        transact(() -> { postPrincipalAdjustmentInTransaction(originalCreditId, adjustmentId, refundedGrossCents, providerRefundFeeCents, providerReference, testMode, type); return null; });
+    }
+
+    private void postPrincipalAdjustmentInTransaction(String originalCreditId, String adjustmentId, long refundedGrossCents,
+            long providerRefundFeeCents, String providerReference, boolean testMode, FinanceLedgerEntry.LedgerType type) {
+        FinanceLedgerEntry existing = mongo.findById(adjustmentId, FinanceLedgerEntry.class);
+        if (existing != null) {
+            if (!Objects.equals(existing.getExternalReference(), originalCreditId) || existing.getGrossCents() != -refundedGrossCents
+                    || !Objects.equals(existing.getProcessorFeeCents(), providerRefundFeeCents) || existing.getType() != type) throw new IllegalStateException("Conflicting refund source.");
+            return;
+        }
+        FinanceLedgerEntry original = mongo.findById(originalCreditId, FinanceLedgerEntry.class);
+        if (original == null || original.getGrossCents() <= 0 || !Boolean.valueOf(original.getMetadata().get("testMode")).equals(testMode)) {
+            throw new IllegalStateException("The original payment must be reconciled before its refund.");
+        }
+        List<FinanceLedgerEntry> prior = mongo.find(Query.query(Criteria.where("externalReference").is(originalCreditId)
+                .and("type").in(FinanceLedgerEntry.LedgerType.REFUND_ADJUSTMENT, FinanceLedgerEntry.LedgerType.DISPUTE_ADJUSTMENT, FinanceLedgerEntry.LedgerType.DISPUTE_REVERSAL)), FinanceLedgerEntry.class);
+        long previousGross = prior.stream().mapToLong(entry -> -entry.getGrossCents()).sum();
+        long previousPlatform = prior.stream().mapToLong(entry -> -entry.getPlatformCents()).sum();
+        long cumulativeGross = Math.addExact(previousGross, refundedGrossCents);
+        if (cumulativeGross > original.getGrossCents()) throw new IllegalArgumentException("Refunds exceed the recorded charge.");
+        long platformTotal = java.math.BigInteger.valueOf(original.getPlatformCents()).multiply(java.math.BigInteger.valueOf(cumulativeGross))
+                .add(java.math.BigInteger.valueOf(original.getGrossCents() / 2)).divide(java.math.BigInteger.valueOf(original.getGrossCents())).longValueExact();
+        long platformReversal = platformTotal - previousPlatform;
+        long creatorAdjustment = Math.subtractExact(-refundedGrossCents + platformReversal, providerRefundFeeCents);
+        FinanceLedgerEntry adjustment = new FinanceLedgerEntry(); adjustment.setId(adjustmentId);
+        adjustment.setCreatorId(original.getCreatorId()); adjustment.setProjectId(original.getProjectId());
+        adjustment.setType(type); adjustment.setGrossCents(-refundedGrossCents);
+        adjustment.setCreatorCents(creatorAdjustment); adjustment.setPlatformCents(-platformReversal); adjustment.setProcessorFeeCents(providerRefundFeeCents);
+        adjustment.setCurrency(original.getCurrency()); adjustment.setStatus(FinanceLedgerEntry.EntryStatus.AVAILABLE);
+        adjustment.setExternalReference(originalCreditId); adjustment.setStripeReference(providerReference);
+        adjustment.getMetadata().put("settlement", "settled"); adjustment.getMetadata().put("testMode", String.valueOf(testMode));
+        adjustment.getMetadata().put("adjustmentReason", type == FinanceLedgerEntry.LedgerType.REFUND_ADJUSTMENT ? "provider_confirmed_refund" : "provider_confirmed_dispute_loss");
+        mongo.insert(adjustment);
+        var result = mongo.updateFirst(Query.query(Criteria.where("_id").is(walletId(original.getCreatorId(), original.getCurrency(), testMode))),
+                new Update().inc("availableCents", creatorAdjustment), CreatorWallet.class);
+        if (result.getMatchedCount() != 1) throw new IllegalStateException("Original creator wallet not found.");
+        return;
+    }
+
+    /** Marks a new observation in the same transaction as its hold, fencing older reviews. */
+    public FinanceDisputeCase beginDisputeRefresh(String caseId, String disputeId, String chargeId, FinanceLedgerEntry original, boolean testMode) {
+        return transact(() -> {
+            String account = original.getMetadata().get("providerAccountId");
+            FinanceDisputeCase existing = mongo.findById(caseId, FinanceDisputeCase.class);
+            if (existing != null && (!Objects.equals(existing.originalCreditId(), original.getId()) || !Objects.equals(existing.providerAccountId(), account))) throw new IllegalArgumentException("Dispute binding changed.");
+            holdForRisk(original.getCreatorId(), original.getCurrency(), testMode, disputeId);
+            return mongo.findAndModify(Query.query(Criteria.where("_id").is(caseId)), new Update()
+                    .setOnInsert("disputeId", disputeId).setOnInsert("chargeId", chargeId).setOnInsert("creatorId", original.getCreatorId())
+                    .setOnInsert("currency", original.getCurrency()).setOnInsert("testMode", testMode).setOnInsert("providerAccountId", account)
+                    .setOnInsert("originalCreditId", original.getId()).setOnInsert("balanceTransactions", List.of())
+                    .setOnInsert("disputedCents", 0L).setOnInsert("returnedPrincipalCents", 0L).setOnInsert("evidenceReady", false).setOnInsert("providerStatus", "pending")
+                    .set("reviewStatus", "REFRESHING").set("updatedAt", Instant.now()).inc("version", 1L),
+                    FindAndModifyOptions.options().upsert(true).returnNew(true), FinanceDisputeCase.class);
+        });
+    }
+
+    public void recordDisputeLoss(String caseId, String digest) {
         transact(() -> {
-            FinanceLedgerEntry existing = mongo.findById(adjustmentId, FinanceLedgerEntry.class);
-            if (existing != null) {
-                if (!Objects.equals(existing.getExternalReference(), originalCreditId) || existing.getGrossCents() != -refundedGrossCents
-                        || !Objects.equals(existing.getProcessorFeeCents(), providerRefundFeeCents) || existing.getType() != type) throw new IllegalStateException("Conflicting refund source.");
-                return null;
-            }
-            FinanceLedgerEntry original = mongo.findById(originalCreditId, FinanceLedgerEntry.class);
-            if (original == null || original.getGrossCents() <= 0 || !Boolean.valueOf(original.getMetadata().get("testMode")).equals(testMode)) {
-                throw new IllegalStateException("The original payment must be reconciled before its refund.");
-            }
-            List<FinanceLedgerEntry> prior = mongo.find(Query.query(Criteria.where("externalReference").is(originalCreditId)
-                    .and("type").in(FinanceLedgerEntry.LedgerType.REFUND_ADJUSTMENT, FinanceLedgerEntry.LedgerType.DISPUTE_ADJUSTMENT)), FinanceLedgerEntry.class);
-            long previousGross = prior.stream().mapToLong(entry -> -entry.getGrossCents()).sum();
-            long previousPlatform = prior.stream().mapToLong(entry -> -entry.getPlatformCents()).sum();
-            long cumulativeGross = Math.addExact(previousGross, refundedGrossCents);
-            if (cumulativeGross > original.getGrossCents()) throw new IllegalArgumentException("Refunds exceed the recorded charge.");
-            long platformTotal = java.math.BigInteger.valueOf(original.getPlatformCents()).multiply(java.math.BigInteger.valueOf(cumulativeGross))
-                    .add(java.math.BigInteger.valueOf(original.getGrossCents() / 2)).divide(java.math.BigInteger.valueOf(original.getGrossCents())).longValueExact();
-            long platformReversal = platformTotal - previousPlatform;
-            long creatorAdjustment = Math.subtractExact(-refundedGrossCents + platformReversal, providerRefundFeeCents);
-            FinanceLedgerEntry adjustment = new FinanceLedgerEntry(); adjustment.setId(adjustmentId);
-            adjustment.setCreatorId(original.getCreatorId()); adjustment.setProjectId(original.getProjectId());
-            adjustment.setType(type); adjustment.setGrossCents(-refundedGrossCents);
-            adjustment.setCreatorCents(creatorAdjustment); adjustment.setPlatformCents(-platformReversal); adjustment.setProcessorFeeCents(providerRefundFeeCents);
-            adjustment.setCurrency(original.getCurrency()); adjustment.setStatus(FinanceLedgerEntry.EntryStatus.AVAILABLE);
-            adjustment.setExternalReference(originalCreditId); adjustment.setStripeReference(providerReference);
-            adjustment.getMetadata().put("settlement", "settled"); adjustment.getMetadata().put("testMode", String.valueOf(testMode));
-            adjustment.getMetadata().put("adjustmentReason", type == FinanceLedgerEntry.LedgerType.REFUND_ADJUSTMENT ? "provider_confirmed_refund" : "provider_confirmed_dispute_loss");
-            mongo.insert(adjustment);
-            var result = mongo.updateFirst(Query.query(Criteria.where("_id").is(walletId(original.getCreatorId(), original.getCurrency(), testMode))),
-                    new Update().inc("availableCents", creatorAdjustment), CreatorWallet.class);
-            if (result.getMatchedCount() != 1) throw new IllegalStateException("Original creator wallet not found.");
+            FinanceDisputeCase dispute = requireCurrentDispute(caseId, digest);
+            if (!"lost".equals(dispute.providerStatus())) throw new IllegalArgumentException("Dispute is no longer a verified loss.");
+            if (mongo.exists(Query.query(Criteria.where("_id").is(FinanceSourceKey.stripe(dispute.testMode(), dispute.providerAccountId(), "dispute-return:" + dispute.disputeId()))), FinanceLedgerEntry.class)) throw new IllegalArgumentException("A reopened principal movement requires separate review.");
+            postPrincipalAdjustmentInTransaction(dispute.originalCreditId(), FinanceSourceKey.stripe(dispute.testMode(), dispute.providerAccountId(), "dispute-principal:" + dispute.disputeId()),
+                    dispute.disputedCents(), 0, dispute.disputeId(), dispute.testMode(), FinanceLedgerEntry.LedgerType.DISPUTE_ADJUSTMENT);
+            mongo.updateFirst(Query.query(Criteria.where("_id").is(caseId)), new Update().inc("version", 1L), FinanceDisputeCase.class);
             return null;
         });
+    }
+
+    private FinanceDisputeCase requireCurrentDispute(String caseId, String digest) {
+        FinanceDisputeCase dispute = mongo.findById(caseId, FinanceDisputeCase.class);
+        if (dispute == null || !Objects.equals(digest, dispute.evidenceDigest()) || !dispute.evidenceReady()
+                || !List.of("POLICY_REVIEW_REQUIRED", "RESOLVED").contains(dispute.reviewStatus()) || dispute.principalMovementCents() == null || dispute.actualFeeCents() == null || dispute.actualFeeCents() < 0) {
+            throw new IllegalArgumentException("Dispute evidence is incomplete or changed; refresh the review.");
+        }
+        return dispute;
+    }
+
+    public void clearReviewedDisputeRisk(String caseId, String digest) {
+        transact(() -> {
+            FinanceDisputeCase dispute = requireCurrentDispute(caseId, digest);
+            if (!mongo.exists(Query.query(Criteria.where("_id").is(caseId + ":" + digest)), FinanceDisputeResolution.class)) throw new IllegalArgumentException("Dispute policy review is missing.");
+            resolveRisk(dispute.creatorId(), dispute.currency(), dispute.testMode(), dispute.disputeId());
+            mongo.updateFirst(Query.query(Criteria.where("_id").is(caseId)), new Update().inc("version", 1L), FinanceDisputeCase.class);
+            return null;
+        });
+    }
+
+    /** Explicit cumulative fee allocation and any proven late-win restoration are one immutable transaction. */
+    public FinanceDisputeResolution resolveDispute(String caseId, String digest, long creatorFeeCents, String reviewer, String reason) {
+        return transact(() -> {
+            FinanceDisputeCase dispute = requireCurrentDispute(caseId, digest);
+            if (creatorFeeCents < 0 || creatorFeeCents > dispute.actualFeeCents()) throw new IllegalArgumentException("Creator fees must be explicitly allocated within verified actual costs.");
+            String resolutionId = caseId + ":" + digest;
+            FinanceDisputeResolution priorResolution = mongo.findById(resolutionId, FinanceDisputeResolution.class);
+            if (priorResolution != null) {
+                if (priorResolution.creatorFeeCents() != creatorFeeCents) throw new IllegalArgumentException("This evidence already has a different immutable fee decision.");
+                resolveRisk(dispute.creatorId(), dispute.currency(), dispute.testMode(), dispute.disputeId());
+                mongo.updateFirst(Query.query(Criteria.where("_id").is(caseId)), new Update().set("reviewStatus", "RESOLVED").inc("version", 1L), FinanceDisputeCase.class);
+                return priorResolution;
+            }
+            FinanceLedgerEntry original = mongo.findById(dispute.originalCreditId(), FinanceLedgerEntry.class);
+            if (original == null || !Objects.equals(original.getMetadata().get("providerAccountId"), dispute.providerAccountId())) throw new IllegalArgumentException("Original funding evidence changed.");
+            CreatorWallet wallet = getWallet(dispute.creatorId(), dispute.currency(), dispute.testMode());
+            if (!Objects.equals(wallet.getProviderAccountId(), dispute.providerAccountId())) throw new IllegalArgumentException("Wallet funding scope requires separate reconciliation.");
+            String lossId = FinanceSourceKey.stripe(dispute.testMode(), dispute.providerAccountId(), "dispute-principal:" + dispute.disputeId());
+            String returnId = FinanceSourceKey.stripe(dispute.testMode(), dispute.providerAccountId(), "dispute-return:" + dispute.disputeId());
+            FinanceLedgerEntry loss = mongo.findById(lossId, FinanceLedgerEntry.class);
+            FinanceLedgerEntry returned = mongo.findById(returnId, FinanceLedgerEntry.class);
+            long creatorChange = 0;
+            if ("lost".equals(dispute.providerStatus())) {
+                if (loss == null || returned != null || loss.getGrossCents() != -dispute.disputedCents()) throw new IllegalArgumentException("Loss principal needs reconciliation before closing its hold.");
+            } else if (loss != null && returned == null) {
+                if (!"won".equals(dispute.providerStatus()) || dispute.principalMovementCents() != 0 || dispute.returnedPrincipalCents() < dispute.disputedCents()) throw new IllegalArgumentException("No settled principal-return evidence is available.");
+                FinanceLedgerEntry reversal = disputeAdjustment(original, dispute, returnId, FinanceLedgerEntry.LedgerType.DISPUTE_REVERSAL);
+                reversal.setGrossCents(-loss.getGrossCents()); reversal.setCreatorCents(-loss.getCreatorCents()); reversal.setPlatformCents(-loss.getPlatformCents()); reversal.setProcessorFeeCents(0L);
+                mongo.insert(reversal); creatorChange = Math.addExact(creatorChange, reversal.getCreatorCents());
+            }
+            List<FinanceLedgerEntry> feeHistory = mongo.find(Query.query(Criteria.where("type").is(FinanceLedgerEntry.LedgerType.DISPUTE_FEE_ADJUSTMENT)
+                    .and("metadata.disputeCaseId").is(caseId)), FinanceLedgerEntry.class);
+            long priorCreatorFees = 0, priorActualFees = 0;
+            for (var fee : feeHistory) { priorCreatorFees = Math.addExact(priorCreatorFees, -fee.getCreatorCents()); priorActualFees = Math.addExact(priorActualFees, fee.getProcessorFeeCents()); }
+            long creatorDelta = Math.subtractExact(creatorFeeCents, priorCreatorFees);
+            long actualDelta = Math.subtractExact(dispute.actualFeeCents(), priorActualFees);
+            if (creatorDelta != 0 || actualDelta != 0) {
+                FinanceLedgerEntry fee = disputeAdjustment(original, dispute, resolutionId + ":fee", FinanceLedgerEntry.LedgerType.DISPUTE_FEE_ADJUSTMENT);
+                fee.setGrossCents(0); fee.setCreatorCents(-creatorDelta); fee.setPlatformCents(Math.negateExact(Math.subtractExact(actualDelta, creatorDelta))); fee.setProcessorFeeCents(actualDelta);
+                mongo.insert(fee); creatorChange = Math.subtractExact(creatorChange, creatorDelta);
+            }
+            var decision = new FinanceDisputeResolution(resolutionId, caseId, dispute.disputeId(), digest, dispute.providerAccountId(), dispute.testMode(),
+                    dispute.providerStatus(), dispute.actualFeeCents(), creatorFeeCents, reviewer, reason, Instant.now(), dispute.currency(), dispute.disputedCents(),
+                    dispute.principalMovementCents(), dispute.returnedPrincipalCents(), List.copyOf(dispute.balanceTransactions()));
+            mongo.insert(decision);
+            var result = mongo.updateFirst(Query.query(Criteria.where("_id").is(wallet.getId()).and("providerAccountId").is(dispute.providerAccountId())),
+                    new Update().inc("availableCents", creatorChange).pull("openRiskIds", dispute.disputeId()), CreatorWallet.class);
+            if (result.getMatchedCount() != 1) throw new IllegalStateException("Wallet scope changed during dispute resolution.");
+            mongo.updateFirst(Query.query(Criteria.where("_id").is(caseId)), new Update().set("reviewStatus", "RESOLVED").inc("version", 1L), FinanceDisputeCase.class);
+            return decision;
+        });
+    }
+
+    private FinanceLedgerEntry disputeAdjustment(FinanceLedgerEntry original, FinanceDisputeCase dispute, String id, FinanceLedgerEntry.LedgerType type) {
+        FinanceLedgerEntry entry = new FinanceLedgerEntry(); entry.setId(id); entry.setCreatorId(original.getCreatorId()); entry.setProjectId(original.getProjectId());
+        entry.setType(type); entry.setCurrency(original.getCurrency()); entry.setStatus(FinanceLedgerEntry.EntryStatus.AVAILABLE);
+        entry.setExternalReference(original.getId()); entry.setStripeReference(dispute.disputeId());
+        entry.getMetadata().put("settlement", "settled"); entry.getMetadata().put("testMode", String.valueOf(dispute.testMode()));
+        entry.getMetadata().put("providerAccountId", dispute.providerAccountId()); entry.getMetadata().put("disputeCaseId", dispute.id());
+        entry.getMetadata().put("evidenceDigest", dispute.evidenceDigest()); return entry;
     }
 
     public List<CreatorPayoutRequest> getRecentRequests(String creatorId, boolean testMode) {

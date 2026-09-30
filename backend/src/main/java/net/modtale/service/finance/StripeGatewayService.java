@@ -248,6 +248,13 @@ public class StripeGatewayService {
         return getProviderObject("/transfers/" + transferId, Map.of());
     }
 
+    public Map<String, Object> getChargeDisputes(String chargeId, String after) {
+        if (chargeId == null || !chargeId.matches("ch_[A-Za-z0-9]+") || (after != null && !after.matches("d[pu]_[A-Za-z0-9]+"))) return Map.of();
+        Map<String, String> query = new HashMap<>(); query.put("charge", chargeId); query.put("limit", "100");
+        if (after != null) query.put("starting_after", after);
+        return getProviderObject("/disputes", query);
+    }
+
     public Map<String, Object> getDispute(String disputeId) {
         if (disputeId == null || !disputeId.matches("d[pu]_[A-Za-z0-9]+")) return Map.of();
         return getProviderObject("/disputes/" + disputeId, Map.of());

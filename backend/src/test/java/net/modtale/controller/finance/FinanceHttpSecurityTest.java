@@ -60,6 +60,7 @@ class FinanceHttpSecurityTest {
     private static final String POLICY = "/api/v1/finance/projects/project/settings";
     private static final String WEBHOOK = "/api/v1/finance/webhooks/stripe";
     private static final String RECONCILE = "/api/v1/admin/finance/payout-reconciliation";
+    private static final String DISPUTES = "/api/v1/admin/finance/dispute-reconciliation";
     private static final String SECRET = "fixture-signing-secret";
     private AnnotationConfigWebApplicationContext context;
     private MockMvc mvc;
@@ -104,6 +105,7 @@ class FinanceHttpSecurityTest {
         @Bean ClientRegistrationRepository clients() { return mock(ClientRegistrationRepository.class); }
         @Bean GlobalExceptionHandler errors() { return new GlobalExceptionHandler(); }
         @Bean PayoutReconciliationController reconciliationController(CreatorPayoutService payouts, AccountService accounts) { return new PayoutReconciliationController(payouts, accounts); }
+        @Bean DisputeReconciliationController disputeController(PaymentAdjustmentService adjustments, AccountService accounts) { return new DisputeReconciliationController(adjustments, accounts); }
         @Bean DonationController donationController() { return new DonationController(); }
         @Bean CreatorRevenueController creatorController() { return new CreatorRevenueController(); }
         @Bean RecurringSupportController recurringController(RecurringSupportService service, AccountService accounts) { return new RecurringSupportController(service, accounts); }
@@ -349,6 +351,49 @@ class FinanceHttpSecurityTest {
         mvc.perform(csrf(browser(post(RECONCILE + "/confirm-existing-transfer"))).with(authentication(session(reviewer)))
                 .contentType("application/json").content(body)).andExpect(status().isBadRequest());
         verifyNoInteractions(bean(CreatorPayoutService.class));
+    }
+    private static String disputeBody(String fee, String digest, String reason) {
+        return "{\"caseId\":\"case_fixture\",\"expectedEvidenceDigest\":\"" + digest + "\",\"creatorFeeCents\":" + fee + ",\"reason\":\"" + reason + "\",\"reviewerId\":\"other\"}";
+    }
+    @Test void disputeQueueRequiresFinanceManagerAndRejectsApiKeys() throws Exception {
+        mvc.perform(browser(get(DISPUTES))).andExpect(status().isForbidden());
+        mvc.perform(browser(get(DISPUTES)).with(authentication(session(owner)))).andExpect(status().isForbidden());
+        apiKey(reviewer);
+        mvc.perform(browser(get(DISPUTES)).header("X-MODTALE-KEY", "fixture-key")).andExpect(status().isForbidden());
+        verifyNoInteractions(bean(PaymentAdjustmentService.class));
+        when(bean(PaymentAdjustmentService.class).getDisputeCases()).thenReturn(List.of());
+        mvc.perform(browser(get(DISPUTES)).with(authentication(session(reviewer)))).andExpect(status().isOk());
+        verify(bean(PaymentAdjustmentService.class)).getDisputeCases();
+    }
+    @Test void disputeResolutionRequiresCsrfAndFinanceSession() throws Exception {
+        String body = disputeBody("125", "a".repeat(64), "Verified actual fee");
+        mvc.perform(browser(post(DISPUTES + "/resolve")).with(authentication(session(reviewer))).contentType("application/json").content(body)).andExpect(status().isForbidden());
+        mvc.perform(csrf(browser(post(DISPUTES + "/resolve"))).with(authentication(session(owner))).contentType("application/json").content(body)).andExpect(status().isForbidden());
+        apiKey(reviewer);
+        mvc.perform(browser(post(DISPUTES + "/resolve")).header("X-MODTALE-KEY", "fixture-key").contentType("application/json").content(body)).andExpect(status().isForbidden());
+        verifyNoInteractions(bean(PaymentAdjustmentService.class));
+    }
+    @Test void disputeResolutionBindsEvidenceAmountAndAuthenticatedReviewer() throws Exception {
+        String digest = "a".repeat(64);
+        var result = new FinanceDisputeResolution("resolution_fixture", "case_fixture", "dp_fixture", digest, "acct_fixture", true, "won", 125, 125, reviewer.getId(), "Verified actual fee", Instant.now(), "usd", 1000, 0, 1000, List.of());
+        when(bean(PaymentAdjustmentService.class).resolveCase("case_fixture", digest, 125L, reviewer, "Verified actual fee")).thenReturn(result);
+        mvc.perform(csrf(browser(post(DISPUTES + "/resolve"))).with(authentication(session(reviewer)))
+                .contentType("application/json").content(disputeBody("125", digest, "Verified actual fee")))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.reviewerId").value("reviewer")).andExpect(jsonPath("$.creatorFeeCents").value(125));
+        verify(bean(PaymentAdjustmentService.class)).resolveCase("case_fixture", digest, 125L, reviewer, "Verified actual fee");
+    }
+    @ParameterizedTest @ValueSource(strings = {"-1", "0.5", "null", "1000000000000"})
+    void invalidDisputeFeeCannotReachAccounting(String fee) throws Exception {
+        mvc.perform(csrf(browser(post(DISPUTES + "/resolve"))).with(authentication(session(reviewer)))
+                .contentType("application/json").content(disputeBody(fee, "a".repeat(64), "Verified actual fee"))).andExpect(status().isBadRequest());
+        verifyNoInteractions(bean(PaymentAdjustmentService.class));
+    }
+    @Test void invalidEvidenceDigestAndBlankReasonCannotReachAccounting() throws Exception {
+        for (String body : List.of(disputeBody("0", "abc", "Verified"), disputeBody("0", "A".repeat(64), "Verified"), disputeBody("0", "a".repeat(64), "  "))) {
+            mvc.perform(csrf(browser(post(DISPUTES + "/resolve"))).with(authentication(session(reviewer)))
+                    .contentType("application/json").content(body)).andExpect(status().isBadRequest());
+        }
+        verifyNoInteractions(bean(PaymentAdjustmentService.class));
     }
     private static String event() { return "{\"id\":\"evt_fixture\",\"type\":\"checkout.session.completed\",\"livemode\":false,\"api_version\":\"" + StripeGatewayService.API_VERSION + "\",\"data\":{\"object\":{\"id\":\"cs_fixture\"}}}"; }
     private static String signature(String body) throws Exception {

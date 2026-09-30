@@ -16,6 +16,8 @@ public final class FinanceLedgerRules {
         return entry.getType() == FinanceLedgerEntry.LedgerType.DONATION
                 || entry.getType() == FinanceLedgerEntry.LedgerType.REFUND_ADJUSTMENT
                 || entry.getType() == FinanceLedgerEntry.LedgerType.DISPUTE_ADJUSTMENT
+                || entry.getType() == FinanceLedgerEntry.LedgerType.DISPUTE_FEE_ADJUSTMENT
+                || entry.getType() == FinanceLedgerEntry.LedgerType.DISPUTE_REVERSAL
                 || entry.getType() == FinanceLedgerEntry.LedgerType.AD_CLICK
                 || entry.getType() == FinanceLedgerEntry.LedgerType.AD_IMPRESSION;
     }

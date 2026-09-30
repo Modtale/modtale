@@ -3,6 +3,8 @@ package net.modtale.service.finance;
 import java.util.List;
 import java.util.Map;
 import net.modtale.model.finance.FinanceLedgerEntry;
+import net.modtale.model.finance.FinanceDisputeCase;
+import net.modtale.model.finance.FinanceDisputeResolution;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
@@ -58,7 +60,8 @@ public class PaymentAdjustmentService {
             if (!Boolean.TRUE.equals(page.get("has_more"))) break;
             if (refunds.isEmpty() || ++pages > 100) throw new IllegalArgumentException("Refund pagination requires review.");
         } while (true);
-        if (allFinal && !Boolean.TRUE.equals(charge.get("disputed")) && refunded == number(charge.get("amount_refunded"))) {
+        if (allFinal && refunded == number(charge.get("amount_refunded"))
+                && (!Boolean.TRUE.equals(charge.get("disputed")) || reconcileAllChargeDisputes(original, chargeId))) {
             wallets.resolveRisk(original.getCreatorId(), original.getCurrency(), testMode, riskKey);
         }
     }
@@ -71,7 +74,8 @@ public class PaymentAdjustmentService {
         boolean testMode = Boolean.parseBoolean(original.getMetadata().get("testMode"));
         String accountId = original.getMetadata().get("providerAccountId");
         if (!gateway.getPlatformAccountId().equals(accountId)) throw new IllegalArgumentException("Payment account scope changed.");
-        wallets.holdForRisk(original.getCreatorId(), original.getCurrency(), testMode, disputeId);
+        String caseId = FinanceSourceKey.stripe(testMode, accountId, "dispute-case:" + disputeId);
+        FinanceDisputeCase previous = wallets.beginDisputeRefresh(caseId, disputeId, chargeId, original, testMode);
         Map<String, Object> dispute = gateway.getDispute(disputeId);
         if (!(dispute.get("livemode") instanceof Boolean) || !disputeId.equals(dispute.get("id")) || !chargeId.equals(dispute.get("charge"))
                 || !original.getCurrency().equals(dispute.get("currency")) || testMode != Boolean.FALSE.equals(dispute.get("livemode"))) {
@@ -80,21 +84,60 @@ public class PaymentAdjustmentService {
         long amount = number(dispute.get("amount"));
         if (amount <= 0 || amount > original.getGrossCents()) throw new IllegalArgumentException("Dispute amount needs review.");
         String status = String.valueOf(dispute.get("status"));
-        Long fee = null;
-        if (dispute.get("balance_transactions") instanceof List<?> balances) {
-            long total = 0; boolean known = true;
-            for (Object value : balances) {
-                if (!(value instanceof Map<?, ?> balance) || number(balance.get("fee")) == Long.MIN_VALUE
-                        || !original.getCurrency().equals(balance.get("currency"))) { known = false; break; }
-                total = Math.addExact(total, number(balance.get("fee")));
-            }
-            if (known) fee = total;
+        DisputeEvidence evidence = DisputeEvidence.read(accountId, testMode, disputeId, chargeId, original.getCurrency(), amount, status, dispute.get("balance_transactions"));
+        boolean eligible = evidence.ready() && evidence.actualFeeCents() != null && evidence.actualFeeCents() >= 0
+                && (("lost".equals(status) && evidence.principalMovementCents() == -amount)
+                || ("won".equals(status) && evidence.principalMovementCents() == 0 && evidence.returnedPrincipalCents() >= amount)
+                || (List.of("warning_closed", "prevented").contains(status) && evidence.principalMovementCents() == 0));
+        if ("lost".equals(status) && mongo.exists(Query.query(Criteria.where("_id").is(FinanceSourceKey.stripe(testMode, accountId, "dispute-return:" + disputeId))), FinanceLedgerEntry.class)) eligible = false;
+        String resolutionId = caseId + ":" + evidence.digest();
+        String reviewStatus = eligible ? (mongo.exists(Query.query(Criteria.where("_id").is(resolutionId)), FinanceDisputeResolution.class) ? "RESOLVED" : "POLICY_REVIEW_REQUIRED") : "EVIDENCE_PENDING";
+        try {
+            mongo.save(new FinanceDisputeCase(caseId, disputeId, chargeId, original.getCreatorId(), original.getCurrency(), testMode, status, amount,
+                    evidence.actualFeeCents(), reviewStatus, java.time.Instant.now(), accountId, original.getId(), evidence.principalMovementCents(),
+                    evidence.returnedPrincipalCents(), eligible, evidence.digest(), evidence.balances(), previous == null ? null : previous.version()));
+        } catch (org.springframework.dao.OptimisticLockingFailureException | org.springframework.dao.DuplicateKeyException changed) {
+            throw new IllegalArgumentException("Dispute evidence changed during reconciliation; retry the canonical lookup.");
         }
-        String caseId = FinanceSourceKey.stripe(testMode, accountId, "dispute-case:" + disputeId);
-        if ("lost".equals(status)) wallets.postDisputePrincipal(original.getId(), FinanceSourceKey.stripe(testMode, accountId, "dispute-principal:" + disputeId), amount, disputeId, testMode);
-        // Fees are visible for explicit policy review. Never invent a fine or debit a bank account.
-        mongo.save(new net.modtale.model.finance.FinanceDisputeCase(caseId, disputeId, chargeId, original.getCreatorId(),
-                original.getCurrency(), testMode, status, amount, fee, "POLICY_REVIEW_REQUIRED", java.time.Instant.now()));
+        if (eligible && "lost".equals(status)) wallets.recordDisputeLoss(caseId, evidence.digest());
+        if ("RESOLVED".equals(reviewStatus)) wallets.clearReviewedDisputeRisk(caseId, evidence.digest());
+    }
+
+    private boolean reconcileAllChargeDisputes(FinanceLedgerEntry original, String chargeId) {
+        String after = null; int pages = 0; boolean reviewed = true; var seen = new java.util.HashSet<String>();
+        do {
+            Map<String, Object> page = gateway.getChargeDisputes(chargeId, after);
+            if (!(page.get("data") instanceof List<?> values) || !(page.get("has_more") instanceof Boolean)) throw new IllegalArgumentException("Could not enumerate charge disputes.");
+            for (Object value : values) {
+                if (!(value instanceof Map<?, ?> dispute) || !(dispute.get("id") instanceof String id) || !chargeId.equals(dispute.get("charge"))
+                        || !(dispute.get("livemode") instanceof Boolean) || gateway.isTestMode() != Boolean.FALSE.equals(dispute.get("livemode"))) throw new IllegalArgumentException("Dispute list source needs review.");
+                after = id;
+                if (!seen.add(id)) continue;
+                synchronizeDispute(id, chargeId);
+                FinanceDisputeCase current = mongo.findById(FinanceSourceKey.stripe(gateway.isTestMode(), original.getMetadata().get("providerAccountId"), "dispute-case:" + id), FinanceDisputeCase.class);
+                if (current == null || !"RESOLVED".equals(current.reviewStatus())) reviewed = false;
+            }
+            if (!Boolean.TRUE.equals(page.get("has_more"))) break;
+            if (values.isEmpty() || ++pages > 100) throw new IllegalArgumentException("Dispute pagination requires review.");
+        } while (true);
+        return !seen.isEmpty() && reviewed;
+    }
+
+    public FinanceDisputeResolution resolveCase(String caseId, String expectedEvidenceDigest, long creatorFeeCents,
+            net.modtale.model.user.User reviewer, String reason) {
+        FinanceDisputeCase before = mongo.findById(caseId, FinanceDisputeCase.class);
+        if (before == null) throw new IllegalArgumentException("Dispute case not found.");
+        if (reviewer == null || reviewer.getId() == null || reason == null || reason.isBlank() || reason.length() > 1000) throw new IllegalArgumentException("A reviewer and policy reason are required.");
+        if (!gateway.isReconciliationEnabled() || gateway.isTestMode() != before.testMode() || !gateway.verifyPlatformAccountId(before.providerAccountId())) throw new IllegalArgumentException("Dispute provider account or mode does not match.");
+        synchronizeDispute(before.disputeId(), before.chargeId());
+        FinanceDisputeResolution resolution = wallets.resolveDispute(caseId, expectedEvidenceDigest, creatorFeeCents, reviewer.getId(), reason.trim());
+        // Generic charge/refund holds are independent. Repair only already-existing holds after enumerating all related disputes.
+        for (String risk : wallets.getWallet(before.creatorId(), before.currency(), before.testMode()).getOpenRiskIds()) {
+            if (risk.equals(before.chargeId()) || risk.endsWith(":" + before.chargeId())) {
+                try { synchronizeCharge(before.chargeId(), risk); } catch (IllegalArgumentException | IllegalStateException pending) { /* Retain this precise hold. */ }
+            }
+        }
+        return resolution;
     }
 
     public List<net.modtale.model.finance.FinanceDisputeCase> getDisputeCases() {
@@ -104,6 +147,10 @@ public class PaymentAdjustmentService {
     @Scheduled(fixedDelayString = "${app.finance.reconciliation-interval-ms:3600000}")
     public void reconcileHeldCharges() {
         if (!gateway.isReconciliationEnabled()) return;
+        for (FinanceDisputeCase dispute : mongo.find(Query.query(Criteria.where("testMode").is(gateway.isTestMode())
+                .and("providerAccountId").is(gateway.getPlatformAccountId())).with(org.springframework.data.domain.Sort.by("updatedAt")).limit(100), FinanceDisputeCase.class)) {
+            try { synchronizeDispute(dispute.disputeId(), dispute.chargeId()); } catch (IllegalArgumentException | IllegalStateException pending) { /* Includes late wins; do not treat a recorded loss as irreversible. */ }
+        }
         for (var wallet : mongo.find(Query.query(Criteria.where("testMode").is(gateway.isTestMode()).and("openRiskIds.0").exists(true)).limit(100), net.modtale.model.finance.CreatorWallet.class)) {
             for (String id : wallet.getOpenRiskIds()) if (id.startsWith("ch_") || id.startsWith("evt_")) {
                 String chargeId = id.contains(":") ? id.substring(id.indexOf(':') + 1) : id;

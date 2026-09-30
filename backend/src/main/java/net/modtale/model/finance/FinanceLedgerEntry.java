@@ -22,6 +22,8 @@ public class FinanceLedgerEntry {
         DONATION,
         REFUND_ADJUSTMENT,
         DISPUTE_ADJUSTMENT,
+        DISPUTE_FEE_ADJUSTMENT,
+        DISPUTE_REVERSAL,
         AD_CLICK,
         AD_IMPRESSION,
         PAYOUT,

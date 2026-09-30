@@ -197,6 +197,21 @@ class StripeGatewayHttpContractTest {
         assertEquals("payout_fixture_group", request.form().get("metadata[transferGroup]"));
         assertEquals("stable-group-key", request.idempotency());
     }
+    @Test void chargeDisputeEnumerationUsesFullCursorPaginationWithoutDateFiltering() throws Exception {
+        reply.set(new Reply(200, "{\"data\":[],\"has_more\":false}", false));
+        gateway.getChargeDisputes("ch_fixture", null);
+        Request first = take(); assertProviderHeaders(first);
+        assertEquals("GET", first.method()); assertEquals("/v1/disputes", first.path());
+        assertEquals(Map.of("charge", "ch_fixture", "limit", "100"), first.query());
+        gateway.getChargeDisputes("ch_fixture", "dp_previous");
+        assertEquals(Map.of("charge", "ch_fixture", "limit", "100", "starting_after", "dp_previous"), take().query());
+    }
+    @Test void invalidDisputePaginationIdentifiersNeverReachProvider() {
+        assertTrue(gateway.getChargeDisputes("ch_fixture/path", null).isEmpty());
+        assertTrue(gateway.getChargeDisputes("ch_fixture", "dp_bad?query").isEmpty());
+        assertTrue(gateway.getChargeDisputes(null, null).isEmpty());
+        assertTrue(requests.isEmpty());
+    }
     @Test void accountScopeComesFromCurrentPlatformAccountEndpoint() throws Exception {
         reply.set(new Reply(200, "{\"id\":\"acct_platform_fixture\"}", false));
         assertEquals("acct_platform_fixture", gateway.getPlatformAccountId());

@@ -93,6 +93,6 @@ class PaymentAdjustmentPipelineIntegrationTest extends FinancePipelineFixture {
     }
     private Map<String, Object> dispute(String status) {
         return Map.of("id", "dp_case", "charge", "ch_pi_first", "currency", "usd", "livemode", false, "amount", 10000, "status", status,
-                "balance_transactions", List.of(Map.of("id", "txn_dispute", "currency", "usd", "amount", -10000, "fee", 1500, "net", -11500, "status", "available")));
+                "balance_transactions", List.of(Map.of("id", "txn_dispute", "source", "dp_case", "type", "adjustment", "currency", "usd", "amount", -10000, "fee", 1500, "net", -11500, "status", "available")));
     }
 }
