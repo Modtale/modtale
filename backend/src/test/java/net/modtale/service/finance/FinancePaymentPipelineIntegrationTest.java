@@ -22,6 +22,17 @@ class FinancePaymentPipelineIntegrationTest extends FinancePipelineFixture {
         assertEquals(321, credit("pi_first").getProcessorFeeCents()); assertEquals(8766, credit("pi_first").getCreatorGrossCents());
         assertEquals(0, wallets.getWallet("creator", "usd", false).getAvailableCents()); assertEquals(2, ledger.count());
     }
+    @Test void aLegacyWalletConflictDoesNotStarveOtherCreatorsSettledPayments() throws Exception {
+        var legacy = new net.modtale.model.finance.CreatorWallet(); legacy.setId(FinanceWalletService.walletId("creator", "usd", true));
+        legacy.setCreatorId("creator"); legacy.setCurrency("usd"); legacy.setTestMode(true); legacy.setAvailableCents(2000); mongo.insert(legacy);
+        var first = checkout(false); event("evt_first", "checkout.session.completed", session(first));
+        when(gateway.getPaymentWithBalanceTransaction("pi_first")).thenReturn(payment("pi_first", "available"));
+        project.setAuthorId("creator2"); var next = checkout(false); var nextSession = session(next); nextSession.put("payment_intent", "pi_next");
+        event("evt_next", "checkout.session.completed", nextSession); when(gateway.getPaymentWithBalanceTransaction("pi_next")).thenReturn(payment("pi_next", "available"));
+        settlement.reconcilePendingPayments();
+        assertEquals(2000, available()); assertEquals(8445, wallets.getWallet("creator2", "usd", true).getAvailableCents());
+        assertEquals("source_or_wallet_scope_conflict", ledger.findById(FinanceSourceKey.stripe(true, "acct_platform", "checkout:" + first.getStripeSessionId())).orElseThrow().getMetadata().get("reconciliationReview"));
+    }
     @Test void staleShareIsRejectedBeforeCreatingIntentOrProviderCheckout() {
         assertThrows(DonationCheckoutService.SupportTermsChangedException.class,
                 () -> donations.createDonationCheckout("project", 10000, false, donor, false, 1000));

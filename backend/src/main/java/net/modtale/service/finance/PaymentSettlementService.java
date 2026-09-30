@@ -32,8 +32,15 @@ public class PaymentSettlementService {
         for (FinanceLedgerEntry pending : mongo.find(Query.query(Criteria.where("type").is(FinanceLedgerEntry.LedgerType.DONATION)
                 .and("status").is(FinanceLedgerEntry.EntryStatus.PENDING)
                 .and("metadata.testMode").is(String.valueOf(gateway.isTestMode()))
-                .and("metadata.providerAccountId").is(accountId)).limit(100), FinanceLedgerEntry.class)) {
-            reconcile(pending);
+                .and("metadata.providerAccountId").is(accountId)).with(org.springframework.data.domain.Sort.by("metadata.lastReconciliationAttemptAt")).limit(100), FinanceLedgerEntry.class)) {
+            mongo.updateFirst(Query.query(Criteria.where("_id").is(pending.getId())),
+                    new Update().set("metadata.lastReconciliationAttemptAt", java.time.Instant.now().toString()), FinanceLedgerEntry.class);
+            try { reconcile(pending); }
+            catch (IllegalArgumentException | IllegalStateException needsReview) {
+                // A conflicting/legacy wallet must not starve unrelated settled payments in this batch.
+                mongo.updateFirst(Query.query(Criteria.where("_id").is(pending.getId())),
+                        new Update().set("metadata.reconciliationReview", "source_or_wallet_scope_conflict"), FinanceLedgerEntry.class);
+            }
         }
     }
 

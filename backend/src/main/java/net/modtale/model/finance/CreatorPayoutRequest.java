@@ -16,6 +16,18 @@ public class CreatorPayoutRequest {
         private long amountCents;
         private String transferId;
         private Instant authorizedAt;
+        private String correlationId;
+        private String confirmedBy;
+        private String confirmationReason;
+        private Instant confirmedAt;
+        public String getCorrelationId() { return correlationId; }
+        public void setCorrelationId(String value) { correlationId = value; }
+        public String getConfirmedBy() { return confirmedBy; }
+        public void setConfirmedBy(String value) { confirmedBy = value; }
+        public String getConfirmationReason() { return confirmationReason; }
+        public void setConfirmationReason(String value) { confirmationReason = value; }
+        public Instant getConfirmedAt() { return confirmedAt; }
+        public void setConfirmedAt(Instant value) { confirmedAt = value; }
         public String getUserId() { return userId; }
         public void setUserId(String id) { userId = id; }
         public String getAccountId() { return accountId; }
@@ -33,10 +45,13 @@ public class CreatorPayoutRequest {
     private String walletId;
     private String currency;
     private boolean testMode;
+    private String providerAccountId;
+    private String transferGroup;
     private long amountCents;
     private Status status = Status.RESERVED;
     private Instant createdAt = Instant.now();
     private Instant firstAttemptAt;
+    private Instant lastDispatchAttemptAt;
     private Instant completedAt;
     private String reviewReason;
     private List<Recipient> recipients = new ArrayList<>();
@@ -51,6 +66,10 @@ public class CreatorPayoutRequest {
     public void setWalletId(String id) { walletId = id; }
     public String getCurrency() { return currency; }
     public void setCurrency(String currency) { this.currency = currency; }
+    public String getProviderAccountId() { return providerAccountId; }
+    public void setProviderAccountId(String value) { providerAccountId = value; }
+    public String getTransferGroup() { return transferGroup; }
+    public void setTransferGroup(String value) { transferGroup = value; }
     public boolean isTestMode() { return testMode; }
     public void setTestMode(boolean mode) { testMode = mode; }
     public long getAmountCents() { return amountCents; }
@@ -59,6 +78,8 @@ public class CreatorPayoutRequest {
     public void setStatus(Status status) { this.status = status; }
     public Instant getCreatedAt() { return createdAt; }
     public void setCreatedAt(Instant value) { createdAt = value; }
+    public Instant getLastDispatchAttemptAt() { return lastDispatchAttemptAt; }
+    public void setLastDispatchAttemptAt(Instant value) { lastDispatchAttemptAt = value; }
     public Instant getFirstAttemptAt() { return firstAttemptAt; }
     public void setFirstAttemptAt(Instant value) { firstAttemptAt = value; }
     public Instant getCompletedAt() { return completedAt; }

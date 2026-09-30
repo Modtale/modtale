@@ -36,7 +36,7 @@ abstract class FinancePipelineFixture {
         var factory = new SimpleMongoClientDatabaseFactory(client, "finance_pipeline_" + UUID.randomUUID().toString().replace("-", ""));
         mongo = new MongoTemplate(factory);
         for (Class<?> type : List.of(CreatorWallet.class, CreatorPayoutRequest.class, FinanceLedgerEntry.class,
-                DonationIntent.class, CreatorSupportSubscription.class, PaymentWebhookReceipt.class, FinanceDisputeCase.class)) mongo.createCollection(type);
+                DonationIntent.class, CreatorSupportSubscription.class, PaymentWebhookReceipt.class, FinanceDisputeCase.class, FinanceTransferReceipt.class)) mongo.createCollection(type);
         var repositories = new MongoRepositoryFactory(mongo);
         intents = repositories.getRepository(DonationIntentRepository.class); ledger = repositories.getRepository(FinanceLedgerEntryRepository.class);
         subscriptions = repositories.getRepository(CreatorSupportSubscriptionRepository.class);

@@ -10,6 +10,7 @@ public class CreatorWallet {
     private String creatorId;
     private String currency;
     private boolean testMode;
+    private String providerAccountId;
     private long availableCents;
     private long reservedCents;
     private boolean payoutHold;
@@ -21,6 +22,8 @@ public class CreatorWallet {
     public void setCreatorId(String creatorId) { this.creatorId = creatorId; }
     public String getCurrency() { return currency; }
     public void setCurrency(String currency) { this.currency = currency; }
+    public String getProviderAccountId() { return providerAccountId; }
+    public void setProviderAccountId(String value) { providerAccountId = value; }
     public boolean isTestMode() { return testMode; }
     public void setTestMode(boolean testMode) { this.testMode = testMode; }
     public long getAvailableCents() { return availableCents; }

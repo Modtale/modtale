@@ -188,7 +188,14 @@ public class EarningsAccountService {
         response.put("availableCents", Math.max(0, liveWallet.getAvailableCents()));
         response.put("reservedCents", activeWallet.getReservedCents());
         response.put("adjustmentOwedCents", Math.max(0, -activeWallet.getAvailableCents()));
-        response.put("payoutHold", activeWallet.isPayoutHold());
+        boolean fundingScopeVerified = false;
+        if (activeWallet.getProviderAccountId() != null && stripeGatewayService.isReconciliationEnabled()) {
+            try { fundingScopeVerified = activeWallet.getProviderAccountId().equals(stripeGatewayService.getPlatformAccountId()); }
+            catch (IllegalStateException unavailable) { /* Preserve balance visibility while provider verification is unavailable. */ }
+        }
+        boolean fundingReview = !fundingScopeVerified && (activeWallet.getAvailableCents() != 0 || activeWallet.getReservedCents() != 0);
+        response.put("payoutHold", activeWallet.isPayoutHold() || fundingReview);
+        response.put("fundingScopeVerified", fundingScopeVerified);
         response.put("testAvailableCents", Math.max(0, testWallet.getAvailableCents()));
         response.put("pendingCents", Math.max(0, pending));
         response.put("paidOutCents", Math.max(0, paidOut));
@@ -210,7 +217,10 @@ public class EarningsAccountService {
         response.put("payouts", payouts);
         response.put("payoutRequests", wallets.getRecentRequests(creator.getId(), testMode).stream().map(request -> {
             Map<String, Object> row = new HashMap<>(); row.put("id", request.getId()); row.put("amountCents", request.getAmountCents());
-            row.put("status", request.getStatus()); row.put("createdAt", request.getCreatedAt()); row.put("reviewReason", request.getReviewReason());
+            row.put("status", request.getStatus()); row.put("createdAt", request.getCreatedAt());
+            if (request.getStatus() != net.modtale.model.finance.CreatorPayoutRequest.Status.TRANSFERRED) row.put("reviewReason", request.getReviewReason());
+            long transferred = request.getRecipients().stream().filter(recipient -> recipient.getTransferId() != null).mapToLong(net.modtale.model.finance.CreatorPayoutRequest.Recipient::getAmountCents).sum();
+            row.put("transferredCents", transferred); row.put("remainingReservedCents", request.getAmountCents() - transferred);
             return row;
         }).toList());
         response.put("stripeConnected", creator.getStripeConnectAccountId() != null && !creator.getStripeConnectAccountId().isBlank());

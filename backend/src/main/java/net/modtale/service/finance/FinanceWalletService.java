@@ -12,6 +12,7 @@ import java.util.function.Supplier;
 import net.modtale.model.finance.CreatorPayoutRequest;
 import net.modtale.model.finance.CreatorWallet;
 import net.modtale.model.finance.FinanceLedgerEntry;
+import net.modtale.model.finance.FinanceTransferReceipt;
 import org.springframework.data.mongodb.MongoDatabaseFactory;
 import org.springframework.data.mongodb.MongoTransactionManager;
 import org.springframework.data.mongodb.core.FindAndModifyOptions;
@@ -78,22 +79,31 @@ public class FinanceWalletService {
                         || !Objects.equals(existing.getProjectId(), credit.getProjectId())
                         || !Objects.equals(existing.getExternalReference(), credit.getExternalReference())
                         || existing.getType() != credit.getType() || existing.getStatus() != credit.getStatus()
+                        || !Objects.equals(existing.getMetadata().get("providerAccountId"), credit.getMetadata().get("providerAccountId"))
                         || !Objects.equals(existing.getMetadata().get("testMode"), String.valueOf(testMode))) {
                     throw new IllegalStateException("A conflicting settlement already uses this source reference.");
                 }
                 return null;
             }
+            String accountId = credit.getMetadata().get("providerAccountId");
+            if (accountId == null || !accountId.matches("acct_[A-Za-z0-9]+")) throw new IllegalArgumentException("Verified funding account is required.");
+            CreatorWallet wallet = mongo.findById(id, CreatorWallet.class);
+            if (wallet != null && (!Objects.equals(accountId, wallet.getProviderAccountId())
+                    && (wallet.getProviderAccountId() != null || wallet.getAvailableCents() != 0 || wallet.getReservedCents() != 0))) {
+                throw new IllegalStateException("Wallet funding scope needs reconciliation before accepting another account's funds.");
+            }
             mongo.insert(credit);
             mongo.upsert(Query.query(Criteria.where("_id").is(id)), new Update()
                     .setOnInsert("creatorId", credit.getCreatorId()).setOnInsert("currency", credit.getCurrency())
                     .setOnInsert("testMode", testMode).setOnInsert("reservedCents", 0L).setOnInsert("payoutHold", false)
-                    .inc("availableCents", credit.getCreatorCents()), CreatorWallet.class);
+                    .set("providerAccountId", accountId).inc("availableCents", credit.getCreatorCents()), CreatorWallet.class);
             return null;
         });
     }
 
     public CreatorPayoutRequest reserve(String creatorId, String requesterId, String currency, boolean testMode,
-            String requestKey, long amountCents, long minimumCents, List<CreatorPayoutRequest.Recipient> recipients) {
+            String requestKey, long amountCents, long minimumCents, List<CreatorPayoutRequest.Recipient> recipients, String providerAccountId) {
+        if (providerAccountId == null || !providerAccountId.matches("acct_[A-Za-z0-9]+")) throw new IllegalArgumentException("Verified payout account is required.");
         try { UUID.fromString(requestKey); } catch (RuntimeException invalid) { throw new IllegalArgumentException("A valid payout request key is required."); }
         if (amountCents < minimumCents || minimumCents < 1) throw new IllegalArgumentException("Payout amount is below the minimum.");
         if (recipients == null || recipients.isEmpty()) throw new IllegalArgumentException("No verified payout recipients.");
@@ -110,20 +120,24 @@ public class FinanceWalletService {
         return transact(() -> {
             CreatorPayoutRequest existing = mongo.findById(payoutId, CreatorPayoutRequest.class);
             if (existing != null) {
-                if (existing.getAmountCents() != amountCents || !Objects.equals(existing.getRequestedBy(), requesterId)) {
+                if (existing.getAmountCents() != amountCents || !Objects.equals(existing.getRequestedBy(), requesterId)
+                        || !Objects.equals(existing.getProviderAccountId(), providerAccountId)) {
                     throw new IllegalArgumentException("This request key was already used for a different payout.");
                 }
                 return existing;
             }
             var wallet = mongo.findAndModify(Query.query(Criteria.where("_id").is(walletId)
-                            .and("availableCents").gte(amountCents).and("payoutHold").ne(true).and("openRiskIds.0").exists(false)),
+                            .and("providerAccountId").is(providerAccountId).and("availableCents").gte(amountCents).and("payoutHold").ne(true).and("openRiskIds.0").exists(false)),
                     new Update().inc("availableCents", -amountCents).inc("reservedCents", amountCents),
                     FindAndModifyOptions.options().returnNew(true), CreatorWallet.class);
             if (wallet == null) throw new IllegalStateException("Insufficient settled funds or the account is on a payout hold.");
             CreatorPayoutRequest request = new CreatorPayoutRequest();
             request.setId(payoutId); request.setWalletId(walletId); request.setCreatorId(creatorId);
             request.setRequestedBy(requesterId); request.setCurrency(currency); request.setTestMode(testMode);
-            request.setAmountCents(amountCents); request.setRecipients(recipients);
+            request.setAmountCents(amountCents); request.setProviderAccountId(providerAccountId);
+            request.setTransferGroup("modtale_" + UUID.randomUUID().toString().replace("-", ""));
+            for (var recipient : recipients) recipient.setCorrelationId(UUID.randomUUID().toString());
+            request.setRecipients(recipients);
             return mongo.insert(request);
         });
     }
@@ -199,13 +213,18 @@ public class FinanceWalletService {
     public CreatorPayoutRequest getRequest(String id) { return mongo.findById(id, CreatorPayoutRequest.class); }
 
     public List<CreatorPayoutRequest> getUnfinishedRequests(boolean testMode) {
-        return mongo.find(Query.query(Criteria.where("status").in(CreatorPayoutRequest.Status.RESERVED, CreatorPayoutRequest.Status.PROCESSING).and("testMode").is(testMode)).limit(100), CreatorPayoutRequest.class);
+        return mongo.find(Query.query(Criteria.where("status").in(CreatorPayoutRequest.Status.RESERVED, CreatorPayoutRequest.Status.PROCESSING).and("testMode").is(testMode)).with(org.springframework.data.domain.Sort.by("lastDispatchAttemptAt", "createdAt")).limit(100), CreatorPayoutRequest.class);
+    }
+
+    public void noteDispatchAttempt(String id) {
+        mongo.updateFirst(Query.query(Criteria.where("_id").is(id).and("status").in(CreatorPayoutRequest.Status.RESERVED, CreatorPayoutRequest.Status.PROCESSING)),
+                new Update().set("lastDispatchAttemptAt", Instant.now()), CreatorPayoutRequest.class);
     }
 
     public CreatorPayoutRequest markAttempted(String id) {
         return mongo.findAndModify(Query.query(Criteria.where("_id").is(id).and("firstAttemptAt").is(null)
                         .and("status").is(CreatorPayoutRequest.Status.RESERVED)),
-                new Update().set("firstAttemptAt", Instant.now()).set("status", CreatorPayoutRequest.Status.PROCESSING),
+                new Update().set("status", CreatorPayoutRequest.Status.PROCESSING),
                 FindAndModifyOptions.options().returnNew(true), CreatorPayoutRequest.class);
     }
 
@@ -215,22 +234,58 @@ public class FinanceWalletService {
             CreatorPayoutRequest request = mongo.findById(requestId, CreatorPayoutRequest.class);
             if (request == null || request.getStatus() != CreatorPayoutRequest.Status.PROCESSING
                     || recipientIndex < 0 || recipientIndex >= request.getRecipients().size()) return false;
-            if (request.getRecipients().get(recipientIndex).getTransferId() != null) return false;
+            var recipient = request.getRecipients().get(recipientIndex);
+            if (recipient.getTransferId() != null || request.getProviderAccountId() == null || request.getTransferGroup() == null
+                    || recipient.getCorrelationId() == null) return false;
+            Instant now = Instant.now();
+            if (recipient.getAuthorizedAt() != null && recipient.getAuthorizedAt().isBefore(now.minus(java.time.Duration.ofHours(23)))) return false;
             var result = mongo.updateFirst(Query.query(Criteria.where("_id").is(request.getWalletId())
-                            .and("payoutHold").ne(true).and("openRiskIds.0").exists(false).and("availableCents").gte(0)),
+                            .and("providerAccountId").is(request.getProviderAccountId()).and("payoutHold").ne(true).and("openRiskIds.0").exists(false).and("availableCents").gte(0)),
                     new Update().inc("dispatchAuthorizationSequence", 1L), CreatorWallet.class);
             if (result.getModifiedCount() != 1) return false;
-            mongo.updateFirst(Query.query(Criteria.where("_id").is(requestId).and("status").is(CreatorPayoutRequest.Status.PROCESSING)),
-                    new Update().set("recipients." + recipientIndex + ".authorizedAt", Instant.now()), CreatorPayoutRequest.class);
+            Update authorization = new Update();
+            if (recipient.getAuthorizedAt() == null) authorization.set("recipients." + recipientIndex + ".authorizedAt", now);
+            if (request.getFirstAttemptAt() == null) authorization.set("firstAttemptAt", now);
+            if (!authorization.getUpdateObject().isEmpty()) mongo.updateFirst(Query.query(Criteria.where("_id").is(requestId)), authorization, CreatorPayoutRequest.class);
             return true;
         }));
     }
 
-    public void recordTransfer(String id, int recipientIndex, String transferId) {
-        if (transferId == null || !transferId.startsWith("tr_")) throw new IllegalArgumentException("Invalid provider transfer reference.");
-        mongo.updateFirst(Query.query(Criteria.where("_id").is(id).and("status").is(CreatorPayoutRequest.Status.PROCESSING)
-                        .and("recipients." + recipientIndex + ".transferId").is(null)),
-                new Update().set("recipients." + recipientIndex + ".transferId", transferId), CreatorPayoutRequest.class);
+    /** Books confirmed outgoing money even if a newer risk hold interrupted the request. No hold is cleared. */
+    public void recordTransfer(String id, int recipientIndex, String transferId, String actor, String reason) {
+        if (transferId == null || !transferId.matches("tr_[A-Za-z0-9]+") || actor == null || reason == null) throw new IllegalArgumentException("Verified transfer evidence is required.");
+        transact(() -> {
+            CreatorPayoutRequest request = mongo.findById(id, CreatorPayoutRequest.class);
+            if (request == null || recipientIndex < 0 || recipientIndex >= request.getRecipients().size()
+                    || request.getProviderAccountId() == null || request.getTransferGroup() == null) throw new IllegalArgumentException("Payout scope needs reconciliation.");
+            var recipient = request.getRecipients().get(recipientIndex);
+            if (recipient.getAuthorizedAt() == null) throw new IllegalArgumentException("No recorded outbound authorization exists for this recipient.");
+            String receiptId = FinanceSourceKey.stripe(request.isTestMode(), request.getProviderAccountId(), "transfer:" + transferId);
+            var prior = mongo.findById(receiptId, FinanceTransferReceipt.class);
+            if (prior != null) {
+                if (!id.equals(prior.payoutRequestId()) || recipientIndex != prior.recipientIndex()) throw new IllegalStateException("This transfer is already claimed by another payout.");
+                if (!transferId.equals(recipient.getTransferId())) throw new IllegalStateException("Transfer receipt and payout require reconciliation.");
+                return null;
+            }
+            if (recipient.getTransferId() != null) throw new IllegalStateException("This recipient already has a different transfer.");
+            if (request.getStatus() != CreatorPayoutRequest.Status.PROCESSING && request.getStatus() != CreatorPayoutRequest.Status.REQUIRES_REVIEW) throw new IllegalStateException("Payout is not awaiting transfer confirmation.");
+            Instant now = Instant.now();
+            mongo.insert(new FinanceTransferReceipt(receiptId, id, recipientIndex, transferId, request.getProviderAccountId(), request.isTestMode(),
+                    recipient.getAccountId(), recipient.getAmountCents(), request.getCurrency(), actor, reason, now));
+            var result = mongo.updateFirst(Query.query(Criteria.where("_id").is(request.getWalletId())
+                            .and("providerAccountId").is(request.getProviderAccountId()).and("reservedCents").gte(recipient.getAmountCents())),
+                    new Update().inc("reservedCents", -recipient.getAmountCents()), CreatorWallet.class);
+            if (result.getModifiedCount() != 1) throw new IllegalStateException("Payout reservation needs reconciliation.");
+            FinanceLedgerEntry entry = new FinanceLedgerEntry(); entry.setId("payout:" + id + ":" + recipientIndex);
+            entry.setCreatorId(request.getCreatorId()); entry.setType(FinanceLedgerEntry.LedgerType.PAYOUT);
+            entry.setCurrency(request.getCurrency()); entry.setCreatorCents(-recipient.getAmountCents());
+            entry.setStatus(FinanceLedgerEntry.EntryStatus.PAID); entry.setCompletedAt(LocalDateTime.now()); entry.setExternalReference(id);
+            entry.getMetadata().put("testMode", String.valueOf(request.isTestMode())); entry.getMetadata().put("providerAccountId", request.getProviderAccountId());
+            entry.getMetadata().put("paymentStage", "connected_account_transfer"); entry.setStripeReference(transferId); mongo.insert(entry);
+            recipient.setTransferId(transferId); recipient.setConfirmedBy(actor); recipient.setConfirmationReason(reason); recipient.setConfirmedAt(now);
+            if (request.getRecipients().stream().allMatch(r -> r.getTransferId() != null)) { request.setStatus(CreatorPayoutRequest.Status.TRANSFERRED); request.setCompletedAt(now); }
+            mongo.save(request); return null;
+        });
     }
 
     public void requireReview(String id, String reason) {
@@ -239,27 +294,18 @@ public class FinanceWalletService {
     }
 
     public CreatorPayoutRequest completeTransfers(String id) {
-        return transact(() -> {
-            CreatorPayoutRequest request = mongo.findById(id, CreatorPayoutRequest.class);
-            if (request == null) throw new IllegalArgumentException("Payout not found.");
-            if (request.getStatus() == CreatorPayoutRequest.Status.TRANSFERRED) return request;
-            if (request.getStatus() != CreatorPayoutRequest.Status.PROCESSING || request.getRecipients().stream().anyMatch(r -> r.getTransferId() == null)) {
-                throw new IllegalStateException("All recipient transfers must be confirmed before releasing the reservation.");
-            }
-            var result = mongo.updateFirst(Query.query(Criteria.where("_id").is(request.getWalletId()).and("reservedCents").gte(request.getAmountCents())),
-                    new Update().inc("reservedCents", -request.getAmountCents()), CreatorWallet.class);
-            if (result.getModifiedCount() != 1) throw new IllegalStateException("Payout reservation needs reconciliation.");
-            FinanceLedgerEntry entry = new FinanceLedgerEntry(); entry.setId("payout:" + id);
-            entry.setCreatorId(request.getCreatorId()); entry.setType(FinanceLedgerEntry.LedgerType.PAYOUT);
-            entry.setCurrency(request.getCurrency()); entry.setCreatorCents(-request.getAmountCents());
-            entry.setStatus(FinanceLedgerEntry.EntryStatus.PAID); entry.setCompletedAt(LocalDateTime.now());
-            entry.setExternalReference(id); entry.getMetadata().put("testMode", String.valueOf(request.isTestMode()));
-            entry.getMetadata().put("paymentStage", "connected_account_transfer");
-            entry.setStripeReference(String.join(",", request.getRecipients().stream().map(CreatorPayoutRequest.Recipient::getTransferId).toList()));
-            mongo.insert(entry);
-            request.setStatus(CreatorPayoutRequest.Status.TRANSFERRED); request.setCompletedAt(Instant.now());
-            return mongo.save(request);
-        });
+        CreatorPayoutRequest request = getRequest(id);
+        if (request == null) throw new IllegalArgumentException("Payout not found.");
+        if (request.getStatus() != CreatorPayoutRequest.Status.TRANSFERRED || request.getRecipients().stream().anyMatch(r -> r.getTransferId() == null)) {
+            throw new IllegalStateException("All recipient transfers must be independently confirmed.");
+        }
+        return request;
+    }
+
+    public List<CreatorPayoutRequest> getReviewRequests(boolean testMode, String providerAccountId) {
+        return mongo.find(Query.query(Criteria.where("testMode").is(testMode).and("providerAccountId").is(providerAccountId)
+                .and("status").in(CreatorPayoutRequest.Status.PROCESSING, CreatorPayoutRequest.Status.REQUIRES_REVIEW))
+                .with(org.springframework.data.domain.Sort.by("createdAt")).limit(100), CreatorPayoutRequest.class);
     }
 
     private <T> T transact(Supplier<T> work) {

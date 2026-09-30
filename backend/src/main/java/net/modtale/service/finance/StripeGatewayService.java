@@ -233,8 +233,19 @@ public class StripeGatewayService {
             });
         }
 
+        if (metadata != null && metadata.get("transferGroup") != null) form.add("transfer_group", metadata.get("transferGroup"));
         if (idempotencyKey == null || idempotencyKey.isBlank()) return new StripeResult(false, null, null, "A durable payout key is required.", Map.of());
         return postForm("/transfers", form, idempotencyKey);
+    }
+
+    public boolean verifyPlatformAccountId(String expected) {
+        if (expected == null || !expected.matches("acct_[A-Za-z0-9]+")) return false;
+        return expected.equals(getProviderObject("/account", Map.of()).get("id"));
+    }
+
+    public Map<String, Object> getTransfer(String transferId) {
+        if (transferId == null || !transferId.matches("tr_[A-Za-z0-9]+")) return Map.of();
+        return getProviderObject("/transfers/" + transferId, Map.of());
     }
 
     public Map<String, Object> getDispute(String disputeId) {

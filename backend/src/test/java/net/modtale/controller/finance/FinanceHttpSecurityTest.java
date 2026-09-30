@@ -59,6 +59,7 @@ class FinanceHttpSecurityTest {
     private static final String PORTAL = "/api/v1/finance/support/subscriptions/sub_fixture/billing-portal";
     private static final String POLICY = "/api/v1/finance/projects/project/settings";
     private static final String WEBHOOK = "/api/v1/finance/webhooks/stripe";
+    private static final String RECONCILE = "/api/v1/admin/finance/payout-reconciliation";
     private static final String SECRET = "fixture-signing-secret";
     private AnnotationConfigWebApplicationContext context;
     private MockMvc mvc;
@@ -102,6 +103,7 @@ class FinanceHttpSecurityTest {
         @Bean ApiKeyService keys() { return mock(ApiKeyService.class); }
         @Bean ClientRegistrationRepository clients() { return mock(ClientRegistrationRepository.class); }
         @Bean GlobalExceptionHandler errors() { return new GlobalExceptionHandler(); }
+        @Bean PayoutReconciliationController reconciliationController(CreatorPayoutService payouts, AccountService accounts) { return new PayoutReconciliationController(payouts, accounts); }
         @Bean DonationController donationController() { return new DonationController(); }
         @Bean CreatorRevenueController creatorController() { return new CreatorRevenueController(); }
         @Bean RecurringSupportController recurringController(RecurringSupportService service, AccountService accounts) { return new RecurringSupportController(service, accounts); }
@@ -310,6 +312,43 @@ class FinanceHttpSecurityTest {
         verify(bean(UserRepository.class), never()).save(any(User.class)); verifyNoInteractions(bean(CreatorPayoutService.class));
         mvc.perform(csrf(browser(put(path))).with(authentication(session(owner))).contentType("application/json").content(body)).andExpect(status().isOk());
         verify(bean(UserRepository.class)).save(org);
+    }
+    private static String reconciliationBody() { return "{\"requestId\":\"payout_fixture\",\"recipientIndex\":0,\"transferId\":\"tr_fixture\",\"reason\":\"Verified provider receipt\",\"reviewerId\":\"other\"}"; }
+    @Test void reconciliationQueueRequiresFinanceManagerAndRejectsApiKeys() throws Exception {
+        mvc.perform(browser(get(RECONCILE))).andExpect(status().isForbidden());
+        mvc.perform(browser(get(RECONCILE)).with(authentication(session(owner)))).andExpect(status().isForbidden());
+        apiKey(reviewer);
+        mvc.perform(browser(get(RECONCILE)).header("X-MODTALE-KEY", "fixture-key")).andExpect(status().isForbidden());
+        verifyNoInteractions(bean(CreatorPayoutService.class));
+        when(bean(CreatorPayoutService.class).getReviewRequests()).thenReturn(List.of());
+        mvc.perform(browser(get(RECONCILE)).with(authentication(session(reviewer)))).andExpect(status().isOk());
+        verify(bean(CreatorPayoutService.class)).getReviewRequests();
+    }
+    @Test void reconciliationMutationRequiresMatchingCsrfAndFinanceSession() throws Exception {
+        String path = RECONCILE + "/confirm-existing-transfer";
+        mvc.perform(browser(post(path)).with(authentication(session(reviewer))).contentType("application/json").content(reconciliationBody())).andExpect(status().isForbidden());
+        mvc.perform(csrf(browser(post(path))).with(authentication(session(owner))).contentType("application/json").content(reconciliationBody())).andExpect(status().isForbidden());
+        apiKey(reviewer);
+        mvc.perform(browser(post(path)).header("X-MODTALE-KEY", "fixture-key").contentType("application/json").content(reconciliationBody())).andExpect(status().isForbidden());
+        verifyNoInteractions(bean(CreatorPayoutService.class));
+    }
+    @Test void reconciliationUsesAuthenticatedReviewerAndExactReceiptArguments() throws Exception {
+        var result = new CreatorPayoutRequest(); result.setId("payout_fixture"); result.setAmountCents(1000);
+        result.setStatus(CreatorPayoutRequest.Status.RESERVED); result.setTestMode(true);
+        when(bean(CreatorPayoutService.class).reconcileKnownTransfer("payout_fixture", 0, "tr_fixture", reviewer, "Verified provider receipt")).thenReturn(result);
+        mvc.perform(csrf(browser(post(RECONCILE + "/confirm-existing-transfer"))).with(authentication(session(reviewer)))
+                .contentType("application/json").content(reconciliationBody())).andExpect(status().isOk()).andExpect(jsonPath("$.requestId").value("payout_fixture"));
+        verify(bean(CreatorPayoutService.class)).reconcileKnownTransfer("payout_fixture", 0, "tr_fixture", reviewer, "Verified provider receipt");
+    }
+    @ParameterizedTest @ValueSource(strings = {
+            "{\"requestId\":\"\",\"recipientIndex\":0,\"transferId\":\"tr_fixture\",\"reason\":\"verified\"}",
+            "{\"requestId\":\"payout_fixture\",\"recipientIndex\":-1,\"transferId\":\"tr_fixture\",\"reason\":\"verified\"}",
+            "{\"requestId\":\"payout_fixture\",\"recipientIndex\":0,\"transferId\":\"tr_bad/path\",\"reason\":\"verified\"}",
+            "{\"requestId\":\"payout_fixture\",\"recipientIndex\":0,\"transferId\":\"tr_fixture\",\"reason\":\"  \"}"})
+    void invalidReconciliationEvidenceCannotReachAccounting(String body) throws Exception {
+        mvc.perform(csrf(browser(post(RECONCILE + "/confirm-existing-transfer"))).with(authentication(session(reviewer)))
+                .contentType("application/json").content(body)).andExpect(status().isBadRequest());
+        verifyNoInteractions(bean(CreatorPayoutService.class));
     }
     private static String event() { return "{\"id\":\"evt_fixture\",\"type\":\"checkout.session.completed\",\"livemode\":false,\"api_version\":\"" + StripeGatewayService.API_VERSION + "\",\"data\":{\"object\":{\"id\":\"cs_fixture\"}}}"; }
     private static String signature(String body) throws Exception {

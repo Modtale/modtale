@@ -181,7 +181,30 @@ jobs:
           exit 1
       - name: Verify ledger and withdrawal concurrency
         working-directory: backend
-        run: ./gradlew test --tests 'net.modtale.service.finance.*'
+        run: |
+          ./gradlew test --tests 'net.modtale.service.finance.*'
+          python3 - <<'PYTHON'
+          import pathlib, xml.etree.ElementTree as ET
+          reports = sorted(pathlib.Path('build/test-results/test').glob('TEST-net.modtale.service.finance.*.xml'))
+          assert reports, 'Finance test reports are missing'
+          total = 0
+          for report in reports:
+              suite = ET.parse(report).getroot()
+              counts = {key: int(suite.get(key, 0)) for key in ('tests', 'failures', 'errors', 'skipped')}
+              print(suite.get('name'), counts)
+              assert counts['tests'] > 0 and not any(counts[key] for key in ('failures', 'errors', 'skipped')), 'Finance CI must execute every test without skips'
+              total += counts['tests']
+          print(f'Finance replica validation: {total} tests executed, zero failures/errors/skips')
+          PYTHON
+      - name: Upload finance test reports
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: finance-test-reports
+          path: |
+            backend/build/reports/tests/test
+            backend/build/test-results/test
+          if-no-files-found: error
       - name: Stop disposable database
         if: always()
         run: docker rm -f finance-mongo || true

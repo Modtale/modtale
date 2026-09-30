@@ -66,6 +66,33 @@ class EarningsReadModelTest {
         assertEquals(true, response.get("payoutHold"));
         assertEquals(1500L, response.get("availableCents"));
     }
+    @Test void fundedLegacyWalletRemainsVisibleButRequiresScopeReconciliation() {
+        when(gateway.isOperational()).thenReturn(true);
+        when(ledger.findByCreatorId("creator")).thenReturn(List.of());
+        var response = service.getCreatorOverview(creator, "creator", "30d");
+        assertEquals(1500L, response.get("availableCents")); assertEquals(true, response.get("payoutHold"));
+        assertEquals(false, response.get("fundingScopeVerified"));
+    }
+    @Test void matchingVerifiedFundingAccountCanProceedWithoutHidingItsBalance() {
+        when(gateway.isReconciliationEnabled()).thenReturn(true); when(gateway.getPlatformAccountId()).thenReturn("acct_platform");
+        wallets.getWallet("creator", "usd", false).setProviderAccountId("acct_platform");
+        when(ledger.findByCreatorId("creator")).thenReturn(List.of());
+        var response = service.getCreatorOverview(creator, "creator", "30d");
+        assertEquals(1500L, response.get("availableCents")); assertEquals(false, response.get("payoutHold"));
+        assertEquals(true, response.get("fundingScopeVerified"));
+        when(gateway.getPlatformAccountId()).thenReturn("acct_other");
+        assertEquals(true, service.getCreatorOverview(creator, "creator", "30d").get("payoutHold"));
+    }
+    @Test void partialTransferHistoryShowsOnlyTheUnconfirmedRemainderAsReserved() {
+        var request = new net.modtale.model.finance.CreatorPayoutRequest(); request.setId("request"); request.setAmountCents(1000);
+        var sent = new net.modtale.model.finance.CreatorPayoutRequest.Recipient(); sent.setAmountCents(400); sent.setTransferId("tr_sent");
+        var pending = new net.modtale.model.finance.CreatorPayoutRequest.Recipient(); pending.setAmountCents(600); request.setRecipients(List.of(sent, pending));
+        when(wallets.getRecentRequests("creator", false)).thenReturn(List.of(request));
+        when(ledger.findByCreatorId("creator")).thenReturn(List.of());
+        var response = service.getCreatorOverview(creator, "creator", "30d");
+        var history = (List<java.util.Map<String, Object>>) response.get("payoutRequests");
+        assertEquals(400L, history.getFirst().get("transferredCents")); assertEquals(600L, history.getFirst().get("remainingReservedCents"));
+    }
     @Test void adminAvailableUsesRemainingWalletFundsInsteadOfHistoricEarnings() {
         when(wallets.getTotalAvailable("usd", false)).thenReturn(1500L);
         var response = service.getAdminOverview("30d");

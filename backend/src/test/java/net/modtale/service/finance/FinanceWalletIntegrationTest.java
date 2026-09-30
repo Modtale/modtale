@@ -29,7 +29,7 @@ class FinanceWalletIntegrationTest {
         client = MongoClients.create(System.getenv("FINANCE_TEST_MONGO_URI"));
         var factory = new SimpleMongoClientDatabaseFactory(client, "finance_test_" + UUID.randomUUID().toString().replace("-", ""));
         mongo = new MongoTemplate(factory);
-        mongo.createCollection(CreatorWallet.class); mongo.createCollection(CreatorPayoutRequest.class); mongo.createCollection(FinanceLedgerEntry.class);
+        mongo.createCollection(CreatorWallet.class); mongo.createCollection(CreatorPayoutRequest.class); mongo.createCollection(FinanceLedgerEntry.class); mongo.createCollection(net.modtale.model.finance.FinanceTransferReceipt.class);
         wallets = new FinanceWalletService(mongo, factory);
     }
     @AfterEach void tearDown() { if (mongo != null) mongo.getDb().drop(); if (client != null) client.close(); }
@@ -37,7 +37,7 @@ class FinanceWalletIntegrationTest {
     private FinanceLedgerEntry credit(String id, long amount) {
         var credit = new FinanceLedgerEntry(); credit.setId(id); credit.setCreatorId("creator"); credit.setGrossCents(amount);
         credit.setCreatorCents(amount); credit.setCurrency("usd"); credit.setType(FinanceLedgerEntry.LedgerType.DONATION);
-        credit.setStatus(FinanceLedgerEntry.EntryStatus.AVAILABLE); credit.getMetadata().put("settlement", "settled");
+        credit.setStatus(FinanceLedgerEntry.EntryStatus.AVAILABLE); credit.getMetadata().put("settlement", "settled"); credit.getMetadata().put("providerAccountId", "acct_platform");
         return credit;
     }
     private List<CreatorPayoutRequest.Recipient> recipients(long amount) {
@@ -64,21 +64,22 @@ class FinanceWalletIntegrationTest {
         assertEquals(1, mongo.getCollection("creator_payout_requests").countDocuments());
     }
     private boolean attemptReserve(String key) {
-        try { wallets.reserve("creator", "creator", "usd", true, key, 1000, 1000, recipients(1000)); return true; }
+        try { wallets.reserve("creator", "creator", "usd", true, key, 1000, 1000, recipients(1000), "acct_platform"); return true; }
         catch (IllegalStateException unavailable) { return false; }
     }
     @Test void repeatedRequestAndTransferCompletionAreIdempotentAndDoNotRewriteEarnings() {
         wallets.postSettledCredit(credit("source-1", 2500), true);
         String key = UUID.randomUUID().toString();
-        var request = wallets.reserve("creator", "creator", "usd", true, key, 1000, 1000, recipients(1000));
-        var replay = wallets.reserve("creator", "creator", "usd", true, key, 1000, 1000, recipients(1000));
+        var request = wallets.reserve("creator", "creator", "usd", true, key, 1000, 1000, recipients(1000), "acct_platform");
+        var replay = wallets.reserve("creator", "creator", "usd", true, key, 1000, 1000, recipients(1000), "acct_platform");
         assertEquals(request.getId(), replay.getId());
         assertEquals(1500, wallets.getWallet("creator", "usd", true).getAvailableCents());
         assertEquals(1500, wallets.getTotalAvailable("usd", true));
         assertEquals(0, wallets.getTotalAvailable("usd", false));
         wallets.markAttempted(request.getId());
         assertThrows(IllegalStateException.class, () -> wallets.completeTransfers(request.getId()));
-        wallets.recordTransfer(request.getId(), 0, "tr_test");
+        assertTrue(wallets.authorizeRecipientTransfer(request.getId(), 0));
+        wallets.recordTransfer(request.getId(), 0, "tr_test", "test-reviewer", "Verified fixture transfer");
         wallets.completeTransfers(request.getId()); wallets.completeTransfers(request.getId());
         assertEquals(0, wallets.getWallet("creator", "usd", true).getReservedCents());
         assertEquals(1500, wallets.getWallet("creator", "usd", true).getAvailableCents());
@@ -87,7 +88,7 @@ class FinanceWalletIntegrationTest {
     }
     @Test void uncertainTransferKeepsItsReservationForReview() {
         wallets.postSettledCredit(credit("source-1", 1000), true);
-        var request = wallets.reserve("creator", "creator", "usd", true, UUID.randomUUID().toString(), 1000, 1000, recipients(1000));
+        var request = wallets.reserve("creator", "creator", "usd", true, UUID.randomUUID().toString(), 1000, 1000, recipients(1000), "acct_platform");
         wallets.markAttempted(request.getId()); wallets.requireReview(request.getId(), "Provider outcome could not be reconciled.");
         assertEquals(1000, wallets.getWallet("creator", "usd", true).getReservedCents());
         assertEquals(CreatorPayoutRequest.Status.REQUIRES_REVIEW, wallets.getRequest(request.getId()).getStatus());
@@ -95,7 +96,7 @@ class FinanceWalletIntegrationTest {
     }
     @Test void riskArrivingAfterReservationBlocksDispatchAuthorization() {
         wallets.postSettledCredit(credit("source-1", 1000), true);
-        var request = wallets.reserve("creator", "creator", "usd", true, UUID.randomUUID().toString(), 1000, 1000, recipients(1000));
+        var request = wallets.reserve("creator", "creator", "usd", true, UUID.randomUUID().toString(), 1000, 1000, recipients(1000), "acct_platform");
         wallets.markAttempted(request.getId());
         wallets.holdForRisk("creator", "usd", true, "dispute:dp_test");
         assertFalse(wallets.authorizeRecipientTransfer(request.getId(), 0));

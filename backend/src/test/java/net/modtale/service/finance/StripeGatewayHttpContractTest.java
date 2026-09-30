@@ -158,6 +158,45 @@ class StripeGatewayHttpContractTest {
         assertEquals("ch_fixture", gateway.getCharge("ch_fixture").get("id"));
         assertEquals("/v1/charges/ch_fixture", take().path());
     }
+    @Test void payoutAccountVerificationBypassesCachedScopeAndRejectsChangedAccount() throws Exception {
+        reply.set(new Reply(200, "{\"id\":\"acct_original\"}", false));
+        assertEquals("acct_original", gateway.getPlatformAccountId());
+        take();
+        reply.set(new Reply(200, "{\"id\":\"acct_changed\"}", false));
+        assertFalse(gateway.verifyPlatformAccountId("acct_original"));
+        Request changed = take(); assertProviderHeaders(changed);
+        assertEquals("GET", changed.method()); assertEquals("/v1/account", changed.path());
+        assertTrue(gateway.verifyPlatformAccountId("acct_changed"));
+        assertEquals("/v1/account", take().path());
+    }
+    @ParameterizedTest @ValueSource(ints = {401, 429, 500})
+    void payoutAccountVerificationFailsClosedOnProviderErrors(int status) throws Exception {
+        reply.set(new Reply(status, "{\"error\":{\"message\":\"private fixture detail\"}}", false));
+        assertFalse(gateway.verifyPlatformAccountId("acct_expected"));
+        assertEquals("/v1/account", take().path());
+    }
+    @Test void knownTransferReconciliationUsesReadOnlyProviderLookup() throws Exception {
+        reply.set(new Reply(200, "{\"id\":\"tr_fixture\",\"amount\":1234,\"reversed\":false}", false));
+        var transfer = gateway.getTransfer("tr_fixture");
+        assertEquals("tr_fixture", transfer.get("id")); assertEquals(1234, transfer.get("amount"));
+        Request request = take(); assertProviderHeaders(request);
+        assertEquals("GET", request.method()); assertEquals("/v1/transfers/tr_fixture", request.path());
+        assertTrue(request.form().isEmpty()); assertNull(request.idempotency());
+    }
+    @Test void invalidReconciliationIdentifiersNeverReachTheProvider() {
+        for (String invalid : Arrays.asList(null, "", "acct_bad/path", "acct_", "acct_bad?query"))
+            assertFalse(gateway.verifyPlatformAccountId(invalid));
+        for (String invalid : Arrays.asList(null, "", "tr_bad/path", "tr_", "tr_bad?query"))
+            assertTrue(gateway.getTransfer(invalid).isEmpty());
+        assertTrue(requests.isEmpty());
+    }
+    @Test void transferGroupSurvivesFormEncodingAlongsideItsAuditMetadata() throws Exception {
+        gateway.createTransfer("acct_creator", 1000, "usd", "Fixture", Map.of("transferGroup", "payout_fixture_group"), false, "stable-group-key");
+        Request request = take();
+        assertEquals("payout_fixture_group", request.form().get("transfer_group"));
+        assertEquals("payout_fixture_group", request.form().get("metadata[transferGroup]"));
+        assertEquals("stable-group-key", request.idempotency());
+    }
     @Test void accountScopeComesFromCurrentPlatformAccountEndpoint() throws Exception {
         reply.set(new Reply(200, "{\"id\":\"acct_platform_fixture\"}", false));
         assertEquals("acct_platform_fixture", gateway.getPlatformAccountId());
