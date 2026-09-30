@@ -9,6 +9,7 @@ export interface DonationConfig {
     suggestedDonationCents: number;
     donationRecurringDefault: boolean;
     donationPlatformCutPercent: number;
+    donationPlatformCutBps: number;
     minimumDonationCents: number;
     maximumDonationCents: number;
 }
@@ -33,4 +34,10 @@ export function parseSupportAmount(value: string, minimum = 100, maximum = 10000
     if (!match) return null;
     const cents = Number(match[1]) * 100 + Number((match[2] || '').padEnd(2, '0'));
     return Number.isSafeInteger(cents) && cents >= minimum && cents <= maximum ? cents : null;
+}
+
+/** Exact server-provided basis points are required before displaying or accepting support terms. */
+export function hasSupportTerms(config: Pick<DonationConfig, 'donationPlatformCutBps'> | null | undefined): boolean {
+    const value = config?.donationPlatformCutBps;
+    return typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= 10000;
 }

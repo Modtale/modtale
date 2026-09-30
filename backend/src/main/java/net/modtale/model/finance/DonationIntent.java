@@ -45,6 +45,7 @@ public class DonationIntent {
 
     private String stripeSessionId;
     private String stripePlatformAccountId;
+    private Boolean stripeTestMode;
     private String checkoutUrl;
 
     private LocalDateTime createdAt = LocalDateTime.now();
@@ -145,6 +146,8 @@ public class DonationIntent {
 
     public String getStripePlatformAccountId() { return stripePlatformAccountId; }
     public void setStripePlatformAccountId(String id) { stripePlatformAccountId = id; }
+    public Boolean getStripeTestMode() { return stripeTestMode; }
+    public void setStripeTestMode(Boolean testMode) { stripeTestMode = testMode; }
 
     public String getStripeSessionId() {
         return stripeSessionId;

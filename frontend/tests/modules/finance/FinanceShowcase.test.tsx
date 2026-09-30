@@ -33,6 +33,11 @@ describe('synthetic finance showcase', () => {
         expect(host.textContent).toContain('$30.00');
         expect([...host.querySelectorAll('button')].find(button => button.textContent?.includes('Request Payout'))?.disabled).toBe(false);
         expect(host.textContent).not.toContain('No data selected');
+        await act(async () => [...host.querySelectorAll('button')].find(button => button.textContent === 'Toggle theme')!.click());
+        expect(document.documentElement.classList.contains('dark')).toBe(true);
+        await act(async () => [...host.querySelectorAll('button')].find(button => button.textContent?.includes('Request Payout'))!.click());
+        expect(host.textContent).toContain('RESERVED');
+        expect([...host.querySelectorAll('button')].find(button => button.textContent?.includes('Request Payout'))?.disabled).toBe(true);
     });
     it('shows provisional ad review and audit without any account or payment request', async () => {
         const read = vi.spyOn(api, 'get'); const write = vi.spyOn(api, 'post');

@@ -33,8 +33,8 @@ export const financeClient = {
     openSupportBillingPortal: async (subscriptionId: string) => (await api.post(`/finance/support/subscriptions/${encodeURIComponent(subscriptionId)}/billing-portal`)).data,
 
     getDonationConfig: async (projectId: string) => (await api.get(`/finance/projects/${projectId}/donation-config`)).data,
-    createDonationCheckout: async (projectId: string, amountCents: number, recurring: boolean, guestCheckout = false) => (
-        await api.post(`/finance/projects/${projectId}/donations/checkout-url`, { amountCents, recurring, guestCheckout })
+    createDonationCheckout: async (projectId: string, amountCents: number, recurring: boolean, guestCheckout: boolean, expectedPlatformCutBps: number) => (
+        await api.post(`/finance/projects/${projectId}/donations/checkout-url`, { amountCents, recurring, guestCheckout, expectedPlatformCutBps })
     ).data,
     confirmDonationIntent: async (intentId: string) => (await api.post('/finance/donations/confirm', { intentId })).data,
 

@@ -20,6 +20,10 @@ import java.util.Map;
 @Service
 public class DonationCheckoutService {
 
+    public static class SupportTermsChangedException extends IllegalStateException {
+        public SupportTermsChangedException() { super("Support terms changed. Review the updated share before starting checkout."); }
+    }
+
     @Autowired private EarningsAccountService financeAccountService;
     @Autowired private DonationIntentRepository donationIntentRepository;
     @Autowired private FinanceLedgerEntryRepository ledgerRepository;
@@ -44,13 +48,14 @@ public class DonationCheckoutService {
         response.put("suggestedDonationCents", Math.max(100, project.getSuggestedDonationCents()));
         response.put("donationRecurringDefault", false);
         response.put("donationPlatformCutPercent", project.getDonationPlatformCutBps() / 100.0);
+        response.put("donationPlatformCutBps", project.getDonationPlatformCutBps());
         response.put("currency", financeAccountService.getSettings().getCurrency());
         response.put("minimumDonationCents", FinanceAmounts.MIN_SUPPORT_CENTS);
         response.put("maximumDonationCents", FinanceAmounts.MAX_SUPPORT_CENTS);
         return response;
     }
 
-    public Map<String, Object> createDonationCheckout(String projectId, long amountCents, boolean recurring, User donor, boolean guestCheckout) {
+    public Map<String, Object> createDonationCheckout(String projectId, long amountCents, boolean recurring, User donor, boolean guestCheckout, int expectedPlatformCutBps) {
         Project project = projectService.getProjectById(projectId);
         if (project == null) {
             throw new IllegalArgumentException("Project not found");
@@ -58,6 +63,8 @@ public class DonationCheckoutService {
         if (!project.isDonationsEnabled()) {
             throw new IllegalStateException("Donations are disabled by this creator for this project.");
         }
+        int platformCutBps = project.getDonationPlatformCutBps();
+        if (expectedPlatformCutBps != platformCutBps) throw new SupportTermsChangedException();
 
         if (!stripeGatewayService.isCheckoutAvailable()) {
             throw new IllegalStateException(stripeGatewayService.getAvailabilityMessage());
@@ -69,11 +76,12 @@ public class DonationCheckoutService {
         }
         long normalizedAmount = FinanceAmounts.validateSupportAmount(amountCents);
 
-        long platformCut = FinanceAmounts.share(normalizedAmount, project.getDonationPlatformCutBps());
+        long platformCut = FinanceAmounts.share(normalizedAmount, platformCutBps);
         long creatorCut = normalizedAmount - platformCut;
 
         DonationIntent intent = new DonationIntent();
         intent.setId(UUID.randomUUID().toString());
+        intent.setStripeTestMode(stripeGatewayService.isTestMode() || stripeGatewayService.isMockEnabled());
         if (!stripeGatewayService.isMockEnabled()) intent.setStripePlatformAccountId(stripeGatewayService.getPlatformAccountId());
         intent.setProjectId(project.getId());
         intent.setCreatorId(project.getAuthorId());
@@ -83,7 +91,7 @@ public class DonationCheckoutService {
         intent.setCreatorCents(creatorCut);
         intent.setPlatformCents(platformCut);
         intent.setRecurring(recurring);
-        intent.setPlatformCutBps(project.getDonationPlatformCutBps());
+        intent.setPlatformCutBps(platformCutBps);
         intent.setCurrency(settings.getCurrency());
         intent.setStatus(DonationIntent.DonationStatus.PENDING);
         intent = donationIntentRepository.save(intent);
@@ -136,6 +144,7 @@ public class DonationCheckoutService {
             return Map.of("ok", false, "status", intent.getStatus().name());
         }
 
+        requireMatchingProviderScope(intent);
         Map<String, Object> session = stripeGatewayService.getCheckoutSession(
                 intent.getStripeSessionId(),
                 stripeGatewayService.isMockEnabled()
@@ -193,9 +202,17 @@ public class DonationCheckoutService {
         DonationIntent intent = donationIntentRepository.findByStripeSessionId(sessionId).orElse(null);
         if (intent == null) throw new IllegalArgumentException("Checkout session is not recorded yet.");
         if (!"paid".equals(session.get("payment_status"))) return;
+        requireMatchingProviderScope(intent);
         if (!isMatchingPaidSession(intent, session)) throw new IllegalArgumentException("Paid checkout does not match its recorded intent.");
         if (intent.isRecurring()) recurringSupport.registerCheckout(intent, session);
         else if (isVerifiedPayment(intent, session)) completeDonationIntent(intent, session);
+    }
+
+    private void requireMatchingProviderScope(DonationIntent intent) {
+        if (intent.getStripeTestMode() == null || intent.getStripeTestMode() != stripeGatewayService.isTestMode()
+                || !java.util.Objects.equals(intent.getStripePlatformAccountId(), stripeGatewayService.getPlatformAccountId())) {
+            throw new IllegalArgumentException("Checkout provider account or mode changed; reconciliation is required.");
+        }
     }
 
     static boolean isVerifiedPayment(DonationIntent intent, Map<String, Object> session) {
@@ -205,6 +222,7 @@ public class DonationCheckoutService {
     static boolean isMatchingPaidSession(DonationIntent intent, Map<String, Object> session) {
         if (session == null || Boolean.TRUE.equals(session.get("simulated"))) return false;
         if (!(session.get("livemode") instanceof Boolean)) return false;
+        if (intent.getStripeTestMode() == null || intent.getStripeTestMode() != Boolean.FALSE.equals(session.get("livemode"))) return false;
         if (!"paid".equals(session.get("payment_status")) || !"complete".equals(session.get("status"))) return false;
         if (!(intent.isRecurring() ? "subscription" : "payment").equals(session.get("mode"))) return false;
         if (intent.getStripeSessionId() == null || !intent.getStripeSessionId().equals(session.get("id"))) return false;

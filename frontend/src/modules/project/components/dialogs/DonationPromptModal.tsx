@@ -9,7 +9,8 @@ interface DonationPromptModalProps {
     suggestedAmountCents: number;
     recurringDefault: boolean;
     allowRecurring?: boolean;
-    platformCutPercent?: number;
+    platformCutBps?: number;
+    errorMessage?: string;
     testMode?: boolean;
     onClose: () => void;
     onSkip: () => void;
@@ -18,7 +19,7 @@ interface DonationPromptModalProps {
 }
 
 export const DonationPromptModal: React.FC<DonationPromptModalProps> = ({
-    show, currency = 'USD', suggestedAmountCents, platformCutPercent = 10,
+    show, currency = 'USD', suggestedAmountCents, platformCutBps, errorMessage,
     allowRecurring = false, testMode = false, onClose, onSkip, onDonate, isProcessing = false
 }) => {
     useScrollLock(show);
@@ -63,16 +64,21 @@ export const DonationPromptModal: React.FC<DonationPromptModalProps> = ({
             document.removeEventListener('keydown', onKeyDown);
             if (previousFocus?.isConnected) previousFocus.focus();
         };
-    }, [show, suggestedAmountCents]);
+    // Snapshot the suggestion when opening; a refreshed quote must not overwrite the donor’s chosen amount.
+    }, [show]);
 
+    useEffect(() => { if (!allowRecurring) setRecurring(false); }, [allowRecurring]);
+    useEffect(() => { if (!isProcessing) submittedRef.current = false; }, [isProcessing, platformCutBps, errorMessage]);
     if (!show) return null;
     const cents = parseSupportAmount(amount);
     const valid = cents !== null;
+    const monthly = recurring && allowRecurring;
+    const termsReady = typeof platformCutBps === 'number' && Number.isInteger(platformCutBps) && platformCutBps >= 0 && platformCutBps <= 10000;
     const formatted = valid ? new Intl.NumberFormat(undefined, { style: 'currency', currency }).format(cents / 100) : '';
     const submit = () => {
-        if (cents === null || isProcessing || submittedRef.current) return;
+        if (cents === null || !termsReady || isProcessing || submittedRef.current) return;
         submittedRef.current = true;
-        onDonate(cents, recurring && allowRecurring, !(recurring && allowRecurring));
+        onDonate(cents, monthly, !monthly);
     };
     const dismiss = () => { if (!isProcessing) onClose(); };
 
@@ -90,8 +96,8 @@ export const DonationPromptModal: React.FC<DonationPromptModalProps> = ({
                 <div className="space-y-4 px-5 py-5">
                     {testMode && <p role="status" className="text-xs font-semibold text-amber-700 dark:text-amber-300">Test mode · No real charge</p>}
                     {allowRecurring && <div className="flex gap-1 rounded-lg bg-slate-100 p-1 dark:bg-slate-950/70" role="group" aria-label="Support frequency">
-                        <button type="button" disabled={isProcessing} aria-pressed={!recurring} onClick={() => setRecurring(false)} className={`flex-1 rounded-md px-3 py-2 text-sm font-bold ${!recurring ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-700 dark:text-white' : 'text-slate-500 dark:text-slate-400'}`}>One-time</button>
-                        <button type="button" disabled={isProcessing} aria-pressed={recurring} onClick={() => setRecurring(true)} className={`flex-1 rounded-md px-3 py-2 text-sm font-bold ${recurring ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-700 dark:text-white' : 'text-slate-500 dark:text-slate-400'}`}>Monthly</button>
+                        <button type="button" disabled={isProcessing} aria-pressed={!monthly} onClick={() => setRecurring(false)} className={`flex-1 rounded-md px-3 py-2 text-sm font-bold ${!monthly ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-700 dark:text-white' : 'text-slate-500 dark:text-slate-400'}`}>One-time</button>
+                        <button type="button" disabled={isProcessing} aria-pressed={monthly} onClick={() => setRecurring(true)} className={`flex-1 rounded-md px-3 py-2 text-sm font-bold ${monthly ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-700 dark:text-white' : 'text-slate-500 dark:text-slate-400'}`}>Monthly</button>
                     </div>}
                     <div>
                         <label htmlFor={amountId} className="block text-xs font-bold text-slate-500 dark:text-slate-400">Amount · {currency.toUpperCase()}</label>
@@ -101,14 +107,15 @@ export const DonationPromptModal: React.FC<DonationPromptModalProps> = ({
                         </div>
                         {!valid && <p id={errorId} className="mt-2 text-xs text-red-600 dark:text-red-400">Enter 1.00–1,000.00, up to two decimal places.</p>}
                     </div>
+                    {errorMessage && <p role="alert" className="text-xs text-amber-700 dark:text-amber-300">{errorMessage}</p>}
                     <div className="space-y-1.5 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
-                        <p>{platformCutPercent}% supports Modtale. Payment processing fees come from the creator’s remaining share.</p>
-                        <p>{recurring ? 'Renews monthly until cancelled. Manage in Finance.' : 'One-time payment.'} Not a charitable donation.</p>
+                        <p>{termsReady ? `${platformCutBps! / 100}% supports Modtale. Payment processing fees come from the creator’s remaining share.` : 'Support details are unavailable. You can still download free.'}</p>
+                        <p>{monthly ? 'Renews monthly until cancelled. Manage in Finance.' : 'One-time payment.'} Not a charitable donation.</p>
                     </div>
                 </div>
                 <div className="grid grid-cols-2 gap-2 border-t border-slate-200 px-5 py-4 dark:border-white/10">
                     <button type="button" onClick={onSkip} disabled={isProcessing} className="flex h-11 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 px-2 text-sm font-bold text-slate-700 hover:bg-slate-100 disabled:opacity-50 dark:border-white/15 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10">Download free</button>
-                    <button type="button" onClick={submit} disabled={isProcessing || !valid} className="flex h-11 items-center justify-center whitespace-nowrap rounded-lg bg-modtale-accent px-2 text-sm font-bold text-white hover:bg-modtale-accentHover disabled:opacity-50">{isProcessing ? 'Opening…' : valid ? `Tip ${formatted}${recurring ? '/mo' : ''}` : 'Choose amount'}</button>
+                    <button type="button" onClick={submit} disabled={isProcessing || !valid || !termsReady} className="flex h-11 items-center justify-center whitespace-nowrap rounded-lg bg-modtale-accent px-2 text-sm font-bold text-white hover:bg-modtale-accentHover disabled:opacity-50">{isProcessing ? 'Opening…' : valid ? `Tip ${formatted}${monthly ? '/mo' : ''}` : 'Choose amount'}</button>
                 </div>
             </div>
         </div>

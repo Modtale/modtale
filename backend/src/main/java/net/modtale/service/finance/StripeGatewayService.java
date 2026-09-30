@@ -61,10 +61,11 @@ public class StripeGatewayService {
     }
 
     public StripeGatewayService() {
-        this.webClient = WebClient.builder()
-                .baseUrl("https://api.stripe.com/v1")
-                .defaultHeader("Stripe-Version", API_VERSION)
-                .build();
+        this(WebClient.builder().baseUrl("https://api.stripe.com/v1"));
+    }
+
+    StripeGatewayService(WebClient.Builder builder) {
+        this.webClient = builder.defaultHeader("Stripe-Version", API_VERSION).build();
     }
 
     public String getPlatformAccountId() {

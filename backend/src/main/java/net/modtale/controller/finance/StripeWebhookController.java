@@ -58,7 +58,9 @@ public class StripeWebhookController {
         // Existing obligations keep reconciling even when new checkout creation is paused.
         if (!(event.get("livemode") instanceof Boolean live) || !gateway.isReconciliationEnabled() || live == gateway.isTestMode()) return ResponseEntity.status(503).build();
         if (!StripeGatewayService.API_VERSION.equals(event.get("api_version"))) return ResponseEntity.status(503).build();
-        String receiptId = FinanceSourceKey.stripe(!live, gateway.getPlatformAccountId(), "event:" + eventId);
+        String accountId = gateway.getPlatformAccountId();
+        if (event.containsKey("account") && !accountId.equals(event.get("account"))) return ResponseEntity.status(503).build();
+        String receiptId = FinanceSourceKey.stripe(!live, accountId, "event:" + eventId);
         if (receipts.existsById(receiptId)) return ResponseEntity.ok(Map.of("received", true));
         if (List.of("checkout.session.completed", "checkout.session.async_payment_succeeded", "invoice.paid", "invoice.payment_failed", "customer.subscription.updated", "customer.subscription.deleted", "charge.refunded", "refund.created", "refund.updated", "charge.dispute.created", "charge.dispute.updated", "charge.dispute.closed", "charge.dispute.funds_withdrawn", "charge.dispute.funds_reinstated").contains(type)) {
             if (!(event.get("data") instanceof Map<?, ?> data) || !(data.get("object") instanceof Map<?, ?> object)) {

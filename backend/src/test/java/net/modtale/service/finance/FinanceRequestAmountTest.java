@@ -13,7 +13,7 @@ class FinanceRequestAmountTest {
     @Test void checkoutJsonPreservesAndRejectsFractionalCents() throws Exception {
         var mapper = new ObjectMapper();
         try (var factory = Validation.buildDefaultValidatorFactory()) {
-            var valid = mapper.readValue("{\"amountCents\":500,\"recurring\":false,\"guestCheckout\":true}", CreateSupportCheckoutRequest.class);
+            var valid = mapper.readValue("{\"amountCents\":500,\"recurring\":false,\"guestCheckout\":true,\"expectedPlatformCutBps\":1000}", CreateSupportCheckoutRequest.class);
             assertTrue(factory.getValidator().validate(valid).isEmpty());
             var fractional = mapper.readValue("{\"amountCents\":500.99}", CreateSupportCheckoutRequest.class);
             assertEquals(new BigDecimal("500.99"), fractional.amountCents());

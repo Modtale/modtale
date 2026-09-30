@@ -8,7 +8,7 @@ let host: HTMLDivElement;
 let root: Root;
 const onDonate = vi.fn(); const onClose = vi.fn(); const onSkip = vi.fn();
 const render = async (props = {}) => {
-    await act(async () => root.render(<DonationPromptModal show suggestedAmountCents={500} recurringDefault allowRecurring onDonate={onDonate} onClose={onClose} onSkip={onSkip} {...props} />));
+    await act(async () => root.render(<DonationPromptModal show platformCutBps={1000} suggestedAmountCents={500} recurringDefault allowRecurring onDonate={onDonate} onClose={onClose} onSkip={onSkip} {...props} />));
 };
 beforeEach(() => { host = document.createElement('div'); document.body.append(host); root = createRoot(host); });
 afterEach(async () => { await act(async () => root.unmount()); host.remove(); });
@@ -50,6 +50,33 @@ describe('optional creator support dialog', () => {
         expect(host.textContent).not.toContain('A one-time tip');
         await act(async () => [...host.querySelectorAll('button')].find(button => button.textContent === 'Tip $5.00/mo')!.click());
         expect(onDonate).toHaveBeenCalledWith(500, true, false);
+    });
+    it('uses exact configured terms without a silent ten-percent fallback', async () => {
+        await render({ platformCutBps: 1234 });
+        expect(host.textContent).toContain('12.34% supports Modtale');
+        expect(host.textContent).not.toContain('10% supports Modtale');
+        await render({ platformCutBps: undefined });
+        expect([...host.querySelectorAll('button')].find(button => button.textContent === 'Tip $5.00')?.disabled).toBe(true);
+        expect([...host.querySelectorAll('button')].find(button => button.textContent === 'Download free')?.disabled).toBe(false);
+        expect(host.textContent).toContain('Support details are unavailable');
+    });
+    it('allows an explicit retry after updated terms while still preventing duplicate submissions', async () => {
+        await render();
+        await act(async () => [...host.querySelectorAll('button')].find(button => button.textContent === 'Tip $5.00')!.click());
+        await render({ platformCutBps: 1234, errorMessage: 'Support terms changed.' });
+        await act(async () => [...host.querySelectorAll('button')].find(button => button.textContent === 'Tip $5.00')!.click());
+        expect(onDonate).toHaveBeenCalledTimes(2);
+    });
+    it('keeps a chosen amount through a terms refresh and resets monthly when it becomes unavailable', async () => {
+        await render();
+        await act(async () => [...host.querySelectorAll('button')].find(button => button.textContent === '$10')!.click());
+        await act(async () => [...host.querySelectorAll('button')].find(button => button.textContent === 'Monthly')!.click());
+        await render({ suggestedAmountCents: 5000, platformCutBps: 1234, allowRecurring: false });
+        expect((host.querySelector('input') as HTMLInputElement).value).toBe('10.00');
+        expect(host.textContent).toContain('One-time payment');
+        expect(host.textContent).not.toContain('/mo');
+        await act(async () => [...host.querySelectorAll('button')].find(button => button.textContent === 'Tip $10.00')!.click());
+        expect(onDonate).toHaveBeenCalledWith(1000, false, true);
     });
 
 });

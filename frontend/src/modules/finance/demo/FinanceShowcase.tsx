@@ -5,9 +5,12 @@ import { financeClient } from '@/modules/finance/api/financeClient';
 import { api } from '@/utils/api';
 import { AdSettlementReview } from '@/modules/finance/components/AdSettlementReview';
 import { createAdSettlementFixture } from './adSettlementFixture';
+import { createDemoDonationConfig, DEMO_MONETIZATION_POLICY } from './financeDemoConfiguration';
+import type { DonationConfig } from '@/modules/finance/api/financeTypes';
 
 export default function FinanceShowcase() {
     const [scenario, setScenario] = useState('unavailable');
+    const [supportConfig, setSupportConfig] = useState<DonationConfig | null>(null);
     const [view, setView] = useState('creator');
     const scenarioRef = useRef(scenario);
     scenarioRef.current = scenario;
@@ -17,7 +20,16 @@ export default function FinanceShowcase() {
     const [notice, setNotice] = useState('');
     const [processing, setProcessing] = useState(false);
     useEffect(() => {
+        const previous = document.documentElement.classList.contains('dark');
+        document.documentElement.classList.toggle('dark', dark);
+        return () => { document.documentElement.classList.toggle('dark', previous); };
+    }, [dark]);
+    useEffect(() => {
         const previous = { ...financeClient };
+        let active = true;
+        financeClient.getDonationConfig = async () => createDemoDonationConfig();
+        void financeClient.getDonationConfig('demo-project').then(config => { if (active) setSupportConfig(config); });
+        let queuedTransfer: { id: string; amountCents: number; status: string; createdAt: string } | null = null;
         let adStage = createAdSettlementFixture();
         financeClient.getAdSettlementStages = async () => [{ ...adStage, ...adStage.snapshots.at(-1), snapshots: undefined, audit: undefined }];
         financeClient.getAdSettlementStage = async () => adStage;
@@ -31,7 +43,11 @@ export default function FinanceShowcase() {
         financeClient.getFinanceContexts = async () => [{ id: 'synthetic-creator', username: 'Demo creator', isPersonal: true }];
         financeClient.getSupportSubscriptions = async () => [{ id: 'demo-subscription', projectId: 'demo-project', projectTitle: 'Demo monthly support', projectUrl: '', amountCents: 500, currency: 'usd', status: 'active', cancelAtPeriodEnd: true, testMode: true }];
         financeClient.openSupportBillingPortal = async () => { throw new Error('Demo only: a real support plan is managed in Stripe’s secure billing portal.'); };
-        financeClient.requestPayout = async (amountCents?: number) => ({ amountCents: amountCents ?? 2500, status: 'RESERVED', testMode: true });
+        financeClient.requestPayout = async (amountCents?: number, _ownerId?: string, requestKey?: string) => {
+            if (queuedTransfer && !queuedTransfer.id.endsWith(`:${requestKey}`)) throw new Error('Demo balance is already reserved.');
+            queuedTransfer ??= { id: `demo-transfer:${requestKey}`, amountCents: amountCents ?? 2500, status: 'RESERVED', createdAt: new Date().toISOString() };
+            return { ...queuedTransfer, requestId: queuedTransfer.id, testMode: true };
+        };
         financeClient.getCreatorOverview = async () => {
         const scenario = scenarioRef.current;
         const disabled = scenario === 'unavailable';
@@ -42,19 +58,20 @@ export default function FinanceShowcase() {
         if (scenario === 'error') throw new Error('Synthetic finance service interruption.');
         return { ownerId: 'synthetic-creator', ownerAccountType: 'PERSONAL', currency: 'usd', testMode: true,
             withdrawalsEnabled: !disabled, onboardingEnabled: false, stripeConnected: scenario === 'settled', stripeOnboardingComplete: scenario === 'settled', stripePayoutsEnabled: scenario === 'settled',
-            availableCents: 0, testAvailableCents: scenario === 'settled' ? 2500 : 0,
+            availableCents: 0, testAvailableCents: scenario === 'settled' ? 2500 - (queuedTransfer?.amountCents ?? 0) : 0,
+            reservedCents: scenario === 'settled' ? queuedTransfer?.amountCents ?? 0 : 0,
             pendingCents: scenario === 'pending' ? 1850 : 0, paidOutCents: scenario === 'settled' ? 4000 : scenario === 'pending' ? 1000 : 0,
             adjustmentOwedCents: scenario === 'refund' ? 45 : 0, payoutHold: scenario === 'refund',
-            minPayoutCents: 1000, adCreatorSplitPercent: 75,
+            minPayoutCents: DEMO_MONETIZATION_POLICY.minPayoutCents, adCreatorSplitPercent: DEMO_MONETIZATION_POLICY.adCreatorSplitBps / 100,
             periodAdRevenueCents: ads.reduce((total, point) => total + point.count, 0),
             periodDonationRevenueCents: support.reduce((total, point) => total + point.count, 0),
             availabilityMessage: 'Synthetic preview data only. No account, payment, bank transfer or reminder email is created.',
-            payoutRequests: scenario === 'settled' || scenario === 'pending' ? [{ id: 'demo-transfer', amountCents: scenario === 'settled' ? 4000 : 1000, status: 'TRANSFERRED', createdAt: '2026-09-29T15:00:00Z' }]
+            payoutRequests: scenario === 'settled' || scenario === 'pending' ? [...(scenario === 'settled' && queuedTransfer ? [queuedTransfer] : []), { id: 'demo-transfer', amountCents: scenario === 'settled' ? 4000 : 1000, status: 'TRANSFERRED', createdAt: '2026-09-29T15:00:00Z' }]
                 : scenario === 'refund' ? [{ id: 'demo-held-transfer', amountCents: 1000, status: 'REQUIRES_REVIEW', createdAt: '2026-09-29T15:00:00Z', reviewReason: 'Synthetic provider reconciliation is still in progress.' }] : [],
             earningsChart: settledEarnings, donationsChart: support, adsChart: ads };
         };
         setReady(true);
-        return () => { Object.assign(financeClient, previous); api.interceptors.request.eject(interceptor); };
+        return () => { active = false; Object.assign(financeClient, previous); api.interceptors.request.eject(interceptor); };
     }, []);
     if (!ready) return <p>Preparing synthetic finance demo…</p>;
     return <div className={dark ? 'dark' : ''}><div className="min-h-screen bg-slate-50 p-4 text-slate-900 dark:bg-slate-950 dark:text-white md:p-8">
@@ -65,12 +82,12 @@ export default function FinanceShowcase() {
                     <button type="button" className="rounded border px-3 py-2 text-sm" onClick={() => setView(value => value === 'creator' ? 'admin' : 'creator')}>{view === 'creator' ? 'Show ad review' : 'Show creator dashboard'}</button>
                     <label className="text-sm">Dashboard state <select value={scenario} onChange={event => setScenario(event.target.value)} className="rounded border bg-white px-2 py-2 text-slate-900"><option value="unavailable">Unavailable</option><option value="pending">Pending earnings</option><option value="settled">Settled earnings</option><option value="refund">Refund adjustment</option><option value="error">Service error</option></select></label>
                     <button className="rounded border px-3 py-2 text-sm" onClick={() => setDark(value => !value)}>Toggle theme</button>
-                    <button className="rounded bg-blue-600 px-3 py-2 text-sm text-white" onClick={() => { setNotice(''); setShowSupport(true); }}>Open support dialog</button>
+                    <button disabled={!supportConfig} className="rounded bg-blue-600 px-3 py-2 text-sm text-white" onClick={() => { setNotice(''); setShowSupport(true); }}>Open support dialog</button>
                 </div>
             </header>
             {notice && <p role="status" className="mb-4 rounded-xl border border-blue-300 p-3 text-sm">{notice}</p>}
             {view === 'creator' ? <FinanceManager key={scenario} /> : <AdSettlementReview />}
-            <DonationPromptModal show={showSupport} suggestedAmountCents={500} recurringDefault={false} allowRecurring platformCutPercent={10} testMode isProcessing={processing}
+            <DonationPromptModal show={showSupport} suggestedAmountCents={supportConfig?.suggestedDonationCents ?? 500} recurringDefault={false} allowRecurring={supportConfig?.recurringEnabled} platformCutBps={supportConfig?.donationPlatformCutBps} testMode isProcessing={processing}
                 onClose={() => { setShowSupport(false); setNotice('Demo: dialog closed; the free download continues.'); }}
                 onSkip={() => { setShowSupport(false); setNotice('Demo: download continues without a tip.'); }}
                 onDonate={(cents, recurring) => {

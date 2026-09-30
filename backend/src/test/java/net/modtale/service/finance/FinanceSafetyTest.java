@@ -28,6 +28,7 @@ class FinanceSafetyTest {
     private DonationIntent intent() {
         var intent = new DonationIntent();
         intent.setId("intent-1"); intent.setStripePlatformAccountId("acct_platform"); intent.setStripeSessionId("cs_test_1");
+        intent.setStripeTestMode(true);
         intent.setAmountCents(500); intent.setCreatorCents(450); intent.setPlatformCents(50);
         intent.setCreatorId("creator"); intent.setProjectId("project");
         return intent;
@@ -66,6 +67,10 @@ class FinanceSafetyTest {
         }
         var session = paidSession(); session.put("simulated", true);
         assertFalse(DonationCheckoutService.isVerifiedPayment(intent(), session));
+        session = paidSession(); session.put("livemode", true);
+        assertFalse(DonationCheckoutService.isVerifiedPayment(intent(), session));
+        var legacy = intent(); legacy.setStripeTestMode(null);
+        assertFalse(DonationCheckoutService.isVerifiedPayment(legacy, paidSession()));
     }
 
     @Test void duplicateWebhookDoesNotOverwriteOrDuplicateCredit() {
@@ -77,6 +82,9 @@ class FinanceSafetyTest {
         when(ledger.insert(any(FinanceLedgerEntry.class))).thenThrow(new DuplicateKeyException("already inserted"));
         ReflectionTestUtils.setField(service, "donationIntentRepository", intents);
         ReflectionTestUtils.setField(service, "ledgerRepository", ledger);
+        var gateway = mock(StripeGatewayService.class); when(gateway.isTestMode()).thenReturn(true);
+        when(gateway.getPlatformAccountId()).thenReturn("acct_platform");
+        ReflectionTestUtils.setField(service, "stripeGatewayService", gateway);
         service.handlePaidCheckout(paidSession());
         assertEquals(DonationIntent.DonationStatus.COMPLETED, intent.getStatus());
         var captured = ArgumentCaptor.forClass(FinanceLedgerEntry.class);
