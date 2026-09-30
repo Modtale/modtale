@@ -1,7 +1,26 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { onRequest } from '@/middleware';
 
 describe('security middleware', () => {
+    afterEach(() => vi.unstubAllEnvs());
+
+    it.each([
+        ['true', '/finance-preview', true],
+        ['false', '/finance-preview', false],
+        ['true', '/dashboard', false],
+        ['true', '/finance-preview/other', false],
+    ])('limits synthetic same-origin framing to its enabled route (%s, %s)', async (enabled, path, allowed) => {
+        vi.stubEnv('PUBLIC_FINANCE_DEMO', enabled);
+        const response = await (onRequest as any)(
+            { url: new URL(`https://preview.modtale.net${path}`) },
+            async () => new Response('<html></html>', { headers: { 'content-type': 'text/html' } })
+        );
+        expect(response.headers.get('X-Frame-Options')).toBe(allowed ? 'SAMEORIGIN' : 'DENY');
+        expect(response.headers.get('Content-Security-Policy')).toContain(
+            allowed ? "frame-ancestors 'self'" : "frame-ancestors 'none'"
+        );
+        expect(response.headers.get('Content-Security-Policy')).toContain("require-trusted-types-for 'script'");
+    });
     it('allows privacy-enhanced YouTube embeds in the production CSP', async () => {
         const response = await (onRequest as any)(
             { url: new URL('https://modtale.net/project/example') },

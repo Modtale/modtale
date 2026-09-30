@@ -19,6 +19,12 @@ const SECURITY_CSP = [
     "trusted-types default",
 ].join('; ');
 
+// The synthetic preview needs a same-origin iframe to exercise real mobile CSS.
+// Real application pages and production builds retain the framing prohibition.
+const FINANCE_PREVIEW_CSP = SECURITY_CSP
+    .replace("frame-ancestors 'none'", "frame-ancestors 'self'")
+    .replace('frame-src https://www.youtube-nocookie.com', "frame-src 'self' https://www.youtube-nocookie.com");
+
 const isLocalHostname = (hostname: string) => {
     return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1';
 };
@@ -30,6 +36,8 @@ export const onRequest: MiddlewareHandler = async ({ url }, next) => {
     const contentType = response.headers.get('content-type') || '';
     const isLocal = isLocalHostname(url.hostname);
     const isDevModtale = isDevModtaleHostname(url.hostname);
+    const isFinancePreview = import.meta.env.PUBLIC_FINANCE_DEMO === 'true'
+        && url.pathname === '/finance-preview';
 
     if (isDevModtale) {
         response.headers.set('X-Robots-Tag', 'noindex, nofollow, noarchive, nosnippet, noimageindex');
@@ -48,10 +56,10 @@ export const onRequest: MiddlewareHandler = async ({ url }, next) => {
     }
 
     if (contentType.includes('text/html') && !isLocal) {
-        response.headers.set('Content-Security-Policy', SECURITY_CSP);
+        response.headers.set('Content-Security-Policy', isFinancePreview ? FINANCE_PREVIEW_CSP : SECURITY_CSP);
         response.headers.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
         response.headers.set('Cross-Origin-Opener-Policy', 'same-origin');
-        response.headers.set('X-Frame-Options', 'DENY');
+        response.headers.set('X-Frame-Options', isFinancePreview ? 'SAMEORIGIN' : 'DENY');
         response.headers.set('X-Content-Type-Options', 'nosniff');
         response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
     }
