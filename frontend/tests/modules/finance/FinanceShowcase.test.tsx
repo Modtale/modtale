@@ -33,6 +33,15 @@ describe('synthetic finance showcase', () => {
         await act(async () => [...host.querySelectorAll('button')].find(button => button.textContent === 'Review recipient 1')!.click());
         expect(host.textContent).toContain('Existing Stripe transfer ID'); expect(get).not.toHaveBeenCalled(); expect(post).not.toHaveBeenCalled();
     });
+    it('renders dispute decisions without any accounting or provider API request', async () => {
+        const get = vi.spyOn(api, 'get'); const post = vi.spyOn(api, 'post');
+        await act(async () => root.render(<FinanceShowcase />));
+        await act(async () => [...host.querySelectorAll('button')].find(button => button.textContent === 'Show dispute review')!.click());
+        await act(async () => [...host.querySelectorAll('button')].find(button => button.textContent?.includes('dp_demo'))!.click());
+        expect(host.textContent).toContain('No discretionary fee is assigned automatically');
+        expect([...host.querySelectorAll('button')].find(button => button.textContent === 'Record reviewed decision')?.disabled).toBe(true);
+        expect(get).not.toHaveBeenCalled(); expect(post).not.toHaveBeenCalled();
+    });
     it('shows settled synthetic amounts as currency rather than raw cents', async () => {
         await act(async () => root.render(<FinanceShowcase />));
         const state = host.querySelector('select')!;

@@ -85,6 +85,18 @@ class DisputeResolutionIntegrationTest extends FinancePipelineFixture {
         assertThrows(org.springframework.dao.OptimisticLockingFailureException.class, () -> mongo.save(previous));
         assertTrue(wallets.getWallet("creator", "usd", true).isPayoutHold()); assertEquals(8445, available());
     }
+    @Test void explicitProviderRefreshValidatesAccountAndModeAndNeverAllocatesFees() throws Exception {
+        settleOneTime(); var pending = new HashMap<>(balance("txn_loss", "dp_case", -10000, 1500)); pending.put("status", "pending");
+        refresh("dp_case", "lost", List.of(pending)); var review = current("dp_case"); clearInvocations(gateway);
+        when(gateway.verifyPlatformAccountId("acct_platform")).thenReturn(false);
+        assertThrows(IllegalArgumentException.class, () -> adjustments.refreshCase(review.id())); verify(gateway, never()).getDispute("dp_case");
+        when(gateway.verifyPlatformAccountId("acct_platform")).thenReturn(true); when(gateway.isTestMode()).thenReturn(false);
+        assertThrows(IllegalArgumentException.class, () -> adjustments.refreshCase(review.id()));
+        when(gateway.isTestMode()).thenReturn(true); when(gateway.getDispute("dp_case")).thenReturn(dispute("dp_case", "lost", List.of(balance("txn_loss", "dp_case", -10000, 1500))));
+        assertEquals("POLICY_REVIEW_REQUIRED", adjustments.refreshCase(review.id()).reviewStatus()); assertEquals(-321, available());
+        assertEquals(0, mongo.getCollection("finance_dispute_resolutions").countDocuments());
+        assertEquals(0, ledger.findAll().stream().filter(entry -> entry.getType() == FinanceLedgerEntry.LedgerType.DISPUTE_FEE_ADJUSTMENT).count());
+    }
     @Test void invalidSourceOrPendingBalanceCannotBookALoss() throws Exception {
         settleOneTime(); var pending = new HashMap<>(balance("txn_loss", "dp_case", -10000, 1500)); pending.put("status", "pending");
         refresh("dp_case", "lost", List.of(pending)); assertEquals(8445, available());

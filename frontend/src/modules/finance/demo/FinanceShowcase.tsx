@@ -5,6 +5,7 @@ import { financeClient } from '@/modules/finance/api/financeClient';
 import { api } from '@/utils/api';
 import { AdSettlementReview } from '@/modules/finance/components/AdSettlementReview';
 import { PayoutReconciliationReview } from '@/modules/finance/components/PayoutReconciliationReview';
+import { DisputeReconciliationReview } from '@/modules/finance/components/DisputeReconciliationReview';
 import { createAdSettlementFixture } from './adSettlementFixture';
 import { createDemoDonationConfig, DEMO_MONETIZATION_POLICY } from './financeDemoConfiguration';
 import type { DonationConfig } from '@/modules/finance/api/financeTypes';
@@ -31,6 +32,17 @@ export default function FinanceShowcase() {
         financeClient.getDonationConfig = async () => createDemoDonationConfig();
         void financeClient.getDonationConfig('demo-project').then(config => { if (active) setSupportConfig(config); });
         let queuedTransfer: { id: string; amountCents: number; status: string; createdAt: string } | null = null;
+        let disputeReviewed = false;
+        const disputeHistory: any[] = [];
+        financeClient.getDisputeReconciliationCases = async () => [{ id: 'demo-dispute-case', disputeId: 'dp_demo', chargeId: 'ch_demo', creatorId: 'demo-creator', currency: 'usd', testMode: true, providerStatus: 'lost', disputedCents: 1000, actualFeeCents: 1500, principalMovementCents: -1000, reviewStatus: disputeReviewed ? 'RESOLVED' : 'POLICY_REVIEW_REQUIRED', evidenceReady: true, evidenceDigest: 'b'.repeat(64), balanceTransactions: [{ id: 'txn_demo', source: 'dp_demo', type: 'adjustment', currency: 'usd', status: 'available', amount: -1000, fee: 1500, net: -2500 }], updatedAt: '2026-09-30T09:00:00Z' }];
+        financeClient.refreshDisputeCase = async () => (await financeClient.getDisputeReconciliationCases())[0];
+        financeClient.getDisputeDecisions = async () => disputeHistory;
+        financeClient.resolveDispute = async decision => {
+            if (decision.expectedEvidenceDigest !== 'b'.repeat(64) || !Number.isSafeInteger(decision.creatorFeeCents) || decision.creatorFeeCents < 0 || decision.creatorFeeCents > 1500) throw new Error('Synthetic evidence mismatch. No ledger was changed.');
+            disputeReviewed = true;
+            const resolution = { id: 'demo-resolution', providerStatus: 'lost', actualFeeCents: 1500, creatorFeeCents: decision.creatorFeeCents, reviewerId: 'demo-reviewer', reason: decision.reason, createdAt: new Date().toISOString(), evidenceDigest: decision.expectedEvidenceDigest };
+            disputeHistory.push(resolution); return resolution;
+        };
         let transferReviewed = false;
         financeClient.getPayoutReconciliationQueue = async () => transferReviewed ? [] : [{ id: 'demo-transfer-review', creatorId: 'demo-creator', providerAccountId: 'acct_demo', testMode: true, currency: 'usd', amountCents: 2500, status: 'REQUIRES_REVIEW', transferGroup: 'demo-original-transfer-group', createdAt: '2026-09-30T09:00:00Z', reviewReason: 'Synthetic lost provider response. Use tr_demo to exercise this form without any provider request.', recipients: [{ userId: 'demo-creator', accountId: 'acct_recipient', amountCents: 2500, authorizedAt: '2026-09-30T09:01:00Z' }] }];
         financeClient.confirmExistingPayoutTransfer = async evidence => {
@@ -88,13 +100,14 @@ export default function FinanceShowcase() {
                 <div className="mt-4 flex flex-wrap gap-2">
                     <button type="button" className="rounded border px-3 py-2 text-sm" onClick={() => setView(value => value === 'creator' ? 'admin' : 'creator')}>{view === 'creator' ? 'Show ad review' : 'Show creator dashboard'}</button>
                     <button type="button" className="rounded border px-3 py-2 text-sm" onClick={() => setView('payout')}>Show transfer review</button>
+                    <button type="button" className="rounded border px-3 py-2 text-sm" onClick={() => setView('dispute')}>Show dispute review</button>
                     <label className="text-sm">Dashboard state <select value={scenario} onChange={event => setScenario(event.target.value)} className="rounded border bg-white px-2 py-2 text-slate-900"><option value="unavailable">Unavailable</option><option value="pending">Pending earnings</option><option value="settled">Settled earnings</option><option value="refund">Refund adjustment</option><option value="error">Service error</option></select></label>
                     <button className="rounded border px-3 py-2 text-sm" onClick={() => setDark(value => !value)}>Toggle theme</button>
                     <button disabled={!supportConfig} className="rounded bg-blue-600 px-3 py-2 text-sm text-white" onClick={() => { setNotice(''); setShowSupport(true); }}>Open support dialog</button>
                 </div>
             </header>
             {notice && <p role="status" className="mb-4 rounded-xl border border-blue-300 p-3 text-sm">{notice}</p>}
-            {view === 'creator' ? <FinanceManager key={scenario} /> : view === 'payout' ? <PayoutReconciliationReview /> : <AdSettlementReview />}
+            {view === 'creator' ? <FinanceManager key={scenario} /> : view === 'payout' ? <PayoutReconciliationReview /> : view === 'dispute' ? <DisputeReconciliationReview /> : <AdSettlementReview />}
             <DonationPromptModal show={showSupport} suggestedAmountCents={supportConfig?.suggestedDonationCents ?? 500} recurringDefault={false} allowRecurring={supportConfig?.recurringEnabled} platformCutBps={supportConfig?.donationPlatformCutBps} testMode isProcessing={processing}
                 onClose={() => { setShowSupport(false); setNotice('Demo: dialog closed; the free download continues.'); }}
                 onSkip={() => { setShowSupport(false); setNotice('Demo: download continues without a tip.'); }}

@@ -365,6 +365,27 @@ class FinanceHttpSecurityTest {
         mvc.perform(browser(get(DISPUTES)).with(authentication(session(reviewer)))).andExpect(status().isOk());
         verify(bean(PaymentAdjustmentService.class)).getDisputeCases();
     }
+    @Test void immutableDisputeDecisionHistoryRequiresBrowserFinanceManager() throws Exception {
+        String path = DISPUTES + "/case_fixture/decisions";
+        mvc.perform(browser(get(path))).andExpect(status().isForbidden());
+        mvc.perform(browser(get(path)).with(authentication(session(owner)))).andExpect(status().isForbidden());
+        apiKey(reviewer);
+        mvc.perform(browser(get(path)).header("X-MODTALE-KEY", "fixture-key")).andExpect(status().isForbidden());
+        verifyNoInteractions(bean(PaymentAdjustmentService.class));
+        when(bean(PaymentAdjustmentService.class).getDisputeDecisions("case_fixture")).thenReturn(List.of());
+        mvc.perform(browser(get(path)).with(authentication(session(reviewer)))).andExpect(status().isOk());
+        verify(bean(PaymentAdjustmentService.class)).getDisputeDecisions("case_fixture");
+    }
+    @Test void selectedDisputeRefreshRequiresFinanceSessionAndCsrf() throws Exception {
+        String path = DISPUTES + "/case_fixture/refresh";
+        mvc.perform(browser(post(path)).with(authentication(session(reviewer)))).andExpect(status().isForbidden());
+        mvc.perform(csrf(browser(post(path))).with(authentication(session(owner)))).andExpect(status().isForbidden());
+        apiKey(reviewer); mvc.perform(browser(post(path)).header("X-MODTALE-KEY", "fixture-key")).andExpect(status().isForbidden());
+        verifyNoInteractions(bean(PaymentAdjustmentService.class));
+        mvc.perform(csrf(browser(post(path))).with(authentication(session(reviewer)))).andExpect(status().isOk());
+        verify(bean(PaymentAdjustmentService.class)).refreshCase("case_fixture");
+        verify(bean(PaymentAdjustmentService.class), never()).resolveCase(anyString(), anyString(), anyLong(), any(), anyString());
+    }
     @Test void disputeResolutionRequiresCsrfAndFinanceSession() throws Exception {
         String body = disputeBody("125", "a".repeat(64), "Verified actual fee");
         mvc.perform(browser(post(DISPUTES + "/resolve")).with(authentication(session(reviewer))).contentType("application/json").content(body)).andExpect(status().isForbidden());

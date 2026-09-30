@@ -18,6 +18,8 @@ public class DisputeReconciliationController {
     public record Decision(@NotBlank String caseId, @NotBlank @Pattern(regexp = "[a-f0-9]{64}") String expectedEvidenceDigest,
             @NotNull @DecimalMin("0") @Digits(integer = 12, fraction = 0) BigDecimal creatorFeeCents, @NotBlank @Size(max = 1000) String reason) {}
     @GetMapping public Object list() { return adjustments.getDisputeCases(); }
+    @GetMapping("/{caseId}/decisions") public Object decisions(@PathVariable String caseId) { return adjustments.getDisputeDecisions(caseId); }
+    @PostMapping("/{caseId}/refresh") public Object refresh(@PathVariable String caseId) { return adjustments.refreshCase(caseId); }
     @PostMapping("/resolve") public Object resolve(@Valid @RequestBody Decision body) {
         return adjustments.resolveCase(body.caseId(), body.expectedEvidenceDigest(), body.creatorFeeCents().longValueExact(), accounts.getCurrentUser(), body.reason());
     }

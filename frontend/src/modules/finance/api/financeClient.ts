@@ -2,6 +2,10 @@ import { api } from '@/utils/api';
 import type { AdStageReport } from '@/modules/finance/components/AdSettlementReview';
 
 export const financeClient = {
+    getDisputeReconciliationCases: async () => (await api.get('/admin/finance/dispute-reconciliation')).data,
+    refreshDisputeCase: async (caseId: string) => (await api.post(`/admin/finance/dispute-reconciliation/${encodeURIComponent(caseId)}/refresh`)).data,
+    getDisputeDecisions: async (caseId: string) => (await api.get(`/admin/finance/dispute-reconciliation/${encodeURIComponent(caseId)}/decisions`)).data,
+    resolveDispute: async (decision: { caseId: string; expectedEvidenceDigest: string; creatorFeeCents: number; reason: string }) => (await api.post('/admin/finance/dispute-reconciliation/resolve', decision)).data,
     getPayoutReconciliationQueue: async () => (await api.get('/admin/finance/payout-reconciliation')).data,
     confirmExistingPayoutTransfer: async (evidence: { requestId: string; recipientIndex: number; transferId: string; reason: string }) => (await api.post('/admin/finance/payout-reconciliation/confirm-existing-transfer', evidence)).data,
     getAdSettlementStages: async () => (await api.get('/finance/admin/ad-settlements')).data,

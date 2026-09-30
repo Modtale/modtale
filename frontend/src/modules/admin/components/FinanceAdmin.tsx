@@ -6,6 +6,7 @@ import { StatusModal } from '@/components/ui/StatusModal';
 import { theme } from '@/styles/theme';
 import { AdSettlementReview } from '@/modules/finance/components/AdSettlementReview';
 import { PayoutReconciliationReview } from '@/modules/finance/components/PayoutReconciliationReview';
+import { DisputeReconciliationReview } from '@/modules/finance/components/DisputeReconciliationReview';
 
 const inputNoNativeUi = `${theme.components.inputField} appearance-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`;
 
@@ -277,6 +278,7 @@ export function FinanceAdmin({ canManageFinance }: FinanceAdminProps) {
                 <button onClick={saveSettings} className={theme.components.buttonPrimary}><Save className="h-4 w-4" /> Save Finance Settings</button>
             </div>
 
+            {canManageFinance && <DisputeReconciliationReview />}
             {canManageFinance && <PayoutReconciliationReview />}
             {canManageFinance && <AdSettlementReview />}
 

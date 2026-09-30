@@ -144,6 +144,19 @@ public class PaymentAdjustmentService {
         return mongo.find(new Query().with(org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.DESC, "updatedAt")).limit(100), net.modtale.model.finance.FinanceDisputeCase.class);
     }
 
+    public FinanceDisputeCase refreshCase(String caseId) {
+        FinanceDisputeCase current = mongo.findById(caseId, FinanceDisputeCase.class);
+        if (current == null) throw new IllegalArgumentException("Dispute case not found.");
+        if (!gateway.isReconciliationEnabled() || gateway.isTestMode() != current.testMode() || !gateway.verifyPlatformAccountId(current.providerAccountId())) throw new IllegalArgumentException("Dispute provider account or mode does not match.");
+        synchronizeDispute(current.disputeId(), current.chargeId());
+        return mongo.findById(caseId, FinanceDisputeCase.class);
+    }
+
+    public List<FinanceDisputeResolution> getDisputeDecisions(String caseId) {
+        return mongo.find(Query.query(Criteria.where("caseId").is(caseId))
+                .with(org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.DESC, "createdAt")).limit(100), FinanceDisputeResolution.class);
+    }
+
     @Scheduled(fixedDelayString = "${app.finance.reconciliation-interval-ms:3600000}")
     public void reconcileHeldCharges() {
         if (!gateway.isReconciliationEnabled()) return;
