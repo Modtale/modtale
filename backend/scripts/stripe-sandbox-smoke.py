@@ -49,6 +49,8 @@ class SandboxRun:
     def record(self, check, passed, **safe):
         self.report["checks"].append({"check": check, "passed": passed, **safe})
         self.save()
+        if not passed and "limitation" not in safe:
+            raise ValueError("A provider contract assertion failed. See the sanitized check report; this run has stopped.")
 
     def request(self, method, path, fields=None, expected=(200,)):
         # No configurable host or redirect: credentials are sent only to Stripe's API.
@@ -247,6 +249,8 @@ def main():
         run = SandboxRun(key, account, directory); run.report["scenario"] = args.scenario; run.save()
         if args.scenario in ("billing", "billing-initial"): run.execute_billing(use_clock=args.scenario == "billing")
         else: run.execute()
+        run.report["result"] = "COMPLETED_WITH_LIMITATIONS" if any(not check["passed"] for check in run.report["checks"]) else "PASSED"
+        run.save()
         print(json.dumps(run.report, indent=2))
     except ValueError as error:
         print(str(error), file=sys.stderr); return 1

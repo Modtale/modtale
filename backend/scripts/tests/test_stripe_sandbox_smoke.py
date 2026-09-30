@@ -40,6 +40,15 @@ class SandboxGuardTest(unittest.TestCase):
   self.assertEqual('pi_fixture',runner.SandboxRun.test_object({'id':'pi_fixture','livemode':False},'pi_'))
 class SandboxTransportGuardTest(unittest.TestCase):
  def make_run(self, directory): return runner.SandboxRun('sk_test_fixture_never_print', 'acct_fixture', pathlib.Path(directory))
+ def test_failed_contract_assertion_stops_after_saving_failure(self):
+  with tempfile.TemporaryDirectory() as directory:
+   run=self.make_run(directory)
+   with self.assertRaises(ValueError):run.record('unexpected_payment_status',False)
+   self.assertFalse(json.loads((pathlib.Path(directory)/'report.json').read_text())['checks'][0]['passed'])
+ def test_explicit_permission_limitation_stays_visible_without_claiming_pass(self):
+  with tempfile.TemporaryDirectory() as directory:
+   run=self.make_run(directory);run.record('restricted_permission',False,limitation='Owner action required')
+   self.assertFalse(run.report['checks'][0]['passed'])
  def test_invalid_paths_never_open_network(self):
   with tempfile.TemporaryDirectory() as directory:
    run=self.make_run(directory)
