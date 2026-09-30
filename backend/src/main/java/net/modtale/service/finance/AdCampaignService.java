@@ -81,6 +81,9 @@ public class AdCampaignService {
     }
 
     public void trackAdImpression(String campaignId, String projectId, String clientIp) {
+        AdCampaign campaign = adCampaignRepository.findById(campaignId).orElse(null);
+        Project project = projectService.getProjectById(projectId);
+        if (!isEligible(campaign, project) || campaign.isTestCampaign()) return;
         if (!core.shouldTrackEvent("impression", campaignId, projectId, clientIp)) return;
 
         FinanceLedgerEntry entry = new FinanceLedgerEntry();
@@ -96,7 +99,7 @@ public class AdCampaignService {
         entry.setAvailableAt(LocalDateTime.now());
         entry.setCompletedAt(LocalDateTime.now());
         entry.getMetadata().put("campaignId", campaignId);
-        entry.getMetadata().put("tracked", "aggregate_only");
+        entry.getMetadata().put("tracked", "engagement_only");
         ledgerRepository.save(entry);
     }
 
@@ -104,40 +107,33 @@ public class AdCampaignService {
         AdCampaign campaign = adCampaignRepository.findById(campaignId)
                 .orElseThrow(() -> new IllegalArgumentException("Ad campaign not found"));
 
-        String targetUrl = core.appendAffiliateParams(campaign.getTargetUrl(), campaign.getAffiliateParam(), campaign.getAffiliateCode());
-
         Project project = projectService.getProjectById(projectId);
-        if (project == null || !project.isAdsEnabled()) {
-            return targetUrl;
-        }
+        if (!isEligible(campaign, project)) throw new IllegalArgumentException("This sponsored placement is unavailable.");
+        core.requireSafeExternalUrl(campaign.getTargetUrl());
+        String targetUrl = core.appendAffiliateParams(campaign.getTargetUrl(), campaign.getAffiliateParam(), campaign.getAffiliateCode());
+        if (campaign.isTestCampaign()) return targetUrl;
 
         if (!core.shouldTrackEvent("click", campaignId, projectId, clientIp)) {
             return targetUrl;
         }
 
         PlatformFinanceSettings settings = financeAccountService.getSettings();
-        long gross = campaign.getBaseRevenuePerClickCents() > 0
-                ? campaign.getBaseRevenuePerClickCents()
-                : settings.getDefaultAdRevenuePerClickCents();
-
-        long creatorCut = Math.round((gross * settings.getAdCreatorSplitBps()) / 10000.0);
-        long platformCut = gross - creatorCut;
-
+        // Engagement is not proof of paid revenue. Only reconciled provider settlements fund earnings.
         FinanceLedgerEntry entry = new FinanceLedgerEntry();
         entry.setCreatorId(project.getAuthorId());
         entry.setProjectId(project.getId());
         entry.setType(FinanceLedgerEntry.LedgerType.AD_CLICK);
-        entry.setGrossCents(gross);
-        entry.setCreatorCents(creatorCut);
-        entry.setPlatformCents(platformCut);
+        entry.setGrossCents(0);
+        entry.setCreatorCents(0);
+        entry.setPlatformCents(0);
         entry.setCurrency(settings.getCurrency());
-        entry.setStatus(FinanceLedgerEntry.EntryStatus.AVAILABLE);
+        entry.setStatus(FinanceLedgerEntry.EntryStatus.PAID);
         entry.setCreatedAt(LocalDateTime.now());
         entry.setAvailableAt(LocalDateTime.now());
-        entry.setExpiresAt(LocalDateTime.now().plusDays(settings.getFundExpiryDays()));
+        entry.setCompletedAt(LocalDateTime.now());
         entry.getMetadata().put("campaignId", campaign.getId());
         entry.getMetadata().put("providerType", campaign.getProviderType().name());
-        entry.getMetadata().put("tracked", "aggregate_only");
+        entry.getMetadata().put("tracked", "engagement_only");
         ledgerRepository.save(entry);
 
         return targetUrl;
@@ -159,8 +155,7 @@ public class AdCampaignService {
         AdCampaign.AdPlacement placement = core.parsePlacement(placementRaw);
 
         List<AdCampaign> candidates = activeCampaigns.stream()
-                .filter(AdCampaign::isPrivacyRespecting)
-                .filter(AdCampaign::isNonIntrusive)
+                .filter(campaign -> isEligible(campaign, project))
                 .filter(campaign -> campaign.getAllowedClassifications() == null
                         || campaign.getAllowedClassifications().isEmpty()
                         || (project.getClassification() != null && campaign.getAllowedClassifications().contains(project.getClassification().name())))
@@ -191,7 +186,7 @@ public class AdCampaignService {
         ad.put("creativeAltText", creative != null ? creative.getAltText() : null);
         ad.put("clickUrl", "/api/v1/finance/ads/click/" + chosen.getId() + "?projectId=" + project.getId());
         ad.put("testCampaign", chosen.isTestCampaign());
-        ad.put("privacyLabel", "Privacy-respecting ad: no personal profile tracking.");
+        ad.put("privacyLabel", "Sponsored link. Modtale records aggregate engagement; the sponsor’s privacy policy applies after you leave.");
         ad.put("creatorRevenueSharePercent", financeAccountService.getSettings().getAdCreatorSplitBps() / 100.0);
         return ad;
     }
@@ -268,5 +263,16 @@ public class AdCampaignService {
             }
             campaign.setCreatives(creatives);
         }
+        core.requireSafeExternalUrl(campaign.getTargetUrl());
+        if (campaign.getImageUrl() != null && !campaign.getImageUrl().isBlank()) core.requireSafeExternalUrl(campaign.getImageUrl());
+        for (AdCampaign.AdCreative creative : campaign.getCreatives()) core.requireSafeExternalUrl(creative.getImageUrl());
+    }
+
+    private boolean isEligible(AdCampaign campaign, Project project) {
+        return campaign != null && campaign.isActive() && campaign.isPrivacyRespecting() && campaign.isNonIntrusive()
+                && (!campaign.isTestCampaign() || defaultAdTestModeEnabled)
+                && project != null && project.isAdsEnabled()
+                && (campaign.getAllowedClassifications() == null || campaign.getAllowedClassifications().isEmpty()
+                || (project.getClassification() != null && campaign.getAllowedClassifications().contains(project.getClassification().name())));
     }
 }

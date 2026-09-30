@@ -11,9 +11,10 @@ public class PlatformFinanceSettings {
     @Id
     private String id = "platform";
 
-    private int adCreatorSplitBps = 9000;
+    private int monetizationPolicyVersion;
+    private int adCreatorSplitBps = 7500;
     private int donationPlatformCutBps = 1000;
-    private int fundExpiryDays = 365;
+    private int fundExpiryDays = 0;
     private int defaultAdRevenuePerClickCents = 3;
     private int minPayoutCents = 1000;
     private boolean adTestModeEnabled = false;
@@ -28,6 +29,10 @@ public class PlatformFinanceSettings {
     public void setId(String id) {
         this.id = id;
     }
+
+    public int getMonetizationPolicyVersion() { return monetizationPolicyVersion; }
+
+    public void setMonetizationPolicyVersion(int version) { monetizationPolicyVersion = version; }
 
     public int getAdCreatorSplitBps() {
         return adCreatorSplitBps;
@@ -50,7 +55,7 @@ public class PlatformFinanceSettings {
     }
 
     public void setFundExpiryDays(int fundExpiryDays) {
-        this.fundExpiryDays = Math.max(30, fundExpiryDays);
+        this.fundExpiryDays = 0;
     }
 
     public int getDefaultAdRevenuePerClickCents() {

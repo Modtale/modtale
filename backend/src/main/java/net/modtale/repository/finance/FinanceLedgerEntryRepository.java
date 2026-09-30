@@ -7,6 +7,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 public interface FinanceLedgerEntryRepository extends MongoRepository<FinanceLedgerEntry, String> {
+    List<FinanceLedgerEntry> findTop100ByTypeAndStatusOrderByCreatedAtAsc(FinanceLedgerEntry.LedgerType type, FinanceLedgerEntry.EntryStatus status);
     List<FinanceLedgerEntry> findByCreatorId(String creatorId);
     List<FinanceLedgerEntry> findByCreatorIdAndStatus(String creatorId, FinanceLedgerEntry.EntryStatus status);
     List<FinanceLedgerEntry> findByCreatorIdAndStatusOrderByCreatedAtAsc(String creatorId, FinanceLedgerEntry.EntryStatus status);

@@ -146,6 +146,46 @@ jobs:
       - name: Run backend tests
         run: ./gradlew test
 
+  finance-transactions:
+    name: Finance Transaction Tests
+    needs: detect-changes
+    if: needs.detect-changes.outputs.backend == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    env:
+      FINANCE_TEST_MONGO_URI: mongodb://127.0.0.1:27018/?replicaSet=finance-test
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 26
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v3
+      - name: Start isolated MongoDB replica set
+        run: |
+          docker run -d --name finance-mongo -p 127.0.0.1:27018:27018 mongo:8.0.32 --replSet finance-test --port 27018 --bind_ip_all
+          for i in {1..60}; do
+            if docker exec finance-mongo mongosh --port 27018 --quiet --eval 'db.adminCommand({ping: 1}).ok' >/dev/null 2>&1; then break; fi
+            sleep 1
+          done
+          docker exec finance-mongo mongosh --port 27018 --quiet --eval 'rs.initiate({_id: "finance-test", members: [{_id: 0, host: "127.0.0.1:27018"}]})'
+          for i in {1..60}; do
+            if docker exec finance-mongo mongosh --port 27018 --quiet --eval 'if (!db.hello().isWritablePrimary) quit(1)' >/dev/null 2>&1; then exit 0; fi
+            sleep 1
+          done
+          exit 1
+      - name: Verify ledger and withdrawal concurrency
+        working-directory: backend
+        run: ./gradlew test --tests 'net.modtale.service.finance.*'
+      - name: Stop disposable database
+        if: always()
+        run: docker rm -f finance-mongo || true
+
   launcher:
     name: Launcher Tests
     needs: detect-changes

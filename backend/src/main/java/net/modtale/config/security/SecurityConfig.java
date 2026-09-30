@@ -311,8 +311,6 @@ public class SecurityConfig {
                                 "/api/v1/wiki/**",
                                 "/api/v1/finance/public/**",
                                 "/api/v1/finance/projects/*/donation-config",
-                                "/api/v1/finance/projects/*/donations/checkout-url",
-                                "/api/v1/finance/donations/confirm",
                                 "/api/v1/finance/ads/slot/**",
                                 "/api/v1/finance/ads/click/**"
                         ).permitAll()
@@ -320,6 +318,9 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST,
                                 "/api/v1/projects/external/identify",
                                 "/api/v1/users/batch",
+                                "/api/v1/finance/projects/*/donations/checkout-url",
+                                "/api/v1/finance/donations/confirm",
+                                "/api/v1/finance/webhooks/stripe",
                                 "/api/v1/finance/ads/impression"
                         ).permitAll()
                         .requestMatchers("/api/v1/analytics/platform/full").access((authentication, context) -> {

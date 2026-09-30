@@ -50,6 +50,8 @@ public class FinanceLedgerEntry {
     private long grossCents;
     private long creatorCents;
     private long platformCents;
+    private Long processorFeeCents;
+    private Long creatorGrossCents;
     private String currency = "usd";
 
     @Indexed
@@ -121,6 +123,14 @@ public class FinanceLedgerEntry {
     public void setPlatformCents(long platformCents) {
         this.platformCents = platformCents;
     }
+
+    public Long getProcessorFeeCents() { return processorFeeCents; }
+
+    public void setProcessorFeeCents(Long cents) { processorFeeCents = cents; }
+
+    public Long getCreatorGrossCents() { return creatorGrossCents; }
+
+    public void setCreatorGrossCents(Long cents) { creatorGrossCents = cents; }
 
     public String getCurrency() {
         return currency;

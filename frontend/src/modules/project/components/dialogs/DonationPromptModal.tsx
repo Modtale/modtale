@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react';
-import { Check, HeartHandshake, X } from 'lucide-react';
+import React, { useEffect, useId, useRef, useState } from 'react';
+import { HeartHandshake, ShieldCheck, X } from 'lucide-react';
 import { useScrollLock } from '@/hooks/useScrollLock';
+import { parseSupportAmount } from '@/modules/finance/api/financeTypes';
 
 interface DonationPromptModalProps {
     show: boolean;
@@ -8,6 +9,8 @@ interface DonationPromptModalProps {
     suggestedAmountCents: number;
     recurringDefault: boolean;
     allowRecurring?: boolean;
+    platformCutPercent?: number;
+    testMode?: boolean;
     onClose: () => void;
     onSkip: () => void;
     onDonate: (amountCents: number, recurring: boolean, guestCheckout: boolean) => void;
@@ -15,105 +18,89 @@ interface DonationPromptModalProps {
 }
 
 export const DonationPromptModal: React.FC<DonationPromptModalProps> = ({
-    show,
-    currency = 'USD',
-    suggestedAmountCents,
-    recurringDefault,
-    allowRecurring = true,
-    onClose,
-    onSkip,
-    onDonate,
-    isProcessing = false
+    show, currency = 'USD', suggestedAmountCents, platformCutPercent = 10,
+    testMode = false, onClose, onSkip, onDonate, isProcessing = false
 }) => {
     useScrollLock(show);
-    const [amount, setAmount] = useState((suggestedAmountCents / 100).toFixed(2));
-    const [recurring, setRecurring] = useState(recurringDefault);
-    const [guestCheckout, setGuestCheckout] = useState(true);
+    const titleId = useId();
+    const descriptionId = useId();
+    const amountId = useId();
+    const errorId = useId();
+    const dialogRef = useRef<HTMLDivElement>(null);
+    const closeRef = useRef(onClose);
+    const processingRef = useRef(isProcessing);
+    const submittedRef = useRef(false);
+    closeRef.current = onClose;
+    processingRef.current = isProcessing;
+    const [amount, setAmount] = useState('5.00');
 
     useEffect(() => {
         if (!show) return;
-        setAmount((Math.max(100, suggestedAmountCents) / 100).toFixed(2));
-        setRecurring(allowRecurring ? recurringDefault : false);
-        setGuestCheckout(true);
-    }, [show, suggestedAmountCents, recurringDefault, allowRecurring]);
+        setAmount((Math.max(100, Math.min(100000, suggestedAmountCents)) / 100).toFixed(2));
+        submittedRef.current = false;
+        const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+        dialogRef.current?.focus();
+        const onKeyDown = (event: KeyboardEvent) => {
+            if (event.key === 'Escape' && !processingRef.current) {
+                event.preventDefault();
+                closeRef.current();
+            }
+            if (event.key !== 'Tab') return;
+            const controls = dialogRef.current?.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), a[href]');
+            if (!controls?.length) { event.preventDefault(); return; }
+            const first = controls[0];
+            const last = controls[controls.length - 1];
+            if (event.shiftKey && (document.activeElement === first || document.activeElement === dialogRef.current)) {
+                event.preventDefault(); last.focus();
+            } else if (!event.shiftKey && (document.activeElement === last || document.activeElement === dialogRef.current)) {
+                event.preventDefault(); first.focus();
+            }
+        };
+        document.addEventListener('keydown', onKeyDown);
+        return () => {
+            document.removeEventListener('keydown', onKeyDown);
+            if (previousFocus?.isConnected) previousFocus.focus();
+        };
+    }, [show, suggestedAmountCents]);
 
     if (!show) return null;
-
-    const normalizedCents = Math.max(100, Math.round(Number(amount || 0) * 100));
+    const cents = parseSupportAmount(amount);
+    const valid = cents !== null;
+    const formatted = valid ? new Intl.NumberFormat(undefined, { style: 'currency', currency }).format(cents / 100) : '';
+    const submit = () => {
+        if (cents === null || isProcessing || submittedRef.current) return;
+        submittedRef.current = true;
+        onDonate(cents, false, true);
+    };
+    const dismiss = () => { if (!isProcessing) onClose(); };
 
     return (
-        <div className="fixed inset-0 z-[110] bg-black/55 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
-            <div className="w-full max-w-lg rounded-2xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
-                <div className="px-6 py-5 border-b border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-800/50 flex items-start justify-between gap-3">
+        <div className="fixed inset-0 z-[110] bg-black/55 backdrop-blur-sm flex items-center justify-center p-4" onClick={dismiss}>
+            <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby={titleId} aria-describedby={descriptionId} aria-busy={isProcessing} tabIndex={-1}
+                className="w-full max-w-lg max-h-[calc(100dvh-2rem)] overflow-y-auto rounded-2xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900 shadow-2xl outline-none" onClick={e => e.stopPropagation()}>
+                <div className="px-6 py-5 border-b border-slate-200 dark:border-white/10 flex items-start justify-between gap-3">
                     <div>
-                        <h3 className="text-xl font-black text-slate-900 dark:text-white flex items-center gap-2"><HeartHandshake className="w-5 h-5 text-modtale-accent" /> Support this creator</h3>
+                        <div className="mb-2 inline-flex rounded-lg bg-modtale-accent/10 p-2 text-modtale-accent"><HeartHandshake className="h-5 w-5" /></div>
+                        <h2 id={titleId} className="text-xl font-black text-slate-900 dark:text-white">Support this creator</h2>
+                        <p id={descriptionId} className="mt-1 text-sm text-slate-600 dark:text-slate-300">Your download is free. A one-time tip helps the creator keep building.</p>
                     </div>
-                    <button onClick={onClose} className="p-2 rounded-full text-slate-500 hover:bg-slate-100 dark:hover:bg-white/10">
-                        <X className="w-5 h-5" />
-                    </button>
+                    <button type="button" onClick={dismiss} disabled={isProcessing} aria-label="Close support dialog" className="p-2 rounded-full text-slate-500 hover:bg-slate-100 dark:hover:bg-white/10 disabled:opacity-50"><X className="h-5 w-5" /></button>
                 </div>
-
                 <div className="px-6 py-5 space-y-4">
-                    <p className="text-sm text-slate-600 dark:text-slate-300">
-                        This creator accepts optional donations. You can continue without donating.
-                    </p>
-
-                    <div className="rounded-xl border border-slate-200 dark:border-white/10 p-4 bg-slate-50 dark:bg-white/5">
-                        <label className="block text-xs font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2">Suggested Amount ({currency.toUpperCase()})</label>
-                        <input
-                            type="number"
-                            min="1"
-                            step="0.01"
-                            value={amount}
-                            onChange={(e) => setAmount(e.target.value)}
-                            className="w-full rounded-lg border border-slate-300 dark:border-white/20 bg-white dark:bg-slate-900 px-3 py-2.5 text-slate-900 dark:text-white font-bold"
-                        />
-                        {allowRecurring && (
-                            <button
-                                type="button"
-                                onClick={() => setRecurring((prev) => !prev)}
-                                className="mt-3 inline-flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300 font-medium"
-                                aria-pressed={recurring}
-                            >
-                                <span className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${recurring ? 'bg-modtale-accent border-modtale-accent text-white' : 'bg-white dark:bg-slate-900 border-slate-300 dark:border-white/20 text-transparent'}`}>
-                                    <Check className="w-3.5 h-3.5" />
-                                </span>
-                                Make this a recurring monthly donation
-                            </button>
-                        )}
-                        <button
-                            type="button"
-                            onClick={() => {
-                                const nextGuest = !guestCheckout;
-                                setGuestCheckout(nextGuest);
-                                if (nextGuest) setRecurring(false);
-                            }}
-                            className="mt-3 inline-flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300 font-medium"
-                            aria-pressed={guestCheckout}
-                        >
-                            <span className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${guestCheckout ? 'bg-modtale-accent border-modtale-accent text-white' : 'bg-white dark:bg-slate-900 border-slate-300 dark:border-white/20 text-transparent'}`}>
-                                <Check className="w-3.5 h-3.5" />
-                            </span>
-                            Donate as guest (one-time)
-                        </button>
+                    {testMode && <p role="status" className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:bg-amber-900/20 dark:text-amber-200">Preview checkout. No real money or creator earnings.</p>}
+                    <div>
+                        <label htmlFor={amountId} className="block text-sm font-bold text-slate-700 dark:text-slate-200">Tip amount ({currency.toUpperCase()})</label>
+                        <div className="mt-2 flex gap-2">{[300, 500, 1000].map(preset => <button key={preset} type="button" disabled={isProcessing} aria-pressed={cents === preset} onClick={() => setAmount((preset / 100).toFixed(2))} className={`flex-1 rounded-lg border px-3 py-2 font-bold ${cents === preset ? 'border-modtale-accent bg-modtale-accent/10 text-modtale-accent' : 'border-slate-200 dark:border-white/20 text-slate-600 dark:text-slate-300'}`}>{new Intl.NumberFormat(undefined, { style: 'currency', currency, maximumFractionDigits: 0 }).format(preset / 100)}</button>)}</div>
+                        <input id={amountId} type="text" inputMode="decimal" value={amount} disabled={isProcessing} onChange={event => setAmount(event.target.value)} aria-invalid={!valid} aria-describedby={!valid ? errorId : undefined}
+                            className="mt-3 w-full rounded-lg border border-slate-300 dark:border-white/20 bg-white dark:bg-slate-950 px-3 py-2.5 text-slate-900 dark:text-white font-bold" />
+                        {!valid && <p id={errorId} className="mt-2 text-sm text-red-600 dark:text-red-400">Enter 1.00–1,000.00 with no more than two decimal places.</p>}
                     </div>
+                    <p className="text-xs leading-relaxed text-slate-500 dark:text-slate-400">{platformCutPercent}% of the tip supports Modtale. Payment processing fees are deducted from the creator’s remaining share. This supports their content and is not a tax-deductible charitable donation.</p>
+                    <p className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400"><ShieldCheck className="h-4 w-4 shrink-0" />One-time payment. No subscription or reminder emails.</p>
                 </div>
-
-                <div className="px-6 py-4 border-t border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-800/50 flex flex-col sm:flex-row gap-2 sm:justify-end">
-                    <button
-                        onClick={onSkip}
-                        disabled={isProcessing}
-                        className="px-4 py-2.5 rounded-xl border border-slate-300 dark:border-white/20 text-slate-700 dark:text-slate-200 font-bold hover:bg-slate-100 dark:hover:bg-white/10"
-                    >
-                        Continue Without Donating
-                    </button>
-                    <button
-                        onClick={() => onDonate(normalizedCents, guestCheckout ? false : recurring, guestCheckout)}
-                        disabled={isProcessing}
-                        className="px-4 py-2.5 rounded-xl bg-modtale-accent text-white font-bold hover:bg-modtale-accentHover disabled:opacity-60"
-                    >
-                        {isProcessing ? 'Processing...' : 'Donate and Continue'}
-                    </button>
+                <div className="px-6 py-4 border-t border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-800/50 flex flex-col-reverse sm:flex-row gap-2 sm:justify-end">
+                    <button type="button" onClick={onSkip} disabled={isProcessing} className="px-4 py-2.5 rounded-xl border border-slate-300 dark:border-white/20 text-slate-700 dark:text-slate-200 font-bold hover:bg-slate-100 dark:hover:bg-white/10 disabled:opacity-50">Download without tipping</button>
+                    <button type="button" onClick={submit} disabled={isProcessing || !valid} className="px-4 py-2.5 rounded-xl bg-modtale-accent text-white font-bold hover:bg-modtale-accentHover disabled:opacity-50">{isProcessing ? 'Opening checkout…' : valid ? `Tip ${formatted} & download` : 'Tip & download'}</button>
                 </div>
             </div>
         </div>

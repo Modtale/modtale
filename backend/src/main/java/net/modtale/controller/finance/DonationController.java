@@ -23,7 +23,7 @@ public class DonationController {
         }
     }
 
-    @GetMapping("/projects/{projectId}/donations/checkout-url")
+    @PostMapping("/projects/{projectId}/donations/checkout-url")
     public ResponseEntity<?> createDonationCheckout(
             @PathVariable String projectId,
             @RequestParam long amountCents,
@@ -38,7 +38,7 @@ public class DonationController {
         }
     }
 
-    @GetMapping("/donations/confirm")
+    @PostMapping("/donations/confirm")
     public ResponseEntity<?> confirmDonation(@RequestParam String intentId) {
         try {
             return ResponseEntity.ok(financeDonationService.confirmDonationIntent(intentId));

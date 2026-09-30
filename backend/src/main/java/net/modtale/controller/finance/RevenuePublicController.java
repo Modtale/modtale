@@ -43,7 +43,8 @@ public class RevenuePublicController {
         return ResponseEntity.ok(Map.of(
                 "adCreatorSplitPercent", settings.getAdCreatorSplitBps() / 100.0,
                 "donationPlatformCutPercent", settings.getDonationPlatformCutBps() / 100.0,
-                "fundExpiryDays", settings.getFundExpiryDays()
+                "fundExpiryDays", 0,
+                "fundsExpire", false
         ));
     }
 }

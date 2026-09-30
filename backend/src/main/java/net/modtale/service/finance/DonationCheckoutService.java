@@ -10,6 +10,8 @@ import net.modtale.repository.finance.FinanceLedgerEntryRepository;
 import net.modtale.service.project.query.ProjectService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.dao.DuplicateKeyException;
+import java.util.UUID;
 
 import java.time.LocalDateTime;
 import java.util.HashMap;
@@ -34,11 +36,16 @@ public class DonationCheckoutService {
         Map<String, Object> response = new HashMap<>();
         response.put("projectId", project.getId());
         response.put("donationsEnabled", project.isDonationsEnabled());
+        response.put("checkoutEnabled", project.isDonationsEnabled() && stripeGatewayService.isCheckoutAvailable());
+        response.put("recurringEnabled", false);
+        response.put("testMode", stripeGatewayService.isCheckoutAvailable());
+        response.put("availabilityMessage", stripeGatewayService.getAvailabilityMessage());
         response.put("suggestedDonationCents", Math.max(100, project.getSuggestedDonationCents()));
-        response.put("donationRecurringDefault", project.isDonationRecurringDefault());
+        response.put("donationRecurringDefault", false);
         response.put("donationPlatformCutPercent", project.getDonationPlatformCutBps() / 100.0);
         response.put("currency", financeAccountService.getSettings().getCurrency());
-        response.put("minimumDonationCents", 100);
+        response.put("minimumDonationCents", FinanceAmounts.MIN_SUPPORT_CENTS);
+        response.put("maximumDonationCents", FinanceAmounts.MAX_SUPPORT_CENTS);
         return response;
     }
 
@@ -51,13 +58,21 @@ public class DonationCheckoutService {
             throw new IllegalStateException("Donations are disabled by this creator for this project.");
         }
 
+        if (!stripeGatewayService.isCheckoutAvailable()) {
+            throw new IllegalStateException(stripeGatewayService.getAvailabilityMessage());
+        }
+        if (recurring) throw new IllegalArgumentException("Monthly support is not available yet.");
         PlatformFinanceSettings settings = financeAccountService.getSettings();
-        long normalizedAmount = Math.max(100, Math.min(100000, amountCents));
+        if (!"usd".equalsIgnoreCase(settings.getCurrency())) {
+            throw new IllegalStateException("This checkout currently supports USD only.");
+        }
+        long normalizedAmount = FinanceAmounts.validateSupportAmount(amountCents);
 
-        long platformCut = Math.round((normalizedAmount * project.getDonationPlatformCutBps()) / 10000.0);
+        long platformCut = FinanceAmounts.share(normalizedAmount, project.getDonationPlatformCutBps());
         long creatorCut = normalizedAmount - platformCut;
 
         DonationIntent intent = new DonationIntent();
+        intent.setId(UUID.randomUUID().toString());
         intent.setProjectId(project.getId());
         intent.setCreatorId(project.getAuthorId());
         intent.setDonorUserId(donor != null ? donor.getId() : null);
@@ -82,7 +97,7 @@ public class DonationCheckoutService {
                 successUrl,
                 cancelUrl,
                 settings.getCurrency(),
-                settings.isMockStripeEnabled()
+                stripeGatewayService.isMockEnabled()
         );
 
         if (!session.success()) {
@@ -96,9 +111,6 @@ public class DonationCheckoutService {
         donationIntentRepository.save(intent);
 
         boolean simulated = Boolean.TRUE.equals(session.raw().get("simulated"));
-        if (simulated) {
-            completeDonationIntent(intent, Map.of("simulated", true, "status", "complete", "payment_status", "paid"));
-        }
 
         Map<String, Object> response = new HashMap<>();
         response.put("intentId", intent.getId());
@@ -123,12 +135,9 @@ public class DonationCheckoutService {
 
         Map<String, Object> session = stripeGatewayService.getCheckoutSession(
                 intent.getStripeSessionId(),
-                financeAccountService.getSettings().isMockStripeEnabled()
+                stripeGatewayService.isMockEnabled()
         );
-        String paymentStatus = session.get("payment_status") == null ? "" : String.valueOf(session.get("payment_status"));
-        String status = session.get("status") == null ? "" : String.valueOf(session.get("status"));
-
-        if ("paid".equalsIgnoreCase(paymentStatus) || "complete".equalsIgnoreCase(status)) {
+        if (isVerifiedPayment(intent, session)) {
             completeDonationIntent(intent, session);
             return Map.of("ok", true, "status", "COMPLETED");
         }
@@ -139,13 +148,10 @@ public class DonationCheckoutService {
     private void completeDonationIntent(DonationIntent intent, Map<String, Object> sessionData) {
         if (intent.getStatus() == DonationIntent.DonationStatus.COMPLETED) return;
 
-        PlatformFinanceSettings settings = financeAccountService.getSettings();
-
-        intent.setStatus(DonationIntent.DonationStatus.COMPLETED);
-        intent.setCompletedAt(LocalDateTime.now());
-        donationIntentRepository.save(intent);
-
         FinanceLedgerEntry entry = new FinanceLedgerEntry();
+        // MongoDB's unique _id makes repeated/concurrent confirmation and webhook delivery safe.
+        // Insert before marking the intent complete: retries repair a crash between these writes.
+        entry.setId("donation:" + intent.getStripeSessionId());
         entry.setCreatorId(intent.getCreatorId());
         entry.setProjectId(intent.getProjectId());
         entry.setType(FinanceLedgerEntry.LedgerType.DONATION);
@@ -153,16 +159,46 @@ public class DonationCheckoutService {
         entry.setCreatorCents(intent.getCreatorCents());
         entry.setPlatformCents(intent.getPlatformCents());
         entry.setCurrency(intent.getCurrency());
-        entry.setStatus(FinanceLedgerEntry.EntryStatus.AVAILABLE);
+        entry.setStatus(FinanceLedgerEntry.EntryStatus.PENDING);
         entry.setCreatedAt(LocalDateTime.now());
-        entry.setAvailableAt(LocalDateTime.now());
-        entry.setExpiresAt(LocalDateTime.now().plusDays(settings.getFundExpiryDays()));
+
         entry.setRecurring(intent.isRecurring());
         entry.setStripeReference(intent.getStripeSessionId());
         entry.setExternalReference(intent.getId());
         if (sessionData != null && sessionData.get("simulated") != null) {
             entry.getMetadata().put("simulated", String.valueOf(sessionData.get("simulated")));
         }
-        ledgerRepository.save(entry);
+        entry.getMetadata().put("settlement", "awaiting_reconciliation");
+        Object paymentIntent = sessionData.get("payment_intent");
+        if (paymentIntent instanceof String paymentId && paymentId.startsWith("pi_")) entry.getMetadata().put("paymentIntentId", paymentId);
+        entry.setCreatorGrossCents(intent.getCreatorCents());
+        entry.getMetadata().put("testMode", String.valueOf(!Boolean.TRUE.equals(sessionData.get("livemode"))));
+        try {
+            ledgerRepository.insert(entry);
+        } catch (DuplicateKeyException duplicate) {
+            // A concurrent delivery already inserted this exact payment. Never overwrite it.
+        }
+        intent.setStatus(DonationIntent.DonationStatus.COMPLETED);
+        intent.setCompletedAt(LocalDateTime.now());
+        donationIntentRepository.save(intent);
+    }
+
+    public void handlePaidCheckout(Map<String, Object> session) {
+        String sessionId = String.valueOf(session.get("id"));
+        DonationIntent intent = donationIntentRepository.findByStripeSessionId(sessionId).orElse(null);
+        if (intent == null) throw new IllegalArgumentException("Checkout session is not recorded yet.");
+        if (isVerifiedPayment(intent, session)) completeDonationIntent(intent, session);
+    }
+
+    static boolean isVerifiedPayment(DonationIntent intent, Map<String, Object> session) {
+        if (session == null || Boolean.TRUE.equals(session.get("simulated"))) return false;
+        if (!(session.get("livemode") instanceof Boolean)) return false;
+        if (!"paid".equals(session.get("payment_status")) || !"complete".equals(session.get("status"))) return false;
+        if (!"payment".equals(session.get("mode")) || intent.isRecurring()) return false;
+        if (intent.getStripeSessionId() == null || !intent.getStripeSessionId().equals(session.get("id"))) return false;
+        if (!intent.getCurrency().equalsIgnoreCase(String.valueOf(session.get("currency")))) return false;
+        if (!(session.get("amount_total") instanceof Number amount) || amount.longValue() != intent.getAmountCents()) return false;
+        if (!(session.get("metadata") instanceof Map<?, ?> metadata) || !intent.getId().equals(metadata.get("intentId"))) return false;
+        return true;
     }
 }

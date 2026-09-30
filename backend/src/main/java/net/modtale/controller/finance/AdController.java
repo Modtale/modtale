@@ -51,7 +51,7 @@ public class AdController {
     }
 
     private String getClientIp(HttpServletRequest request) {
-        String xfHeader = request.getHeader("X-Forwarded-For");
-        return xfHeader == null ? request.getRemoteAddr() : xfHeader.split(",")[0];
+        // Trust only the server's configured forwarded-header handling.
+        return request.getRemoteAddr();
     }
 }

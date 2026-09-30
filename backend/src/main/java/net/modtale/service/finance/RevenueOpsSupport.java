@@ -24,7 +24,15 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
+import java.time.Duration;
+import java.net.URI;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
+import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Predicate;
 import java.util.function.ToLongFunction;
@@ -44,7 +52,9 @@ public class RevenueOpsSupport {
     @Value("${app.frontend.url:http://localhost:5173}")
     private String frontendUrl;
 
-    private final Map<String, LocalDateTime> adDebounce = new ConcurrentHashMap<>();
+    private final Cache<String, Boolean> adDebounce = Caffeine.newBuilder()
+            .maximumSize(100000).expireAfterWrite(Duration.ofMinutes(20)).build();
+    private final String eventSalt = UUID.randomUUID().toString();
 
     public List<Map<String, Object>> buildDailySeries(
             List<FinanceLedgerEntry> source,
@@ -135,20 +145,22 @@ public class RevenueOpsSupport {
         return false;
     }
 
+    public static void requireSafeExternalUrl(String value) {
+        try {
+            URI uri = URI.create(value);
+            if (!"https".equalsIgnoreCase(uri.getScheme()) || uri.getHost() == null || uri.getUserInfo() != null) {
+                throw new IllegalArgumentException("Sponsored links and images must use an absolute HTTPS URL without credentials.");
+            }
+        } catch (RuntimeException invalid) {
+            throw new IllegalArgumentException("Sponsored links and images must use an absolute HTTPS URL without credentials.");
+        }
+    }
+
     public String appendAffiliateParams(String targetUrl, String param, String code) {
-        if (targetUrl == null || targetUrl.isBlank()) return normalizeFrontendUrl();
+        requireSafeExternalUrl(targetUrl);
         if (code == null || code.isBlank()) return targetUrl;
         String queryParam = (param == null || param.isBlank()) ? "ref" : param;
-
-        try {
-            return UriComponentsBuilder.fromUriString(targetUrl)
-                    .queryParam(queryParam, code)
-                    .build(true)
-                    .toUriString();
-        } catch (Exception e) {
-            String separator = targetUrl.contains("?") ? "&" : "?";
-            return targetUrl + separator + queryParam + "=" + code;
-        }
+        return UriComponentsBuilder.fromUriString(targetUrl).queryParam(queryParam, code).build().encode().toUriString();
     }
 
     public String resolveCreatorId(String projectId) {
@@ -158,20 +170,14 @@ public class RevenueOpsSupport {
     }
 
     public boolean shouldTrackEvent(String type, String campaignId, String projectId, String clientIp) {
-        if (clientIp == null || clientIp.isBlank()) return true;
-
-        LocalDateTime now = LocalDateTime.now();
-        LocalDateTime cutoff = now.minusMinutes(20);
-        adDebounce.entrySet().removeIf(entry -> entry.getValue().isBefore(cutoff));
-
-        String key = type + ":" + campaignId + ":" + projectId + ":" + clientIp;
-        LocalDateTime last = adDebounce.get(key);
-        if (last != null && last.isAfter(cutoff)) {
-            return false;
+        if (clientIp == null || clientIp.isBlank()) return false;
+        try {
+            String source = eventSalt + ":" + type + ":" + campaignId + ":" + projectId + ":" + clientIp;
+            String key = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(source.getBytes(StandardCharsets.UTF_8)));
+            return adDebounce.asMap().putIfAbsent(key, Boolean.TRUE) == null;
+        } catch (NoSuchAlgorithmException impossible) {
+            throw new IllegalStateException("SHA-256 unavailable", impossible);
         }
-
-        adDebounce.put(key, now);
-        return true;
     }
 
     public User resolveFinanceOwner(User requester, String ownerId, boolean requireOrgFinanceManage) {
@@ -283,6 +289,7 @@ public class RevenueOpsSupport {
                 .collect(Collectors.toSet());
 
         int totalPercent = 0;
+        Set<String> recipients = new java.util.HashSet<>();
         for (User.OrgPayoutShare share : shares) {
             if (share.getUserId() == null || share.getUserId().isBlank()) {
                 throw new IllegalArgumentException("All payout shares must include a userId.");
@@ -290,7 +297,8 @@ public class RevenueOpsSupport {
             if (!memberIds.contains(share.getUserId())) {
                 throw new IllegalArgumentException("Payout share includes a non-member user.");
             }
-            if (share.getPercent() <= 0) {
+            if (!recipients.add(share.getUserId())) throw new IllegalArgumentException("Each recipient may appear only once.");
+            if (share.getPercent() <= 0 || share.getPercent() > 100) {
                 throw new IllegalArgumentException("Payout share percentages must be greater than zero.");
             }
             totalPercent += share.getPercent();

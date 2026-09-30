@@ -2,6 +2,8 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AlertTriangle, BadgeDollarSign, Building2, CalendarClock, ChevronDown, CreditCard, RefreshCw, Wallet } from 'lucide-react';
 import { financeClient } from '@/modules/finance/api/financeClient';
+import { extractApiErrorMessage } from '@/utils/api';
+import { parseSupportAmount } from '@/modules/finance/api/financeTypes';
 import { LineChart } from '@/components/ui/charts/LineChart';
 import { StatusModal } from '@/components/ui/StatusModal';
 import { theme } from '@/styles/theme';
@@ -92,6 +94,10 @@ export const FinanceManager: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [data, setData] = useState<any>(null);
     const [payoutAmount, setPayoutAmount] = useState('');
+    const [loadError, setLoadError] = useState('');
+    const [busyAction, setBusyAction] = useState('');
+    const requestVersionRef = useRef(0);
+    const actionInFlightRef = useRef(false);
     const [contexts, setContexts] = useState<any[]>([]);
     const [selectedOwnerId, setSelectedOwnerId] = useState('');
     const [isContextDropdownOpen, setIsContextDropdownOpen] = useState(false);
@@ -113,18 +119,23 @@ export const FinanceManager: React.FC = () => {
     const loadContexts = async () => {
         const available = await financeClient.getFinanceContexts();
         setContexts(Array.isArray(available) ? available : []);
+        if (!Array.isArray(available) || available.length === 0) { setLoadError('No finance accounts are available for this account.'); setLoading(false); }
         if (!selectedOwnerId && Array.isArray(available) && available.length > 0) setSelectedOwnerId(available[0].id);
     };
 
     const load = async (selectedRange = range, ownerId = selectedOwnerId) => {
         if (!ownerId) return;
+        const requestVersion = ++requestVersionRef.current;
         setLoading(true);
+        setLoadError('');
         try {
             const overview = await financeClient.getCreatorOverview(selectedRange, ownerId);
+            if (requestVersion !== requestVersionRef.current) return;
             setData(overview);
 
             if (overview?.ownerAccountType === 'ORGANIZATION') {
                 const policy = await financeClient.getOrgPayoutPolicy(ownerId);
+                if (requestVersion !== requestVersionRef.current) return;
                 const members = (policy?.members || []) as OrgPolicyMember[];
                 setOrgMembers(members);
                 setOrgPayoutMode(policy?.payoutMode || 'DIRECT_TO_ORG_STRIPE');
@@ -141,14 +152,15 @@ export const FinanceManager: React.FC = () => {
                 setOrgShares({});
             }
         } catch (e: any) {
-            setStatus({ type: 'error', title: 'Load Failed', msg: e?.response?.data || 'Could not load finance data.' });
+            if (requestVersion === requestVersionRef.current) setLoadError(extractApiErrorMessage(e, 'Could not load finance data.'));
         } finally {
-            setLoading(false);
+            if (requestVersion === requestVersionRef.current) setLoading(false);
         }
     };
 
     useEffect(() => {
-        loadContexts().catch(() => setStatus({ type: 'error', title: 'Load Failed', msg: 'Could not load finance contexts.' }));
+        loadContexts().catch(() => { setLoadError('Could not load finance accounts. Please try again.'); setLoading(false); });
+        return () => { requestVersionRef.current += 1; };
     }, []);
 
     useEffect(() => {
@@ -175,13 +187,21 @@ export const FinanceManager: React.FC = () => {
     }, [data]);
 
     const handleConnectStripe = async () => {
+        if (actionInFlightRef.current || !data?.onboardingEnabled) return;
+        actionInFlightRef.current = true; setBusyAction('connect');
+        const onboardingWindow = window.open('about:blank', '_blank');
+        if (onboardingWindow) onboardingWindow.opener = null;
         try {
             const res = await financeClient.createStripeOnboardingLink('/dashboard/finance', selectedOwnerId || undefined);
-            if (res?.onboardingUrl) window.open(res.onboardingUrl, '_blank', 'noopener,noreferrer');
+            if (!res?.onboardingUrl || !onboardingWindow) throw new Error('Allow a new tab to complete onboarding.');
+            const url = new URL(res.onboardingUrl);
+            if (url.protocol !== 'https:' || url.hostname !== 'connect.stripe.com') throw new Error('The provider returned an invalid onboarding link.');
+            onboardingWindow.location.replace(url.href);
             setStatus({ type: 'info', title: 'Stripe Onboarding', msg: 'Stripe opened in a new tab. Complete it, then click "Refresh Stripe Status".' });
         } catch (e: any) {
-            setStatus({ type: 'error', title: 'Stripe Error', msg: e?.response?.data || 'Could not start Stripe onboarding.' });
-        }
+            onboardingWindow?.close();
+            setStatus({ type: 'error', title: 'Stripe Error', msg: extractApiErrorMessage(e, 'Could not start Stripe onboarding.') });
+        } finally { actionInFlightRef.current = false; setBusyAction(''); }
     };
 
     const handleRefreshStripe = async () => {
@@ -195,15 +215,18 @@ export const FinanceManager: React.FC = () => {
     };
 
     const handleRequestPayout = async () => {
+        if (actionInFlightRef.current || !data?.withdrawalsEnabled) return;
+        const parsed = payoutAmount.trim() ? parseSupportAmount(payoutAmount, data?.minPayoutCents || 1000, data?.availableCents || 0) : undefined;
+        if (parsed === null) { setStatus({ type: 'warning', title: 'Check Amount', msg: 'Enter a valid amount between the minimum payout and your available balance.' }); return; }
+        actionInFlightRef.current = true; setBusyAction('payout');
         try {
-            const parsed = payoutAmount.trim() ? Math.round(Number(payoutAmount) * 100) : undefined;
             const res = await financeClient.requestPayout(parsed, selectedOwnerId || undefined);
             setStatus({ type: 'success', title: 'Payout Requested', msg: `Requested ${formatMoney(res.amountCents || 0)} payout.` });
             setPayoutAmount('');
             await load(range, selectedOwnerId);
         } catch (e: any) {
-            setStatus({ type: 'error', title: 'Payout Failed', msg: e?.response?.data || 'Could not request payout.' });
-        }
+            setStatus({ type: 'error', title: 'Payout Failed', msg: extractApiErrorMessage(e, 'Could not request payout.') });
+        } finally { actionInFlightRef.current = false; setBusyAction(''); }
     };
 
     const saveOrgPayoutPolicy = async () => {
@@ -213,8 +236,8 @@ export const FinanceManager: React.FC = () => {
             .filter(item => item.percent > 0);
 
         const total = shares.reduce((sum, item) => sum + item.percent, 0);
-        if (orgPayoutMode === 'DISTRIBUTE_TO_MEMBERS' && total < 100) {
-            setStatus({ type: 'warning', title: 'Invalid Distribution', msg: 'Distributed payout shares must total at least 100%.' });
+        if (orgPayoutMode === 'DISTRIBUTE_TO_MEMBERS' && total !== 100) {
+            setStatus({ type: 'warning', title: 'Invalid Distribution', msg: 'Distributed payout shares must total exactly 100%.' });
             return;
         }
 
@@ -231,6 +254,7 @@ export const FinanceManager: React.FC = () => {
     };
 
     if (loading) return <FinanceManagerSkeleton />;
+    if (loadError) return <div role="alert" className={theme.components.panel + ' p-6 space-y-3'}><h2 className="text-lg font-bold text-slate-900 dark:text-white">Finance is temporarily unavailable</h2><p className="text-sm text-slate-600 dark:text-slate-300">{loadError}</p><button className={theme.components.buttonSecondary} onClick={() => selectedOwnerId ? load() : loadContexts().catch(() => setLoadError('Could not load finance accounts. Please try again.'))}>Try again</button></div>;
 
     const selectedContext = contexts.find(ctx => ctx.id === selectedOwnerId);
     const orgShareTotal = Object.values(orgShares).reduce((sum, n) => sum + Math.max(0, Math.round(Number(n || 0))), 0);
@@ -312,11 +336,12 @@ export const FinanceManager: React.FC = () => {
                 </div>
             </div>
 
+            {!data?.withdrawalsEnabled && <div role="status" className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950 dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-100"><p className="font-bold">{data?.testMode ? 'Finance preview' : 'Creator payments are being prepared'}</p><p className="mt-1">{data?.availabilityMessage || 'Withdrawals are currently unavailable.'} Earned balances do not expire.</p></div>}
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-                <SummaryCard title="Available" value={formatMoney(data?.availableCents || 0)} subtitle="Ready to payout" icon={Wallet} color="text-emerald-500" />
-                <SummaryCard title="Pending" value={formatMoney(data?.pendingCents || 0)} subtitle="Awaiting settlement" icon={CalendarClock} color="text-amber-500" />
-                <SummaryCard title="Expiring Soon" value={formatMoney(data?.expiringSoonCents || 0)} subtitle="Within 30 days" icon={AlertTriangle} color="text-red-500" />
-                <SummaryCard title="Paid Out" value={formatMoney(data?.paidOutCents || 0)} subtitle="Lifetime payouts" icon={BadgeDollarSign} color="text-blue-500" />
+                <SummaryCard title="Available" value={formatMoney(data?.availableCents || 0)} subtitle="Settled funds" icon={Wallet} color="text-emerald-500" />
+                <SummaryCard title="Pending Estimate" value={formatMoney(data?.pendingCents || 0)} subtitle="Awaiting settlement" icon={CalendarClock} color="text-amber-500" />
+                <SummaryCard title="This Period" value={formatMoney((data?.periodAdRevenueCents || 0) + (data?.periodDonationRevenueCents || 0))} subtitle="Ads and creator support" icon={BadgeDollarSign} color="text-violet-500" />
+                <SummaryCard title="Transferred" value={formatMoney(data?.paidOutCents || 0)} subtitle="Sent to payout provider" icon={BadgeDollarSign} color="text-blue-500" />
             </div>
 
             <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
@@ -410,8 +435,8 @@ export const FinanceManager: React.FC = () => {
                         <p className="text-sm text-slate-500 dark:text-slate-400">Payouts run through Stripe Connect. Refresh status after onboarding.</p>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
-                        <button onClick={handleConnectStripe} className={theme.components.buttonPrimary}>Connect / Continue Stripe</button>
-                        <button onClick={handleRefreshStripe} className={theme.components.buttonSecondary}><RefreshCw className="h-4 w-4" />Refresh Stripe Status</button>
+                        <button onClick={handleConnectStripe} disabled={!!busyAction || !data?.onboardingEnabled} className={theme.components.buttonPrimary}>Connect / Continue Stripe</button>
+                        <button onClick={handleRefreshStripe} disabled={!!busyAction || !data?.stripeConnected} className={theme.components.buttonSecondary}><RefreshCw className="h-4 w-4" />Refresh Stripe Status</button>
                     </div>
                 </div>
 
@@ -434,7 +459,7 @@ export const FinanceManager: React.FC = () => {
                             className={inputNoNativeUi}
                         />
                     </div>
-                    <button onClick={handleRequestPayout} className={theme.components.buttonPrimary + ' h-[46px]'}>
+                    <button onClick={handleRequestPayout} disabled={!!busyAction || !data?.withdrawalsEnabled || Number(data?.availableCents || 0) < Number(data?.minPayoutCents || 1000)} className={theme.components.buttonPrimary + ' h-[46px]'}>
                         <CreditCard className="h-4 w-4" /> Request Payout
                     </button>
                 </div>

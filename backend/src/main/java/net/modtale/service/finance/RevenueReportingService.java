@@ -34,69 +34,33 @@ public class RevenueReportingService {
         Map<LocalDate, long[]> buckets = new HashMap<>();
 
         for (FinanceLedgerEntry entry : entries) {
-            if (entry.getCreatedAt() == null) continue;
+            if (entry.getCreatedAt() == null || !FinanceLedgerRules.isRecognizedRevenue(entry)) continue;
             LocalDate date = entry.getCreatedAt().toLocalDate();
-            long[] sums = buckets.computeIfAbsent(date, key -> new long[3]);
+            long[] sums = buckets.computeIfAbsent(date, key -> new long[4]);
             sums[0] += Math.max(0, entry.getGrossCents());
             sums[1] += Math.max(0, entry.getCreatorCents());
             sums[2] += Math.max(0, entry.getPlatformCents());
+            sums[3] += Math.max(0, entry.getProcessorFeeCents() == null ? 0 : entry.getProcessorFeeCents());
         }
 
         List<Map<String, Object>> response = new ArrayList<>();
         for (LocalDate day = start; !day.isAfter(LocalDate.now()); day = day.plusDays(1)) {
-            long[] sums = buckets.getOrDefault(day, new long[3]);
+            long[] sums = buckets.getOrDefault(day, new long[4]);
             Map<String, Object> item = new HashMap<>();
             item.put("date", day.format(RevenueOpsSupport.DATE_FMT));
             item.put("grossCents", sums[0]);
             item.put("creatorCents", sums[1]);
             item.put("platformCents", sums[2]);
+            item.put("processorFeeCents", sums[3]);
             response.add(item);
         }
 
         return response;
     }
 
-    @Scheduled(cron = "0 30 0 * * *")
+    /** Earned creator funds are never forfeited. Unclaimed-property handling requires a separate reviewed process. */
+    @Deprecated
     public void expireCreatorFunds() {
-        PlatformFinanceSettings settings = financeAccountService.getSettings();
-        LocalDateTime now = LocalDateTime.now();
-
-        List<FinanceLedgerEntry> expiringEntries = ledgerRepository.findByStatusAndExpiresAtBefore(FinanceLedgerEntry.EntryStatus.AVAILABLE, now);
-        if (expiringEntries.isEmpty()) return;
-
-        List<FinanceLedgerEntry> updates = new ArrayList<>();
-        List<FinanceLedgerEntry> transferEntries = new ArrayList<>();
-
-        for (FinanceLedgerEntry entry : expiringEntries) {
-            if (entry.getCreatorCents() <= 0) continue;
-
-            entry.setStatus(FinanceLedgerEntry.EntryStatus.EXPIRED);
-            entry.setCompletedAt(now);
-            updates.add(entry);
-
-            FinanceLedgerEntry transfer = new FinanceLedgerEntry();
-            transfer.setType(FinanceLedgerEntry.LedgerType.EXPIRED_TRANSFER);
-            transfer.setProjectId(entry.getProjectId());
-            transfer.setGrossCents(entry.getCreatorCents());
-            transfer.setCreatorCents(0);
-            transfer.setPlatformCents(entry.getCreatorCents());
-            transfer.setCurrency(settings.getCurrency());
-            transfer.setStatus(FinanceLedgerEntry.EntryStatus.AVAILABLE);
-            transfer.setCreatedAt(now);
-            transfer.setAvailableAt(now);
-            transfer.setExpiresAt(now.plusYears(50));
-            transfer.setExternalReference(entry.getId());
-            transfer.getMetadata().put("reason", "creator_funds_expired_after_365_days");
-            transferEntries.add(transfer);
-        }
-
-        if (!updates.isEmpty()) ledgerRepository.saveAll(updates);
-        if (!transferEntries.isEmpty()) ledgerRepository.saveAll(transferEntries);
-
-        donationIntentRepository.findByStatusAndExpiresAtBefore(DonationIntent.DonationStatus.PENDING, now)
-                .forEach(intent -> {
-                    intent.setStatus(DonationIntent.DonationStatus.EXPIRED);
-                    donationIntentRepository.save(intent);
-                });
+        // Intentionally no database writes and no scheduled invocation.
     }
 }

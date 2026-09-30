@@ -1,20 +1,21 @@
-import { NewsManagement } from '../components/NewsManagement';
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { Suspense, lazy, useState, useEffect, useMemo, useRef } from 'react';
 import { Shield, Users, LayoutDashboard, ShieldAlert, Package, Activity, FileText, Wallet, CalendarClock } from 'lucide-react';
 import { adminClient } from '../api/adminClient';
 import { StatusModal } from '@/components/ui/StatusModal';
 import { extractApiErrorMessage } from '@/utils/api';
 import { VerificationQueue } from '../components/VerificationQueue';
-import { UserManagement } from '../components/UserManagement.tsx';
-import { Review } from './Review';
-import { ReportQueue } from '../components/ReportQueue';
-import { ProjectManagement } from '../components/ProjectManagement';
-import { PlatformAnalytics } from '../components/PlatformAnalytics';
-import { AuditLogs } from '../components/AuditLogs';
-import { FinanceAdmin } from '../components/FinanceAdmin';
-import { StatusIncidents } from '../components/StatusIncidents';
 import { AdminPermission, hasAdminPermission, hasAnyAdminPermission, isAdminUser } from '../utils/access';
 import type { AdminVerificationQueueItem } from '@/types';
+
+const FinanceAdmin = lazy(() => import('../components/FinanceAdmin').then(module => ({ default: module.FinanceAdmin })));
+const Review = lazy(() => import('./Review').then(module => ({ default: module.Review })));
+const NewsManagement = lazy(() => import('../components/NewsManagement').then(module => ({ default: module.NewsManagement })));
+const UserManagement = lazy(() => import('../components/UserManagement.tsx').then(module => ({ default: module.UserManagement })));
+const ReportQueue = lazy(() => import('../components/ReportQueue').then(module => ({ default: module.ReportQueue })));
+const ProjectManagement = lazy(() => import('../components/ProjectManagement').then(module => ({ default: module.ProjectManagement })));
+const PlatformAnalytics = lazy(() => import('../components/PlatformAnalytics').then(module => ({ default: module.PlatformAnalytics })));
+const AuditLogs = lazy(() => import('../components/AuditLogs').then(module => ({ default: module.AuditLogs })));
+const StatusIncidents = lazy(() => import('../components/StatusIncidents').then(module => ({ default: module.StatusIncidents })));
 
 interface AdminPanelProps {
     currentUser: any;
@@ -27,7 +28,7 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
     const [status, setStatus] = useState<any>(null);
 
     const [pendingProjects, setPendingProjects] = useState<AdminVerificationQueueItem[]>([]);
-    const [loadingQueue, setLoadingQueue] = useState(false);
+    const [loadingQueue, setLoadingQueue] = useState(true);
     const [queueError, setQueueError] = useState<string | null>(null);
     const queueRequestInFlight = useRef(false);
 
@@ -101,13 +102,15 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
             setQueueError(null);
         }
 
-        if (canReadReports) {
-            fetchReports();
-        } else {
+        if (!canReadReports) {
             setReports([]);
             setReportsError(null);
         }
     }, [canReadReviewQueue, canReadReports]);
+
+    useEffect(() => {
+        if (activeTab === 'reports' && canReadReports) fetchReports();
+    }, [activeTab, canReadReports]);
 
     useEffect(() => {
         if (!canReadReviewQueue) return;
@@ -164,7 +167,7 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
         setLoadingReview(true);
         setLoadingReviewId(id);
         try {
-            const data = await adminClient.getReviewDetails(id);
+            const [data] = await Promise.all([adminClient.getReviewDetails(id), import('./Review')]);
             setReviewingProject(data);
         } catch (e) {
             setStatus({ type: 'error', title: 'Error', msg: extractApiErrorMessage(e, "We could not load this project's review details.") });
@@ -175,12 +178,14 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
     };
 
     const handleApprove = async () => {
+        setPendingProjects(items => items.filter(item => item.id !== reviewingProject?.mod?.id));
         setStatus({ type: 'success', title: 'Approved', msg: 'Project published successfully.' });
         setReviewingProject(null);
         fetchQueue(true);
     };
 
     const handleReject = async (reason: string) => {
+        setPendingProjects(items => items.filter(item => item.id !== reviewingProject?.mod?.id));
         setStatus({ type: 'info', title: 'Rejected', msg: 'Project returned to drafts.' });
         setReviewingProject(null);
         fetchQueue(true);
@@ -223,7 +228,7 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
         <div className="min-h-screen bg-slate-50 dark:bg-slate-950 pb-20">
             {status && <StatusModal type={status.type} title={status.title} message={status.msg} onClose={() => setStatus(null)} />}
 
-            {reviewingProject && (
+            <Suspense fallback={null}>{reviewingProject && (
                 <Review
                     reviewingProject={reviewingProject}
                     onClose={() => setReviewingProject(null)}
@@ -233,7 +238,7 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
                     canDecide={canDecideReviews}
                     canRescan={canRescanVersions}
                 />
-            )}
+            )}</Suspense>
 
             <div className="max-w-[112rem] mx-auto px-6 sm:px-12 md:px-16 lg:px-20 xl:px-28 py-8 transition-[max-width,padding] duration-300">
                 <div className="flex flex-col lg:flex-row gap-8">
@@ -313,6 +318,7 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
 
                     <div className="flex-1 min-w-0">
                         <div className={`bg-white/90 dark:bg-slate-900/90 backdrop-blur-2xl border border-slate-200 dark:border-white/10 rounded-3xl ${activeTab === 'news' ? 'p-4 sm:p-8' : 'p-8'} shadow-2xl`}>
+                            <Suspense fallback={null}>
                             {activeTab === 'verification' && canReadReviewQueue && (
                                 <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                                     <div className="mb-8">
@@ -401,6 +407,7 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
                                     <AuditLogs />
                                 </div>
                             )}
+                            </Suspense>
                         </div>
                     </div>
                 </div>

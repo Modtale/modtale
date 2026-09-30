@@ -39,7 +39,6 @@ export function FinanceAdmin({ canManageFinance }: FinanceAdminProps) {
     const [testAdResult, setTestAdResult] = useState<any>(null);
 
     const [settings, setSettings] = useState({
-        defaultAdRevenuePerClickCents: 3,
         minPayoutCents: 1000
     });
 
@@ -83,7 +82,6 @@ export function FinanceAdmin({ canManageFinance }: FinanceAdminProps) {
             const overview = await financeClient.getAdminOverview(selectedRange);
             setData(overview);
             setSettings({
-                defaultAdRevenuePerClickCents: Number(overview?.defaultAdRevenuePerClickCents || 3),
                 minPayoutCents: Number(overview?.minPayoutCents || 1000)
             });
             await loadCampaigns();
@@ -109,7 +107,6 @@ export function FinanceAdmin({ canManageFinance }: FinanceAdminProps) {
     const saveSettings = async () => {
         try {
             const payload = {
-                defaultAdRevenuePerClickCents: Math.max(0, Math.round(settings.defaultAdRevenuePerClickCents)),
                 minPayoutCents: Math.max(100, Math.round(settings.minPayoutCents))
             };
             await financeClient.updateAdminSettings(payload);
@@ -266,11 +263,8 @@ export function FinanceAdmin({ canManageFinance }: FinanceAdminProps) {
 
             <div className={theme.components.panel + ' space-y-4 p-5'}>
                 <h3 className="text-lg font-black text-slate-900 dark:text-white">Platform Settings</h3>
+                <p className="text-sm text-slate-500 dark:text-slate-400">Creators share {data?.adCreatorSplitPercent ?? 75}% of collected ad revenue. Clicks and impressions are engagement metrics, not money. Provider settlement and eligible-activity reconciliation determine earnings.</p>
                 <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                    <label className={theme.components.panel + ' p-3'}>
-                        <div className="text-xs font-black uppercase tracking-widest text-slate-500 dark:text-slate-400">Default Ad Revenue / Click (cents)</div>
-                        <input type="number" min="0" step="1" value={settings.defaultAdRevenuePerClickCents} onChange={(e) => setSettings(prev => ({ ...prev, defaultAdRevenuePerClickCents: Number(e.target.value) }))} className={inputNoNativeUi + ' mt-2'} />
-                    </label>
 
                     <label className={theme.components.panel + ' p-3'}>
                         <div className="text-xs font-black uppercase tracking-widest text-slate-500 dark:text-slate-400">Minimum Payout (cents)</div>
@@ -294,7 +288,6 @@ export function FinanceAdmin({ canManageFinance }: FinanceAdminProps) {
                             <input value={draftCampaign.callToAction} onChange={(e) => setDraftCampaign(prev => ({ ...prev, callToAction: e.target.value }))} placeholder="Call to action" className={theme.components.inputField} />
                             <input value={draftCampaign.targetUrl} onChange={(e) => setDraftCampaign(prev => ({ ...prev, targetUrl: e.target.value }))} placeholder="Target URL" className={theme.components.inputField} />
                             <input value={draftCampaign.affiliateCode} onChange={(e) => setDraftCampaign(prev => ({ ...prev, affiliateCode: e.target.value }))} placeholder="Affiliate code" className={theme.components.inputField} />
-                            <input type="number" min="0" value={draftCampaign.baseRevenuePerClickCents} onChange={(e) => setDraftCampaign(prev => ({ ...prev, baseRevenuePerClickCents: Number(e.target.value) }))} placeholder="Revenue per click (cents)" className={inputNoNativeUi} />
                         </div>
 
                         <div className={theme.components.panel + ' p-3 space-y-2'}>

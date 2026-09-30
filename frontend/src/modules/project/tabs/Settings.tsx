@@ -109,18 +109,18 @@ export const Settings: React.FC<SettingsProps> = ({
                     </div>
 
                     <div className="flex items-center justify-between mb-4">
-                        <div><p className={`text-sm font-bold ${theme.colors.textPrimary}`}>Donations Enabled</p><p className={`text-xs ${theme.colors.textMuted}`}>Show donation prompt during downloads.</p></div>
+                        <div><p className={`text-sm font-bold ${theme.colors.textPrimary}`}>Creator Support Enabled</p><p className={`text-xs ${theme.colors.textMuted}`}>Offer optional tips during downloads when checkout is available.</p></div>
                         <button type="button" disabled={readOnly || !hasProjectPermission(Permission.PROJECT_EDIT_METADATA)} onClick={() => { markDirty(); setProjectData(prev => prev ? { ...prev, donationsEnabled: !prev.donationsEnabled } : null); }} className={`transition-colors ${readOnly || !hasProjectPermission(Permission.PROJECT_EDIT_METADATA) ? 'opacity-50' : projectData?.donationsEnabled ? 'text-green-500' : theme.colors.textSecondary}`}>{projectData?.donationsEnabled ? <ToggleRight className="w-8 h-8" /> : <ToggleLeft className="w-8 h-8" />}</button>
                     </div>
 
                     <div className="flex items-center justify-between mb-4">
-                        <div><p className={`text-sm font-bold ${theme.colors.textPrimary}`}>Recurring by Default</p><p className={`text-xs ${theme.colors.textMuted}`}>Preselect monthly recurring donations.</p></div>
+                        <div><p className={`text-sm font-bold ${theme.colors.textPrimary}`}>Recurring by Default</p><p className={`text-xs ${theme.colors.textMuted}`}>Monthly support is being prepared and is not offered in checkout yet.</p></div>
                         <button type="button" disabled={readOnly || !hasProjectPermission(Permission.PROJECT_EDIT_METADATA)} onClick={() => { markDirty(); setProjectData(prev => prev ? { ...prev, donationRecurringDefault: !prev.donationRecurringDefault } : null); }} className={`transition-colors ${readOnly || !hasProjectPermission(Permission.PROJECT_EDIT_METADATA) ? 'opacity-50' : projectData?.donationRecurringDefault ? 'text-green-500' : theme.colors.textSecondary}`}>{projectData?.donationRecurringDefault ? <ToggleRight className="w-8 h-8" /> : <ToggleLeft className="w-8 h-8" />}</button>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                            <label className={`block text-xs font-bold uppercase ${theme.colors.textMuted} mb-2 tracking-wide`}>Suggested Donation (USD)</label>
+                            <label className={`block text-xs font-bold uppercase ${theme.colors.textMuted} mb-2 tracking-wide`}>Suggested Tip (USD)</label>
                             <input
                                 type="number"
                                 min="1"
@@ -136,7 +136,7 @@ export const Settings: React.FC<SettingsProps> = ({
                             />
                         </div>
                         <div>
-                            <label className={`block text-xs font-bold uppercase ${theme.colors.textMuted} mb-2 tracking-wide`}>Donation Platform Cut (%)</label>
+                            <label className={`block text-xs font-bold uppercase ${theme.colors.textMuted} mb-2 tracking-wide`}>Modtale Share of Tips (%)</label>
                             <input
                                 type="number"
                                 min="0"

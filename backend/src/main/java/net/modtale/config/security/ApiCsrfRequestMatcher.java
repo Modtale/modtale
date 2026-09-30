@@ -16,7 +16,8 @@ final class ApiCsrfRequestMatcher implements RequestMatcher {
             "/api/v1/auth/forgot-password",
             "/api/v1/auth/reset-password",
             "/api/v1/users/batch",
-            "/api/v1/projects/external/identify"
+            "/api/v1/projects/external/identify",
+            "/api/v1/finance/webhooks/stripe"
     );
 
     @Override

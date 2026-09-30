@@ -25,9 +25,9 @@ export const financeClient = {
 
     getDonationConfig: async (projectId: string) => (await api.get(`/finance/projects/${projectId}/donation-config`)).data,
     createDonationCheckout: async (projectId: string, amountCents: number, recurring: boolean, guestCheckout = false) => (
-        await api.get(`/finance/projects/${projectId}/donations/checkout-url`, { params: { amountCents, recurring, guestCheckout } })
+        await api.post(`/finance/projects/${projectId}/donations/checkout-url`, null, { params: { amountCents, recurring, guestCheckout } })
     ).data,
-    confirmDonationIntent: async (intentId: string) => (await api.get('/finance/donations/confirm', { params: { intentId } })).data,
+    confirmDonationIntent: async (intentId: string) => (await api.post('/finance/donations/confirm', null, { params: { intentId } })).data,
 
     getAdSlot: async (projectId: string, placement?: string) => (await api.get(`/finance/ads/slot/${projectId}`, { params: { placement } })).data,
     trackAdImpression: async (campaignId: string, projectId: string) => (await api.post('/finance/ads/impression', { campaignId, projectId })).data,

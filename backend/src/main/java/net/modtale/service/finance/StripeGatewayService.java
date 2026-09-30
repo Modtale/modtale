@@ -9,6 +9,8 @@ import org.springframework.web.reactive.function.BodyInserters;
 import org.springframework.web.reactive.function.client.WebClient;
 
 import java.time.LocalDateTime;
+import java.time.Duration;
+import java.util.UUID;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -26,6 +28,26 @@ public class StripeGatewayService {
     @Value("${app.frontend.url:http://localhost:5173}")
     private String frontendUrl;
 
+    @Value("${app.finance.stripe.mock-enabled:false}")
+    private boolean mockEnabled;
+
+    public boolean isMockEnabled() { return mockEnabled; }
+
+    public boolean isTestMode() {
+        return isEnabled() && (stripeSecretKey.startsWith("sk_test_") || stripeSecretKey.startsWith("rk_test_"));
+    }
+
+    public boolean isCheckoutAvailable() { return mockEnabled || isTestMode(); }
+
+    public String getAvailabilityMessage() {
+        return "Creator payments are in preview. Live payments and withdrawals are unavailable until provider approval and settlement reconciliation are complete.";
+    }
+
+    // Live money is deliberately fail-closed. This is not a substitute for the launch checklist.
+    private StripeResult unavailableForLiveMoney() {
+        return new StripeResult(false, null, null, getAvailabilityMessage(), Map.of());
+    }
+
     public StripeGatewayService() {
         this.webClient = WebClient.builder()
                 .baseUrl("https://api.stripe.com/v1")
@@ -38,14 +60,13 @@ public class StripeGatewayService {
 
     public StripeResult createOrSimulateConnectAccount(String email, String country, boolean forceMock) {
         if (forceMock) {
-            return new StripeResult(true, "sim_acct_" + System.currentTimeMillis(), null, null, Map.of("simulated", true));
+            return new StripeResult(true, "sim_acct_" + UUID.randomUUID(), null, null, Map.of("simulated", true));
         }
-        if (!isEnabled()) {
-            return new StripeResult(false, null, null, "Stripe secret key is not configured.", Map.of());
-        }
+        if (!isTestMode()) return unavailableForLiveMoney();
 
         MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
         form.add("type", "express");
+        form.add("capabilities[transfers][requested]", "true");
         if (email != null && !email.isBlank()) form.add("email", email);
         if (country != null && !country.isBlank()) form.add("country", country.toUpperCase());
 
@@ -55,11 +76,9 @@ public class StripeGatewayService {
     public StripeResult createOrSimulateOnboardingLink(String accountId, String returnPath, boolean forceMock) {
         if (forceMock) {
             String url = normalizeFrontendUrl() + (returnPath.startsWith("/") ? returnPath : "/" + returnPath);
-            return new StripeResult(true, "sim_link_" + System.currentTimeMillis(), url, null, Map.of("simulated", true));
+            return new StripeResult(true, "sim_link_" + UUID.randomUUID(), url, null, Map.of("simulated", true));
         }
-        if (!isEnabled()) {
-            return new StripeResult(false, null, null, "Stripe secret key is not configured.", Map.of());
-        }
+        if (!isTestMode()) return unavailableForLiveMoney();
 
         String returnUrl = normalizeFrontendUrl() + (returnPath.startsWith("/") ? returnPath : "/" + returnPath);
         String refreshUrl = normalizeFrontendUrl() + "/dashboard/finance?stripe=refresh";
@@ -95,10 +114,10 @@ public class StripeGatewayService {
                     .headers(headers -> headers.setBasicAuth(stripeSecretKey, ""))
                     .retrieve()
                     .bodyToMono(Map.class)
-                    .block();
+                    .block(Duration.ofSeconds(20));
             return result == null ? Map.of() : result;
         } catch (Exception e) {
-            return Map.of("error", e.getMessage());
+            return Map.of("error", "The payment provider could not be reached. Please try again later.");
         }
     }
 
@@ -112,12 +131,13 @@ public class StripeGatewayService {
             String currency,
             boolean forceMock
     ) {
+        if (recurring) {
+            return new StripeResult(false, null, null, "Monthly support is not available yet.", Map.of());
+        }
         if (forceMock) {
-            return new StripeResult(true, "sim_cs_" + System.currentTimeMillis(), normalizeFrontendUrl() + "/dashboard/finance?donation=intent-" + intentId, null, Map.of("simulated", true));
+            return new StripeResult(true, "sim_cs_" + UUID.randomUUID(), null, null, Map.of("simulated", true));
         }
-        if (!isEnabled()) {
-            return new StripeResult(false, null, null, "Stripe secret key is not configured.", Map.of());
-        }
+        if (!isTestMode()) return unavailableForLiveMoney();
 
         MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
         form.add("mode", recurring ? "subscription" : "payment");
@@ -134,7 +154,7 @@ public class StripeGatewayService {
         form.add("metadata[project]", projectTitle);
         form.add("metadata[source]", "modtale_donation");
 
-        StripeResult result = postForm("/checkout/sessions", form);
+        StripeResult result = postForm("/checkout/sessions", form, "donation-checkout-" + intentId);
         if (!result.success()) return result;
         return new StripeResult(true, result.id(), (String) result.raw().get("url"), null, result.raw());
     }
@@ -153,25 +173,23 @@ public class StripeGatewayService {
                     .headers(headers -> headers.setBasicAuth(stripeSecretKey, ""))
                     .retrieve()
                     .bodyToMono(Map.class)
-                    .block();
+                    .block(Duration.ofSeconds(20));
             return result == null ? Map.of() : result;
         } catch (Exception e) {
-            return Map.of("error", e.getMessage());
+            return Map.of("error", "The payment provider could not be reached. Please try again later.");
         }
     }
 
     public StripeResult createOrSimulateTransfer(String destinationAccountId, long amountCents, String currency, String description, Map<String, String> metadata, boolean forceMock) {
         if (forceMock) {
-            return new StripeResult(true, "sim_tr_" + System.currentTimeMillis(), null, null, Map.of(
+            return new StripeResult(true, "sim_tr_" + UUID.randomUUID(), null, null, Map.of(
                     "simulated", true,
                     "createdAt", LocalDateTime.now().toString(),
                     "destination", destinationAccountId,
                     "amount", amountCents
             ));
         }
-        if (!isEnabled()) {
-            return new StripeResult(false, null, null, "Stripe secret key is not configured.", Map.of());
-        }
+        if (!isTestMode()) return unavailableForLiveMoney();
 
         MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
         form.add("amount", String.valueOf(amountCents));
@@ -191,16 +209,36 @@ public class StripeGatewayService {
         return postForm("/transfers", form);
     }
 
+    public Map<String, Object> getPaymentWithBalanceTransaction(String paymentId) {
+        if (!isTestMode() || paymentId == null || !paymentId.startsWith("pi_")) return Map.of();
+        try {
+            Map<String, Object> result = webClient.get()
+                    .uri(builder -> builder.path("/payment_intents/{id}").queryParam("expand[]", "latest_charge.balance_transaction").build(paymentId))
+                    .headers(headers -> headers.setBasicAuth(stripeSecretKey, ""))
+                    .retrieve().bodyToMono(Map.class).block(Duration.ofSeconds(20));
+            return result == null ? Map.of() : result;
+        } catch (Exception unavailable) {
+            return Map.of();
+        }
+    }
+
     private StripeResult postForm(String path, MultiValueMap<String, String> form) {
+        return postForm(path, form, null);
+    }
+
+    private StripeResult postForm(String path, MultiValueMap<String, String> form, String idempotencyKey) {
         try {
             Map<String, Object> result = webClient.post()
                     .uri(path)
-                    .headers(headers -> headers.setBasicAuth(stripeSecretKey, ""))
+                    .headers(headers -> {
+                        headers.setBasicAuth(stripeSecretKey, "");
+                        if (idempotencyKey != null) headers.set("Idempotency-Key", idempotencyKey);
+                    })
                     .contentType(MediaType.APPLICATION_FORM_URLENCODED)
                     .body(BodyInserters.fromFormData(form))
                     .retrieve()
                     .bodyToMono(Map.class)
-                    .block();
+                    .block(Duration.ofSeconds(20));
 
             if (result == null) {
                 return new StripeResult(false, null, null, "No response from Stripe", Map.of());
@@ -210,7 +248,7 @@ public class StripeGatewayService {
             String url = valueAsString(result.get("url"));
             return new StripeResult(true, id, url, null, result);
         } catch (Exception e) {
-            return new StripeResult(false, null, null, e.getMessage(), Map.of("error", e.getMessage()));
+            return new StripeResult(false, null, null, "The payment provider could not be reached. Please try again later.", Map.of());
         }
     }
 

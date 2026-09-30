@@ -37,6 +37,7 @@ import { StatusModal } from '@/components/ui/StatusModal';
 import { api, extractApiErrorMessage } from '@/utils/api';
 import { projectClient } from '../api/projectClient';
 import { financeClient } from '@/modules/finance/api/financeClient';
+import type { DonationConfig } from '@/modules/finance/api/financeTypes';
 import { DonationPromptModal } from '../components/dialogs/DonationPromptModal';
 import { mergeProjectVersionChangelogs, projectNeedsChangelogHydration } from '../utils/changelogHydration';
 import { getSelectableBundleDependencies, hasCurseForgeDependencies } from '../utils/dependencyEntries';
@@ -114,7 +115,10 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
     const [isDepModalOpen, setIsDepModalOpen] = useState(false);
     const [pendingDownload, setPendingDownload] = useState<{ versionNumber: string; gameVersion: string; dependencies: any[]; channel: DownloadChannel } | null>(null);
     const [pendingFinalDownload, setPendingFinalDownload] = useState<{ versionNumber: string; gameVersion: string; selectedDeps: string[]; channel: DownloadChannel } | null>(null);
-    const [donationConfig, setDonationConfig] = useState<any>(null);
+    const [donationConfig, setDonationConfig] = useState<DonationConfig | null>(null);
+    const donationInFlightRef = useRef(false);
+    const activeDonationProjectRef = useRef(project?.id);
+    activeDonationProjectRef.current = project?.id;
     const [showDonationPrompt, setShowDonationPrompt] = useState(false);
     const [processingDonation, setProcessingDonation] = useState(false);
     const commentsRef = useRef<HTMLDivElement>(null);
@@ -379,10 +383,15 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
     }, [isHistoryOpen, needsChangelogHydration, project?.id, changelogStateKey, loadChangelogPage]);
 
     useEffect(() => {
+        let active = true;
+        setDonationConfig(null);
+        setShowDonationPrompt(false);
+        setPendingFinalDownload(null);
         if (!project?.id) return;
         financeClient.getDonationConfig(project.id)
-            .then((cfg) => setDonationConfig(cfg))
-            .catch(() => setDonationConfig(null));
+            .then(cfg => { if (active) setDonationConfig(cfg); })
+            .catch(() => { if (active) setDonationConfig(null); });
+        return () => { active = false; };
     }, [project?.id]);
 
     useEffect(() => {
@@ -648,7 +657,7 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
         throw new Error('The server did not return a usable download link for this file.');
     };
 
-    const shouldPromptDonation = Boolean(donationConfig?.donationsEnabled ?? project?.donationsEnabled ?? false);
+    const shouldPromptDonation = Boolean(donationConfig?.projectId === project?.id && donationConfig?.donationsEnabled && donationConfig?.checkoutEnabled);
 
     const queueOrStartDownload = async (versionNumber: string, gameVersion: string, selectedDeps: string[], channel: DownloadChannel = 'RELEASE') => {
         if (shouldPromptDonation) {
@@ -675,13 +684,24 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
 
     const handleDonateAndContinue = async (amountCents: number, recurring: boolean, guestCheckout: boolean) => {
         const pending = pendingFinalDownload;
-        if (!pending || !project?.id) return;
-
+        if (!pending || !project?.id || donationInFlightRef.current) return;
+        donationInFlightRef.current = true;
+        const requestProjectId = project.id;
+        // Open synchronously so popup blockers do not silently swallow a successful checkout.
+        const checkoutWindow = window.open('about:blank', '_blank');
+        if (checkoutWindow) checkoutWindow.opener = null;
         setProcessingDonation(true);
         try {
-            const donation = await financeClient.createDonationCheckout(project.id, amountCents, recurring, guestCheckout);
+            const donation = await financeClient.createDonationCheckout(requestProjectId, amountCents, recurring, guestCheckout);
+            if (activeDonationProjectRef.current !== requestProjectId) { checkoutWindow?.close(); return; }
             if (donation?.checkoutUrl) {
-                window.open(donation.checkoutUrl, '_blank', 'noopener,noreferrer');
+                const checkoutUrl = new URL(donation.checkoutUrl);
+                if (checkoutUrl.protocol !== 'https:' || checkoutUrl.hostname !== 'checkout.stripe.com') throw new Error('Invalid checkout destination');
+                if (!checkoutWindow) throw new Error('The browser blocked the checkout window');
+                checkoutWindow.location.replace(checkoutUrl.href);
+            } else {
+                checkoutWindow?.close();
+                if (!donation?.simulated) throw new Error('No checkout destination');
             }
             if (donation?.simulated || donation?.mockStripeEnabled) {
                 setStatusModal({ type: 'info', title: 'Mock Stripe Checkout', message: 'Mock Stripe is enabled. This donation will not be counted as paid.' });
@@ -689,11 +709,14 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
                 setStatusModal({ type: 'info', title: 'Donation Opened', message: 'Donation checkout opened in a new tab.' });
             }
         } catch {
-            setStatusModal({ type: 'warning', title: 'Donation Not Started', message: 'Download will continue without a donation.' });
+            checkoutWindow?.close();
+            if (activeDonationProjectRef.current === requestProjectId) setStatusModal({ type: 'warning', title: 'Support Not Started', message: 'Checkout could not open. Your download will continue without a tip.' });
         } finally {
+            donationInFlightRef.current = false;
             setProcessingDonation(false);
             setShowDonationPrompt(false);
             setPendingFinalDownload(null);
+            if (activeDonationProjectRef.current !== requestProjectId) return;
             finishVersionDownload(pending.versionNumber, pending.gameVersion, pending.selectedDeps, pending.channel).catch((e) => {
                 showDownloadError(e, 'We could not prepare this download.');
             });
@@ -860,11 +883,10 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
                     currency={(donationConfig?.currency || 'USD').toUpperCase()}
                     suggestedAmountCents={Math.max(100, Number(donationConfig?.suggestedDonationCents || project.suggestedDonationCents || 500))}
                     recurringDefault={Boolean(donationConfig?.donationRecurringDefault ?? project.donationRecurringDefault)}
-                    allowRecurring={Boolean(currentUser)}
-                    onClose={() => {
-                        setShowDonationPrompt(false);
-                        setPendingFinalDownload(null);
-                    }}
+                    allowRecurring={false}
+                    platformCutPercent={donationConfig?.donationPlatformCutPercent ?? 10}
+                    testMode={donationConfig?.testMode ?? false}
+                    onClose={handleSkipDonation}
                     onSkip={handleSkipDonation}
                     onDonate={handleDonateAndContinue}
                     isProcessing={processingDonation}
