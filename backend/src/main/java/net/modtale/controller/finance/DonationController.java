@@ -32,7 +32,7 @@ public class DonationController {
     ) {
         try {
             User donor = accountService.getCurrentUser();
-            return ResponseEntity.ok(financeDonationService.createDonationCheckout(projectId, request.amountCents(), request.recurring(), donor, request.guestCheckout()));
+            return ResponseEntity.ok(financeDonationService.createDonationCheckout(projectId, request.amountCents().longValueExact(), request.recurring(), donor, request.guestCheckout()));
         } catch (IllegalStateException | IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(e.getMessage());
         }

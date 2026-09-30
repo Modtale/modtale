@@ -313,9 +313,6 @@ public class RevenueOpsSupport {
         if (requester == null) {
             throw new SecurityException("Authentication required.");
         }
-        if (accessControlService.hasAdminPermission(requester, AdminPermission.PLATFORM_FINANCE_MANAGE)) {
-            return;
-        }
         if (project == null || project.getAuthorId() == null || project.getAuthorId().isBlank()) {
             throw new SecurityException("Project ownership could not be verified.");
         }
@@ -339,9 +336,6 @@ public class RevenueOpsSupport {
         if (requester == null || organization == null) {
             throw new SecurityException("Organization ownership could not be verified.");
         }
-        if (accessControlService.hasAdminPermission(requester, AdminPermission.PLATFORM_FINANCE_MANAGE)) {
-            return;
-        }
         if (organization.getAccountType() != User.AccountType.ORGANIZATION) {
             throw new SecurityException("Target account is not an organization.");
         }
@@ -362,6 +356,7 @@ public class RevenueOpsSupport {
             if (role != null && role.isOwner()) {
                 return;
             }
+            throw new SecurityException("Only current organization owners can update monetization policies.");
         }
 
         String legacyRole = requesterMembership.getRole();

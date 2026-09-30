@@ -1,7 +1,11 @@
 package net.modtale.model.dto.request.finance;
 
-import jakarta.validation.constraints.Max;
-import jakarta.validation.constraints.Min;
+import java.math.BigDecimal;
+import jakarta.validation.constraints.DecimalMax;
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Digits;
+import jakarta.validation.constraints.NotNull;
 
-public record CreateSupportCheckoutRequest(@Min(100) @Max(100000) long amountCents,
+/** Preserve the submitted numeric value until validation; never truncate fractional cents. */
+public record CreateSupportCheckoutRequest(@NotNull @DecimalMin("100") @DecimalMax("100000") @Digits(integer = 6, fraction = 0) BigDecimal amountCents,
         boolean recurring, boolean guestCheckout) {}

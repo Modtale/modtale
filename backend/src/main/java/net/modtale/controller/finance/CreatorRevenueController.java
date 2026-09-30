@@ -111,7 +111,7 @@ public class CreatorRevenueController {
     }
 
     @GetMapping("/creator/orgs/{orgId}/payout-policy")
-    @PreAuthorize("@apiSecurity.hasOrgPerm(#orgId, 'ORG_EDIT_METADATA', authentication)")
+    @PreAuthorize("!hasAuthority('ROLE_API') && @apiSecurity.hasOrgPerm(#orgId, 'ORG_EDIT_METADATA', authentication)")
     public ResponseEntity<?> getOrgPayoutPolicy(@PathVariable String orgId) {
         User user = accountService.getCurrentUser();
         if (user == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
@@ -125,7 +125,7 @@ public class CreatorRevenueController {
     }
 
     @PutMapping("/creator/orgs/{orgId}/payout-policy")
-    @PreAuthorize("@apiSecurity.hasOrgPerm(#orgId, 'ORG_EDIT_METADATA', authentication)")
+    @PreAuthorize("!hasAuthority('ROLE_API') && @apiSecurity.hasOrgPerm(#orgId, 'ORG_EDIT_METADATA', authentication)")
     public ResponseEntity<?> updateOrgPayoutPolicy(@PathVariable String orgId, @RequestBody Map<String, Object> payload) {
         User user = accountService.getCurrentUser();
         if (user == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
@@ -152,7 +152,7 @@ public class CreatorRevenueController {
     }
 
     @PutMapping("/projects/{projectId}/settings")
-    @PreAuthorize("@apiSecurity.hasProjectPerm(#projectId, 'PROJECT_EDIT_METADATA', authentication)")
+    @PreAuthorize("!hasAuthority('ROLE_API') && @apiSecurity.hasProjectPerm(#projectId, 'PROJECT_EDIT_METADATA', authentication)")
     public ResponseEntity<?> updateProjectMonetization(
             @PathVariable String projectId,
             @RequestBody UpdateProjectMonetizationRequest request
