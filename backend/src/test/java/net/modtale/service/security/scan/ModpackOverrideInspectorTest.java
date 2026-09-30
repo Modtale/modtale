@@ -67,6 +67,39 @@ class ModpackOverrideInspectorTest {
         assertThrows(IllegalArgumentException.class,
                 ()->inspector.inspectWindow("override.zip",sha(bytes),refs(content),owners(),PATH,-1,2));
     }
+    @Test void completedInspectionReleasesCapacityBeforeReturning() throws Exception {
+        byte[] bytes = archive("{}");
+        var releasing = new CountDownLatch(1);
+        var allowRelease = new CountDownLatch(1);
+        var capacity = new Semaphore(1) {
+            @Override public void release() {
+                releasing.countDown();
+                try {
+                    if (!allowRelease.await(5, TimeUnit.SECONDS))
+                        throw new AssertionError("Timed out waiting to release inspection capacity");
+                } catch (InterruptedException failure) {
+                    Thread.currentThread().interrupt();
+                    throw new AssertionError(failure);
+                }
+                super.release();
+            }
+        };
+        var inspector = new ModpackOverrideInspector(ref -> new ByteArrayInputStream(bytes), capacity);
+        String hash = sha(bytes);
+        var configs = refs("{}");
+        var result = java.util.concurrent.CompletableFuture.supplyAsync(
+                () -> inspector.inspect("override.zip", hash, configs, owners()));
+        try {
+            assertTrue(releasing.await(2, TimeUnit.SECONDS));
+            assertThrows(java.util.concurrent.TimeoutException.class,
+                    () -> result.get(100, TimeUnit.MILLISECONDS));
+        } finally {
+            allowRelease.countDown();
+        }
+        assertEquals(MATCHED, result.get(2, TimeUnit.SECONDS).state());
+        assertEquals(1, capacity.availablePermits());
+        assertEquals(MATCHED, inspector.inspect("override.zip", hash, configs, owners()).state());
+    }
     @Test void changedStorageConfigsOrOwnersCannotMatch() throws Exception {
         byte[] bytes=archive("{}");
         var inspector=new ModpackOverrideInspector(ref->new ByteArrayInputStream(bytes),new Semaphore(1));

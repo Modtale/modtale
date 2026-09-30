@@ -22,6 +22,38 @@ class DependencyArtifactVerifierTest {
         assertTrue(result.matched());assertEquals(3,result.bytes());assertEquals(1,calls.get());assertEquals(hash(bytes),result.artifacts().getFirst().actualSha256());
         assertEquals("c".repeat(64),result.inventoryIdentity());
     }
+    @Test void completedVerificationReleasesCapacityBeforeReturning() throws Exception {
+        byte[] bytes = {1, 2, 3};
+        var releasing = new CountDownLatch(1);
+        var allowRelease = new CountDownLatch(1);
+        var capacity = new Semaphore(1) {
+            @Override public void release() {
+                releasing.countDown();
+                try {
+                    if (!allowRelease.await(5, TimeUnit.SECONDS))
+                        throw new AssertionError("Timed out waiting to release inspection capacity");
+                } catch (InterruptedException failure) {
+                    Thread.currentThread().interrupt();
+                    throw new AssertionError(failure);
+                }
+                super.release();
+            }
+        };
+        var verifier = new DependencyArtifactVerifier(ref -> new ByteArrayInputStream(bytes), capacity);
+        var input = inventory(node("a", "file", bytes));
+        var result = java.util.concurrent.CompletableFuture.supplyAsync(
+                () -> verifier.verify(input));
+        try {
+            assertTrue(releasing.await(2, TimeUnit.SECONDS));
+            assertThrows(java.util.concurrent.TimeoutException.class,
+                    () -> result.get(100, TimeUnit.MILLISECONDS));
+        } finally {
+            allowRelease.countDown();
+        }
+        assertEquals(MATCHED, result.get(2, TimeUnit.SECONDS).state());
+        assertEquals(1, capacity.availablePermits());
+        assertEquals(MATCHED, verifier.verify(input).state());
+    }
     @Test void changedBytesAndConflictingSharedIdentitiesCannotMatch()throws Exception {
         byte[] bytes={1,2,3};var verifier=new DependencyArtifactVerifier(path->new ByteArrayInputStream(bytes),new Semaphore(2));
         var wrong=verifier.verify(inventory(node("a","file",new byte[]{4})),10,Duration.ofSeconds(1));

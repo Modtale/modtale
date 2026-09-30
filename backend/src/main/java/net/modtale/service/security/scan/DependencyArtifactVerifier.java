@@ -47,9 +47,12 @@ public final class DependencyArtifactVerifier {
         Thread worker;
         try {
             worker=Thread.ofVirtual().name("dependency-byte-inspection").start(()->{
-                try {future.complete(read(nodes,identity,maxBytes,started,nanos));}
-                catch(Exception failure){future.complete(new Result(identity,List.of(),State.UNAVAILABLE,0));}
+                Result result;
+                try {result=read(nodes,identity,maxBytes,started,nanos);}
+                catch(Exception failure){result=new Result(identity,List.of(),State.UNAVAILABLE,0);}
                 finally {capacity.release();}
+                // A completed observation must leave its capacity available to the next caller.
+                future.complete(result);
             });
         } catch(RuntimeException failure){capacity.release();throw failure;}
         try {

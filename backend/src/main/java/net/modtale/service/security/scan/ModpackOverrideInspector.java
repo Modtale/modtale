@@ -75,9 +75,12 @@ public final class ModpackOverrideInspector {
         Thread worker;
         try {
             worker = Thread.ofVirtual().name("modpack-override-inspection").start(() -> {
-                try { future.complete(read(reference, expectedSha256, configs, owners, window, started, nanos)); }
-                catch(Exception failure) { future.complete(incomplete(State.UNAVAILABLE, 0)); }
+                Result result;
+                try { result = read(reference, expectedSha256, configs, owners, window, started, nanos); }
+                catch(Exception failure) { result = incomplete(State.UNAVAILABLE, 0); }
                 finally { capacity.release(); }
+                // Publish only after cleanup so a completed inspection cannot leave the next one busy.
+                future.complete(result);
             });
         } catch(RuntimeException failure) { capacity.release(); throw failure; }
         try {
