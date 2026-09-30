@@ -4,7 +4,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Instant;
 import java.util.Map;
-import java.util.List;
+import net.modtale.service.finance.StripeWebhookEvents;
 import net.modtale.model.finance.PaymentWebhookReceipt;
 import net.modtale.repository.finance.PaymentWebhookReceiptRepository;
 import net.modtale.service.finance.DonationCheckoutService;
@@ -62,7 +62,7 @@ public class StripeWebhookController {
         if (event.containsKey("account") && !accountId.equals(event.get("account"))) return ResponseEntity.status(503).build();
         String receiptId = FinanceSourceKey.stripe(!live, accountId, "event:" + eventId);
         if (receipts.existsById(receiptId)) return ResponseEntity.ok(Map.of("received", true));
-        if (List.of("checkout.session.completed", "checkout.session.async_payment_succeeded", "invoice.paid", "invoice.payment_failed", "customer.subscription.updated", "customer.subscription.deleted", "charge.refunded", "refund.created", "refund.updated", "charge.dispute.created", "charge.dispute.updated", "charge.dispute.closed", "charge.dispute.funds_withdrawn", "charge.dispute.funds_reinstated").contains(type)) {
+        if (StripeWebhookEvents.REQUIRED.contains(type)) {
             if (!(event.get("data") instanceof Map<?, ?> data) || !(data.get("object") instanceof Map<?, ?> object)) {
                 return ResponseEntity.badRequest().build();
             }

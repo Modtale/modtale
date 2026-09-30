@@ -212,6 +212,36 @@ class StripeGatewayHttpContractTest {
         assertTrue(gateway.getChargeDisputes(null, null).isEmpty());
         assertTrue(requests.isEmpty());
     }
+    @Test void readinessProviderChecksOnlyReadExactConfigurationEndpoints() throws Exception {
+        reply.set(new Reply(200, "{}", false));
+        gateway.getCurrentAccount(); gateway.getBalance(); gateway.getWebhookEndpoint("we_fixture"); gateway.getPortalConfiguration("bpc_fixture");
+        for (String path : List.of("/v1/account", "/v1/balance", "/v1/webhook_endpoints/we_fixture", "/v1/billing_portal/configurations/bpc_fixture")) {
+            Request request = take(); assertProviderHeaders(request);
+            assertEquals("GET", request.method()); assertEquals(path, request.path());
+            assertTrue(request.query().isEmpty()); assertTrue(request.form().isEmpty());
+        }
+    }
+    @Test void invalidReadinessIdentifiersNeverReachProvider() {
+        for (String invalid : Arrays.asList(null, "", "we_", "we_bad/path", "we_bad?query")) assertTrue(gateway.getWebhookEndpoint(invalid).isEmpty());
+        for (String invalid : Arrays.asList(null, "", "bpc_", "bpc_bad/path", "bpc_bad?query")) assertTrue(gateway.getPortalConfiguration(invalid).isEmpty());
+        assertTrue(requests.isEmpty());
+    }
+    @Test void configuredPortalSessionUsesPinnedConfigurationAndRejectsInvalidConfig() throws Exception {
+        ReflectionTestUtils.setField(gateway, "portalConfigurationId", "bpc_fixture");
+        gateway.createBillingPortalSession("cus_fixture", "https://modtale.test/finance");
+        assertEquals(Map.of("customer", "cus_fixture", "return_url", "https://modtale.test/finance", "configuration", "bpc_fixture"), take().form());
+        ReflectionTestUtils.setField(gateway, "portalConfigurationId", "bpc_bad/path");
+        assertFalse(gateway.createBillingPortalSession("cus_fixture", "https://modtale.test/finance").success());
+        assertTrue(requests.isEmpty());
+    }
+    @Test void claimableSandboxCredentialsRemainTestOnlyEvenWhenLiveSwitchIsOff() throws Exception {
+        ReflectionTestUtils.setField(gateway, "stripeSecretKey", "rkcs_local_http_fixture_not_a_real_key");
+        ReflectionTestUtils.setField(gateway, "livePaymentsEnabled", false);
+        assertTrue(gateway.isAnonymousSandbox()); assertTrue(gateway.isTestMode()); assertFalse(gateway.isLiveMode());
+        assertFalse(gateway.isOperational()); assertFalse(gateway.isCheckoutAvailable());
+        assertTrue(gateway.createOrSimulateDonationCheckout("intent_fixture", "Fixture", 500, false, "https://modtale.test", "https://modtale.test", "usd", false).success());
+        assertEquals("/v1/checkout/sessions", take().path());
+    }
     @Test void accountScopeComesFromCurrentPlatformAccountEndpoint() throws Exception {
         reply.set(new Reply(200, "{\"id\":\"acct_platform_fixture\"}", false));
         assertEquals("acct_platform_fixture", gateway.getPlatformAccountId());

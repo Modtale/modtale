@@ -61,6 +61,7 @@ class FinanceHttpSecurityTest {
     private static final String WEBHOOK = "/api/v1/finance/webhooks/stripe";
     private static final String RECONCILE = "/api/v1/admin/finance/payout-reconciliation";
     private static final String DISPUTES = "/api/v1/admin/finance/dispute-reconciliation";
+    private static final String READINESS = "/api/v1/admin/finance/stripe-readiness";
     private static final String SECRET = "fixture-signing-secret";
     private AnnotationConfigWebApplicationContext context;
     private MockMvc mvc;
@@ -106,6 +107,8 @@ class FinanceHttpSecurityTest {
         @Bean GlobalExceptionHandler errors() { return new GlobalExceptionHandler(); }
         @Bean PayoutReconciliationController reconciliationController(CreatorPayoutService payouts, AccountService accounts) { return new PayoutReconciliationController(payouts, accounts); }
         @Bean DisputeReconciliationController disputeController(PaymentAdjustmentService adjustments, AccountService accounts) { return new DisputeReconciliationController(adjustments, accounts); }
+        @Bean StripeReadinessService readiness() { return mock(StripeReadinessService.class); }
+        @Bean StripeReadinessController readinessController(StripeReadinessService readiness) { return new StripeReadinessController(readiness); }
         @Bean DonationController donationController() { return new DonationController(); }
         @Bean CreatorRevenueController creatorController() { return new CreatorRevenueController(); }
         @Bean RecurringSupportController recurringController(RecurringSupportService service, AccountService accounts) { return new RecurringSupportController(service, accounts); }
@@ -415,6 +418,37 @@ class FinanceHttpSecurityTest {
                     .contentType("application/json").content(body)).andExpect(status().isBadRequest());
         }
         verifyNoInteractions(bean(PaymentAdjustmentService.class));
+    }
+    @Test void stripeReadinessIsPrivateAndUnavailableToApiKeys() throws Exception {
+        mvc.perform(browser(get(READINESS))).andExpect(status().isForbidden());
+        mvc.perform(browser(get(READINESS)).with(authentication(session(owner)))).andExpect(status().isForbidden());
+        apiKey(reviewer);
+        mvc.perform(browser(get(READINESS)).header("X-MODTALE-KEY", "fixture-key")).andExpect(status().isForbidden());
+        verifyNoInteractions(bean(StripeReadinessService.class));
+    }
+    @Test void stripeReadinessGetUsesLocalConfigurationAndDoesNotVerifyProvider() throws Exception {
+        var report = new StripeReadinessService.Report("TEST", StripeGatewayService.API_VERSION, false, false, null, List.of(), List.of("Signed delivery remains unverified"));
+        when(bean(StripeReadinessService.class).configuration()).thenReturn(report);
+        mvc.perform(browser(get(READINESS)).with(authentication(session(reviewer))))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.mode").value("TEST"))
+                .andExpect(jsonPath("$.providerConfigurationVerified").value(false));
+        verify(bean(StripeReadinessService.class)).configuration();
+        verify(bean(StripeReadinessService.class), never()).verifyProviderConfiguration();
+    }
+    @Test void stripeProviderVerificationRequiresExplicitManagerCsrfRequest() throws Exception {
+        String path = READINESS + "/verify";
+        mvc.perform(browser(post(path)).with(authentication(session(reviewer)))).andExpect(status().isForbidden());
+        mvc.perform(csrf(browser(post(path))).with(authentication(session(owner)))).andExpect(status().isForbidden());
+        apiKey(reviewer);
+        mvc.perform(browser(post(path)).header("X-MODTALE-KEY", "fixture-key")).andExpect(status().isForbidden());
+        verifyNoInteractions(bean(StripeReadinessService.class));
+        var report = new StripeReadinessService.Report("TEST", StripeGatewayService.API_VERSION, false, false, Instant.now(), List.of(new StripeReadinessService.Check("provider_account", false, "Verify account read permission")), List.of("Signed delivery remains unverified"));
+        when(bean(StripeReadinessService.class).verifyProviderConfiguration()).thenReturn(report);
+        mvc.perform(csrf(browser(post(path))).with(authentication(session(reviewer))))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.providerConfigurationVerified").value(false))
+                .andExpect(jsonPath("$.checks[0].passed").value(false));
+        verify(bean(StripeReadinessService.class)).verifyProviderConfiguration();
+        verify(bean(StripeReadinessService.class), never()).configuration();
     }
     private static String event() { return "{\"id\":\"evt_fixture\",\"type\":\"checkout.session.completed\",\"livemode\":false,\"api_version\":\"" + StripeGatewayService.API_VERSION + "\",\"data\":{\"object\":{\"id\":\"cs_fixture\"}}}"; }
     private static String signature(String body) throws Exception {

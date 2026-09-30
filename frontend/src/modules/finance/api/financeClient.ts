@@ -2,6 +2,8 @@ import { api } from '@/utils/api';
 import type { AdStageReport } from '@/modules/finance/components/AdSettlementReview';
 
 export const financeClient = {
+    getStripeReadiness: async () => (await api.get('/admin/finance/stripe-readiness')).data,
+    verifyStripeReadiness: async () => (await api.post('/admin/finance/stripe-readiness/verify')).data,
     getDisputeReconciliationCases: async () => (await api.get('/admin/finance/dispute-reconciliation')).data,
     refreshDisputeCase: async (caseId: string) => (await api.post(`/admin/finance/dispute-reconciliation/${encodeURIComponent(caseId)}/refresh`)).data,
     getDisputeDecisions: async (caseId: string) => (await api.get(`/admin/finance/dispute-reconciliation/${encodeURIComponent(caseId)}/decisions`)).data,

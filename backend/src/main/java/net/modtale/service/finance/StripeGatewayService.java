@@ -37,10 +37,21 @@ public class StripeGatewayService {
     @Value("${app.finance.live-payments-enabled:false}")
     private boolean livePaymentsEnabled;
 
+    @Value("${app.finance.stripe.platform-account-id:}")
+    private String expectedPlatformAccountId;
+
+    @Value("${app.finance.stripe.portal-configuration-id:}")
+    private String portalConfigurationId;
+
+    public boolean isAnonymousSandbox() { return isEnabled() && stripeSecretKey.startsWith("rkcs_"); }
+    public boolean isLivePaymentsEnabled() { return livePaymentsEnabled; }
+    public String getExpectedPlatformAccountId() { return expectedPlatformAccountId == null ? "" : expectedPlatformAccountId; }
+    public String getPortalConfigurationId() { return portalConfigurationId == null ? "" : portalConfigurationId; }
+
     public boolean isMockEnabled() { return mockEnabled; }
 
     public boolean isTestMode() {
-        return isEnabled() && (stripeSecretKey.startsWith("sk_test_") || stripeSecretKey.startsWith("rk_test_"));
+        return isEnabled() && (stripeSecretKey.startsWith("sk_test_") || stripeSecretKey.startsWith("rk_test_") || isAnonymousSandbox());
     }
 
     public boolean isLiveMode() {
@@ -48,10 +59,11 @@ public class StripeGatewayService {
     }
 
     public boolean isReconciliationEnabled() { return isTestMode() || isLiveMode(); }
-    public boolean isOperational() { return isTestMode() || (isLiveMode() && livePaymentsEnabled); }
+    public boolean isOperational() { return (isTestMode() && !isAnonymousSandbox()) || (isLiveMode() && livePaymentsEnabled); }
     public boolean isCheckoutAvailable() { return mockEnabled || isOperational(); }
 
     public String getAvailabilityMessage() {
+        if (isAnonymousSandbox()) return "This limited test sandbox cannot verify the platform account. A full test credential is required before application payments, onboarding and withdrawals can be enabled.";
         return isOperational() ? (isTestMode() ? "Test mode: payments and transfers do not move real money." : "Creator payments are available. Settlement and account eligibility determine withdrawals.") : "Creator payments are being prepared. Live payments and withdrawals require provider approval and completed launch checks.";
     }
 
@@ -72,6 +84,8 @@ public class StripeGatewayService {
         if (platformAccountId != null) return platformAccountId;
         Map<String, Object> account = getProviderObject("/account", Map.of());
         if (!(account.get("id") instanceof String id) || !id.startsWith("acct_")) throw new IllegalStateException("Could not verify the platform payment account.");
+        if (!getExpectedPlatformAccountId().isBlank() && !id.equals(getExpectedPlatformAccountId()))
+            throw new IllegalStateException("The payment credential does not match the configured platform account.");
         platformAccountId = id;
         return id;
     }
@@ -156,7 +170,8 @@ public class StripeGatewayService {
         if (forceMock) {
             return new StripeResult(true, "sim_cs_" + UUID.randomUUID(), null, null, Map.of("simulated", true));
         }
-        if (!isOperational()) return unavailableForLiveMoney();
+        // Anonymous sandboxes support isolated Checkout contract tests, but cannot enable the application integration.
+        if (!isOperational() && !isAnonymousSandbox()) return unavailableForLiveMoney();
 
         MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
         form.add("mode", recurring ? "subscription" : "payment");
@@ -243,6 +258,17 @@ public class StripeGatewayService {
         return expected.equals(getProviderObject("/account", Map.of()).get("id"));
     }
 
+    public Map<String, Object> getCurrentAccount() { return getProviderObject("/account", Map.of()); }
+    public Map<String, Object> getBalance() { return getProviderObject("/balance", Map.of()); }
+    public Map<String, Object> getWebhookEndpoint(String id) {
+        if (id == null || !id.matches("we_[A-Za-z0-9]+")) return Map.of();
+        return getProviderObject("/webhook_endpoints/" + id, Map.of());
+    }
+    public Map<String, Object> getPortalConfiguration(String id) {
+        if (id == null || !id.matches("bpc_[A-Za-z0-9]+")) return Map.of();
+        return getProviderObject("/billing_portal/configurations/" + id, Map.of());
+    }
+
     public Map<String, Object> getTransfer(String transferId) {
         if (transferId == null || !transferId.matches("tr_[A-Za-z0-9]+")) return Map.of();
         return getProviderObject("/transfers/" + transferId, Map.of());
@@ -299,6 +325,10 @@ public class StripeGatewayService {
         if (customerId == null || !customerId.startsWith("cus_")) return new StripeResult(false, null, null, "Invalid billing account.", Map.of());
         MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
         form.add("customer", customerId); form.add("return_url", returnUrl);
+        if (!getPortalConfigurationId().isBlank()) {
+            if (!getPortalConfigurationId().matches("bpc_[A-Za-z0-9]+")) return new StripeResult(false, null, null, "Invalid billing portal configuration.", Map.of());
+            form.add("configuration", getPortalConfigurationId());
+        }
         return postForm("/billing_portal/sessions", form);
     }
 
