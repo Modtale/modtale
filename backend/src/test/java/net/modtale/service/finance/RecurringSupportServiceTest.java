@@ -28,6 +28,7 @@ class RecurringSupportServiceTest {
         service = new RecurringSupportService(subscriptions, mock(DonationIntentRepository.class), ledger, gateway, new RevenueOpsSupport(), mock(net.modtale.service.project.query.ProjectService.class));
         var subscription = new CreatorSupportSubscription(); subscription.setId("sub_test"); subscription.setProviderAccountId("acct_platform"); subscription.setDonorUserId("donor"); subscription.setCreatorId("creator"); subscription.setProjectId("project"); subscription.setCustomerId("cus_test"); subscription.setAmountCents(500); subscription.setPlatformCutBps(1000); subscription.setCurrency("usd"); subscription.setTestMode(true); subscription.setStatus("active");
         when(subscriptions.findById("sub_test")).thenReturn(Optional.of(subscription));
+        when(subscriptions.updateProviderState(anyString(), any(), anyString(), anyBoolean(), anyString(), anyString(), anyBoolean(), any())).thenReturn(1L);
         when(gateway.getSubscription("sub_test")).thenReturn(Map.of("id", "sub_test", "customer", "cus_test", "status", "active", "livemode", false));
         invoice = Map.of("id", "in_test", "status", "paid", "parent", Map.of("type", "subscription_details", "subscription_details", Map.of("subscription", "sub_test")),
                 "currency", "usd", "customer", "cus_test", "livemode", false, "amount_paid", 500);
@@ -56,8 +57,18 @@ class RecurringSupportServiceTest {
     @Test void subscriptionUpdatesRetrieveCurrentProviderStateInsteadOfRegressingFromOldEvents() {
         when(gateway.getSubscription("sub_test")).thenReturn(Map.of("id", "sub_test", "customer", "cus_test", "status", "canceled", "cancel_at_period_end", false, "livemode", false));
         service.refreshSubscription("sub_test");
-        var captured = ArgumentCaptor.forClass(CreatorSupportSubscription.class); verify(subscriptions).save(captured.capture());
-        assertEquals("canceled", captured.getValue().getStatus());
+        verify(subscriptions).updateProviderState(eq("sub_test"), any(), eq("acct_platform"), eq(true), eq("cus_test"), eq("canceled"), eq(false), any());
+        verify(subscriptions, never()).save(any());
+    }
+    @Test void anAlreadyCanceledSubscriptionCannotBeReactivatedByStaleProviderData() {
+        subscriptions.findById("sub_test").orElseThrow().setStatus("canceled");
+        assertThrows(IllegalArgumentException.class, () -> service.refreshSubscription("sub_test"));
+        verify(subscriptions, never()).updateProviderState(anyString(), any(), anyString(), anyBoolean(), anyString(), anyString(), anyBoolean(), any());
+    }
+    @Test void aConcurrentUpdateRejectsTheOlderResponseInsteadOfOverwritingIt() {
+        when(subscriptions.updateProviderState(anyString(), any(), anyString(), anyBoolean(), anyString(), anyString(), anyBoolean(), any())).thenReturn(0L);
+        assertThrows(IllegalArgumentException.class, () -> service.refreshSubscription("sub_test"));
+        verify(subscriptions, never()).save(any());
     }
     @Test void invoicesNeedExplicitModeAndMatchingProviderScope() {
         var missingMode = new java.util.HashMap<>(invoice); missingMode.remove("livemode");

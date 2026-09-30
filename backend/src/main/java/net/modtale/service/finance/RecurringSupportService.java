@@ -98,9 +98,20 @@ public class RecurringSupportService {
                 || !(current.get("status") instanceof String)) {
             throw new IllegalArgumentException("Could not refresh subscription state.");
         }
-        subscription.setStatus(String.valueOf(current.get("status")));
-        subscription.setCancelAtPeriodEnd(Boolean.TRUE.equals(current.get("cancel_at_period_end")));
-        subscription.setUpdatedAt(Instant.now()); subscriptions.save(subscription);
+        // Stripe requires a new subscription to restart after completed cancellation.
+        if ("canceled".equals(subscription.getStatus()) && !"canceled".equals(current.get("status"))) {
+            throw new IllegalArgumentException("Canceled subscription state cannot be reactivated; provider reconciliation is required.");
+        }
+        Instant previous = subscription.getUpdatedAt();
+        if (previous == null) throw new IllegalArgumentException("Subscription state needs reconciliation.");
+        Instant updated = Instant.now().truncatedTo(java.time.temporal.ChronoUnit.MILLIS);
+        if (!updated.isAfter(previous)) updated = previous.plusMillis(1).truncatedTo(java.time.temporal.ChronoUnit.MILLIS);
+        // A slower older provider response cannot overwrite a newer cancellation/update.
+        // The millisecond revision must advance even when calls finish within one MongoDB timestamp tick.
+        if (subscriptions.updateProviderState(id, previous, subscription.getProviderAccountId(), subscription.isTestMode(), subscription.getCustomerId(),
+                String.valueOf(current.get("status")), Boolean.TRUE.equals(current.get("cancel_at_period_end")), updated) != 1) {
+            throw new IllegalArgumentException("Subscription state changed during refresh; retry its canonical provider lookup.");
+        }
     }
 
     public List<Map<String, Object>> listForDonor(User donor) {
