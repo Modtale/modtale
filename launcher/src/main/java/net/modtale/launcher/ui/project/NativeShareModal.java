@@ -1,5 +1,7 @@
 package net.modtale.launcher.ui.project;
 
+import net.modtale.launcher.ui.common.LauncherTooltips;
+
 import static net.modtale.launcher.ui.common.LauncherUi.value;
 
 import java.io.IOException;
@@ -124,6 +126,8 @@ final class NativeShareModal {
         HBox.setHgrow(titleRow, Priority.ALWAYS);
 
         Button close = new Button(null, LauncherIcons.icon(LauncherIcons.Glyph.X, 16));
+        LauncherTooltips.install(close, "Close sharing");
+        close.setAccessibleText("Close sharing");
         close.getStyleClass().add("share-modal-close");
         close.setOnAction(event -> hide());
         header.getChildren().addAll(titleRow, close);

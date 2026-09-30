@@ -127,10 +127,16 @@ public final class CosmeticCatalogClient {
     }
 
     public Page browseAssets(String category, String search, int page, int pageSize) throws IOException {
+        return browseAssets(category, search, page, pageSize, Set.of());
+    }
+
+    public Page browseAssets(String category, String search, int page, int pageSize, Set<String> ownedAssetIds) throws IOException {
         validatePage(page, pageSize);
         var unique = new LinkedHashMap<String, CosmeticOption>();
         for (var option : select(category, search)) unique.putIfAbsent(option.assetId(), option);
-        return page(List.copyOf(unique.values()), page, pageSize);
+        var ordered = new ArrayList<>(unique.values());
+        ordered.sort(java.util.Comparator.comparing(option -> !ownedAssetIds.contains(option.assetId())));
+        return page(ordered, page, pageSize);
     }
 
     /** All known valid combinations for an asset; local mode is exhaustive for the installed version. */

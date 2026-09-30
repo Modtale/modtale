@@ -1,5 +1,7 @@
 package net.modtale.launcher.ui.library;
 
+import net.modtale.launcher.ui.common.LauncherTooltips;
+
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -48,6 +50,8 @@ final class ShareConfigSelectionModal {
         identity.getStyleClass().add("post-download-modal-title");
         HBox.setHgrow(identity, Priority.ALWAYS);
         Button close = new Button(null, LauncherIcons.icon(LauncherIcons.Glyph.X, 18));
+        LauncherTooltips.install(close, "Close shared list settings");
+        close.setAccessibleText("Close shared list settings");
         close.getStyleClass().add("post-download-modal-close");
         close.setAccessibleText("Close shared list settings");
         close.setOnAction(event -> dismiss.run());
@@ -102,6 +106,7 @@ final class ShareConfigSelectionModal {
             heading.prefWidthProperty().bind(expand.widthProperty().subtract(32));
             expand.getStyleClass().add("share-config-group-toggle");
             expand.setAccessibleText("Show configs for " + group.getKey());
+            LauncherTooltips.install(expand, expand.accessibleTextProperty());
             expand.setOnAction(event -> {
                 boolean open = !configRows.isVisible();
                 configRows.setVisible(open);
@@ -125,7 +130,7 @@ final class ShareConfigSelectionModal {
                     path.setWrapText(true);
                     copy.getChildren().add(path);
                 }
-                Tooltip.install(copy, new Tooltip(file.label()));
+                net.modtale.launcher.ui.common.LauncherTooltips.install(copy, new Tooltip(file.label()));
                 HBox.setHgrow(copy, Priority.ALWAYS);
                 HBox row = new HBox(14, choice, copy);
                 row.setAlignment(Pos.CENTER_LEFT);

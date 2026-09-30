@@ -241,7 +241,7 @@ final class NativeCreatorProfileView {
             String normalized = value(profileBadge.legacyType(), "").toUpperCase(Locale.ROOT);
             if (!normalized.equals("OG") && !normalized.equals("VERIFIED")) return null;
             Node badge = badge(normalized.equals("OG") ? "OG" : "Verified", normalized.toLowerCase(Locale.ROOT), null);
-            Tooltip.install(badge, new Tooltip(normalized.equals("OG") ? "Early Adopter" : "Verified Creator"));
+            net.modtale.launcher.ui.common.LauncherTooltips.install(badge, new Tooltip(normalized.equals("OG") ? "Early Adopter" : "Verified Creator"));
             return badge;
         }
         String label = profileBadge.displayLabel();
@@ -261,7 +261,7 @@ final class NativeCreatorProfileView {
         } else {
             badge = badge(label, "custom", null);
         }
-        Tooltip.install(badge, new Tooltip(profileBadge.displayTooltip()));
+        net.modtale.launcher.ui.common.LauncherTooltips.install(badge, new Tooltip(profileBadge.displayTooltip()));
         return badge;
     }
 

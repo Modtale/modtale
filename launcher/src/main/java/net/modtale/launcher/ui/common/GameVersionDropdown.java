@@ -45,6 +45,7 @@ public final class GameVersionDropdown extends VBox {
     };
 
     public GameVersionDropdown() {
+        LauncherTooltips.install(toggle, "Choose which game versions to include");
         getStyleClass().add("game-version-dropdown");
         setSpacing(6);
         setMaxWidth(Double.MAX_VALUE);

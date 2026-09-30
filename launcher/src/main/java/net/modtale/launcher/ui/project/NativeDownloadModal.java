@@ -1,5 +1,7 @@
 package net.modtale.launcher.ui.project;
 
+import net.modtale.launcher.ui.common.LauncherTooltips;
+
 import static net.modtale.launcher.ui.browse.card.ProjectCardFormatter.timeAgo;
 import static net.modtale.launcher.ui.common.LauncherUi.value;
 
@@ -246,6 +248,8 @@ final class NativeDownloadModal {
         }
 
         Button close = new Button(null, LauncherIcons.icon(LauncherIcons.Glyph.X, 18));
+        LauncherTooltips.install(close, "Close download options");
+        close.setAccessibleText("Close download options");
         close.getStyleClass().add("download-modal-close");
         close.setOnAction(event -> hide());
         header.getChildren().addAll(copy, close);

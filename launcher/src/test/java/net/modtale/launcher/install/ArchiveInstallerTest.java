@@ -99,7 +99,7 @@ class ArchiveInstallerTest {
         Path actual = Files.createDirectory(tempDir.resolve("actual"));
         Path alias = tempDir.resolve("alias");
         try {
-            Files.createSymbolicLink(alias, actual);
+            net.modtale.launcher.TestSymlinks.createSymbolicLink(alias, actual);
         } catch (IOException | UnsupportedOperationException unsupported) {
             org.junit.jupiter.api.Assumptions.abort("Symbolic links unavailable: " + unsupported);
         }
@@ -176,7 +176,7 @@ class ArchiveInstallerTest {
         Path mods = Files.createDirectories(instance.resolve("Mods"));
         Path outside = Files.createDirectory(tempDir.resolve("outside"));
         try {
-            Files.createSymbolicLink(mods.resolve("linked"), outside);
+            net.modtale.launcher.TestSymlinks.createSymbolicLink(mods.resolve("linked"), outside);
         } catch (UnsupportedOperationException | IOException ex) {
             org.junit.jupiter.api.Assumptions.abort("Symbolic links are unavailable: " + ex.getMessage());
         }

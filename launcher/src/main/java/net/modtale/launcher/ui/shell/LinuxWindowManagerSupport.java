@@ -16,11 +16,12 @@ final class LinuxWindowManagerSupport {
     private LinuxWindowManagerSupport() {}
 
     static boolean beginMove(Stage stage, MouseEvent event) {
-        return stage != null && event != null && LinuxDesktopBackend.beginMoveResize(8);
+        return stage != null && event != null
+                && LinuxDesktopBackend.beginMoveResize(8, event.getScreenX(), event.getScreenY());
     }
 
     static boolean beginResize(Stage stage, MouseEvent event, ResizeDirection direction) {
         return stage != null && event != null && direction != null
-                && LinuxDesktopBackend.beginMoveResize(direction.nativeCode);
+                && LinuxDesktopBackend.beginMoveResize(direction.nativeCode, event.getScreenX(), event.getScreenY());
     }
 }

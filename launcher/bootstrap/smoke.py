@@ -7,6 +7,8 @@ import sys
 import tempfile
 
 executable = Path(sys.argv[1]).resolve()
+installer_stage = "--installer" in sys.argv[2:]
+runtime_source = next((argument for argument in sys.argv[2:] if not argument.startswith("--")), None)
 with tempfile.TemporaryDirectory(prefix="modtale bootstrap ü ") as directory:
     home = Path(directory)
     environment = os.environ.copy()
@@ -15,7 +17,7 @@ with tempfile.TemporaryDirectory(prefix="modtale bootstrap ü ") as directory:
     environment.update(HOME=str(home), USERPROFILE=str(home), PATH="", XDG_DATA_HOME=str(home))
     offline = dict(HTTPS_PROXY="http://127.0.0.1:1", HTTP_PROXY="http://127.0.0.1:1", ALL_PROXY="http://127.0.0.1:1", NO_PROXY="")
     hytale = None
-    if len(sys.argv) > 2:
+    if runtime_source:
         if "--hytale" in sys.argv:
             if sys.platform == "win32":
                 environment["APPDATA"] = str(home / "AppData" / "Roaming")
@@ -27,10 +29,14 @@ with tempfile.TemporaryDirectory(prefix="modtale bootstrap ü ") as directory:
             runtime = hytale / "install" / "pre-release" / "package" / "jre" / "latest"
             if sys.platform == "darwin":
                 runtime = runtime / "Contents" / "Home"
-            shutil.copytree(sys.argv[2], runtime, symlinks=False, ignore_dangling_symlinks=True)
+            shutil.copytree(runtime_source, runtime, symlinks=False, ignore_dangling_symlinks=True)
         else:
-            environment["JAVA_HOME"] = sys.argv[2]
+            environment["JAVA_HOME"] = runtime_source
         # Discovery and adoption must succeed without downloading a substitute runtime.
+        environment.update(offline)
+    if installer_stage:
+        subprocess.run([executable, "--modtale-install-runtime"], env=environment, check=True, timeout=240)
+        assert "Installer prepared runtime:" in (home / ".modtale" / "launcher" / "bootstrap.log").read_text(encoding="utf-8")
         environment.update(offline)
     subprocess.run([executable, "--modtale-bootstrap-check"], env=environment, check=True, timeout=240)
     cache = home / ".modtale" / "launcher" / "runtime-25"

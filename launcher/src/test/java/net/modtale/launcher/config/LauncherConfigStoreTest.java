@@ -66,7 +66,7 @@ class LauncherConfigStoreTest {
         assertThrows(IOException.class, () -> configs.restore(List.of(new LauncherConfigSnapshot("Mods/../config.json", "{}")), target));
         Path outside = Files.createDirectory(directory.resolve("outside"));
         Files.createDirectories(target.hytaleModsDirectory());
-        Files.createSymbolicLink(target.hytaleModsDirectory().resolve("Linked"), outside);
+        net.modtale.launcher.TestSymlinks.createSymbolicLink(target.hytaleModsDirectory().resolve("Linked"), outside);
         assertThrows(IOException.class, () -> configs.restore(List.of(
                 new LauncherConfigSnapshot("Mods/Safe/config.json", "{}"),
                 new LauncherConfigSnapshot("Mods/Linked/config.json", "{}")), target));

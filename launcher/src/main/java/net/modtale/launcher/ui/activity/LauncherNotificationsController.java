@@ -1,5 +1,7 @@
 package net.modtale.launcher.ui.activity;
 
+import net.modtale.launcher.ui.common.LauncherTooltips;
+
 import static net.modtale.launcher.ui.common.LauncherUi.dangerButton;
 import static net.modtale.launcher.ui.common.LauncherUi.primaryButton;
 import static net.modtale.launcher.ui.common.LauncherUi.pseudo;
@@ -122,9 +124,11 @@ public final class LauncherNotificationsController {
         refresh.setOnAction(event -> loadNotifications());
         Button markAll = secondaryButton("Mark All Read");
         markAll.setGraphic(LauncherIcons.icon(LauncherIcons.Glyph.CHECK, 13));
+        LauncherTooltips.install(markAll, "Mark all notifications as read");
         markAll.setOnAction(event -> markAllRead(markAll));
         Button clear = secondaryButton("Clear All");
         clear.setGraphic(LauncherIcons.icon(LauncherIcons.Glyph.TRASH, 13));
+        LauncherTooltips.install(clear, "Delete all notifications");
         clear.setOnAction(event -> clearAll(clear));
         HBox recentActions = new HBox(8, refresh, markAll, clear);
         recentActions.setAlignment(Pos.CENTER_RIGHT);

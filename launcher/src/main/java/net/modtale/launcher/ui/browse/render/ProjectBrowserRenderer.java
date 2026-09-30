@@ -33,12 +33,13 @@ public final class ProjectBrowserRenderer {
     private static final double GRID_MIN_CARD_BODY_HEIGHT = 216;
     private static final double GRID_MAX_CARD_BODY_HEIGHT = 228;
     private static final double GRID_FALLBACK_WIDTH = 936;
-    private static final double GRID_THREE_COLUMN_WIDTH = 1320;
+    private static final double GRID_ONE_COLUMN_WIDTH = 544;
+    private static final double GRID_THREE_COLUMN_WIDTH = 832;
     private static final double GRID_HORIZONTAL_GAP = 27;
     private static final double GRID_VERTICAL_GAP = 30;
     private static final double COMPACT_FALLBACK_WIDTH = 936;
     private static final double COMPACT_CARD_HEIGHT = 90;
-    private static final double COMPACT_THREE_COLUMN_WIDTH = 1120;
+    private static final double COMPACT_THREE_COLUMN_WIDTH = 832;
     private static final double COMPACT_HORIZONTAL_GAP = 19.5;
     private static final double COMPACT_VERTICAL_GAP = 19.5;
 
@@ -281,7 +282,7 @@ public final class ProjectBrowserRenderer {
         if (availableWidth >= threeColumnWidth) {
             return 3;
         }
-        return 2;
+        return availableWidth >= GRID_ONE_COLUMN_WIDTH ? 2 : 1;
     }
 
     private int rowsForPageSize(int columns, int pageSize) {

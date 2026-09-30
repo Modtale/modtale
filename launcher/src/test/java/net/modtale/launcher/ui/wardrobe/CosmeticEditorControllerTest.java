@@ -78,6 +78,31 @@ class CosmeticEditorControllerTest {
         }
     }
 
+    @Test void applyDotOnlyMarksActualPendingEdits() throws Exception {
+        try (Harness h = new Harness()) {
+            fx(() -> { h.controller.loadCurrentOnOpen(); return null; });
+            await(() -> h.controller.draftSnapshot().equals(json(FRESH)));
+            fx(() -> {
+                ButtonBase apply = button(h.root(), "Apply");
+                ButtonBase save = button(h.root(), "Save As");
+                assertNull(apply.getGraphic());
+                assertNull(save.getGraphic());
+                h.controller.editCape("Cape_Fresh.Blue");
+                assertNull(apply.getGraphic(), "Choosing the current item is not an edit");
+                h.controller.editCape("Cape_Changed.Red");
+                assertNotNull(apply.getGraphic());
+                assertNull(save.getGraphic());
+                button(h.root(), "Undo").fire();
+                assertNull(apply.getGraphic(), "Undoing back to the loaded look clears the dot");
+                button(h.root(), "Redo").fire();
+                assertNotNull(apply.getGraphic());
+                button(h.root(), "Reset").fire();
+                assertNull(apply.getGraphic());
+                return null;
+            });
+        }
+    }
+
     @Test void opensSelectedLookOnlyAfterHydration() throws Exception {
         try (Harness h = new Harness()) {
             h.gateway.delayLoads = true;
@@ -129,7 +154,7 @@ class CosmeticEditorControllerTest {
         try (Harness h = new Harness()) {
             fx(() -> { button(h.root(), "Load current look").fire(); return null; });
             await(() -> h.controller.draftSnapshot().equals(json(FRESH)));
-            FutureTask<Void> opened = submitFx(() -> { button(h.root(), "Save").fire(); return null; });
+            FutureTask<Void> opened = submitFx(() -> { button(h.root(), "Save As").fire(); return null; });
             await(() -> h.stage.getScene().lookup(".status-modal-primary") != null);
             fx(() -> {
                 TextField name = (TextField) h.stage.getScene().lookup(".status-modal-custom-content");
@@ -144,7 +169,7 @@ class CosmeticEditorControllerTest {
             var saved = new WardrobeStore(directory).items().getFirst();
             assertEquals("My saved look", saved.name());
             assertEquals(json(FRESH), json(saved.payload()).path("skin"));
-            FutureTask<Void> cancelled = submitFx(() -> { button(h.root(), "Save").fire(); return null; });
+            FutureTask<Void> cancelled = submitFx(() -> { button(h.root(), "Save As").fire(); return null; });
             await(() -> h.stage.getScene().lookup(".status-modal-secondary") != null);
             fx(() -> { ((Button) h.stage.getScene().lookup(".status-modal-secondary")).fire(); return null; });
             cancelled.get(5, TimeUnit.SECONDS);
@@ -186,7 +211,7 @@ class CosmeticEditorControllerTest {
                 scene.getStylesheets().add(getClass().getResource("/net/modtale/launcher/ui/nativefx/launcher.css").toExternalForm());
                 result.setScene(scene); result.show(); controller.refresh(); return result;
             });
-            await(() -> ((CheckBox) button(root(), "Owned only")).isSelected());
+            assertTrue(fx(() -> nodes(root(), CheckBox.class).isEmpty()));
         }
         Node root() { return controller.view(); }
         Node dialog() {

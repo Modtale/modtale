@@ -1,5 +1,7 @@
 package net.modtale.launcher.ui.settings;
 
+import net.modtale.launcher.ui.common.LauncherTooltips;
+
 import static net.modtale.launcher.ui.common.LauncherUi.readableField;
 import static net.modtale.launcher.ui.common.LauncherUi.secondaryButton;
 
@@ -25,6 +27,9 @@ public final class LauncherPathControls {
         field.setMaxWidth(Double.MAX_VALUE);
         HBox.setHgrow(field, Priority.ALWAYS);
         Button browse = secondaryButton("Browse");
+        LauncherTooltips.install(browse, "Choose the " + readableField(fieldName));
+        LauncherTooltips.install(field, javafx.beans.binding.Bindings.createStringBinding(
+                () -> readableField(fieldName) + (field.getText().isBlank() ? "" : ": " + field.getText()), field.textProperty()));
         browse.setMinWidth(86);
         browse.setPrefWidth(86);
         browse.setOnAction(event -> {
@@ -37,6 +42,7 @@ public final class LauncherPathControls {
         row.getChildren().addAll(field, browse);
         if (detect) {
             Button detectButton = secondaryButton("Detect");
+            LauncherTooltips.install(detectButton, "Use the default Hytale mods folder");
             detectButton.setMinWidth(78);
             detectButton.setPrefWidth(78);
             detectButton.setOnAction(event -> field.setText(HytalePathDetector.defaultModsDirectory().toString()));

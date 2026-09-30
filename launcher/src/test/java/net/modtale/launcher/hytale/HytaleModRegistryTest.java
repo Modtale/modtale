@@ -118,7 +118,7 @@ class HytaleModRegistryTest {
         Path file = jar("mod.jar", "1");
         Path alias = root.resolve("mods-alias");
         try {
-            Files.createSymbolicLink(alias, root.toRealPath());
+            net.modtale.launcher.TestSymlinks.createSymbolicLink(alias, root.toRealPath());
         } catch (UnsupportedOperationException | java.io.IOException ex) {
             org.junit.jupiter.api.Assumptions.abort("Directory symlinks unavailable: " + ex.getMessage());
         }

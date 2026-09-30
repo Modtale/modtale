@@ -1,5 +1,7 @@
 package net.modtale.launcher.ui.library;
 
+import net.modtale.launcher.ui.common.LauncherTooltips;
+
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -155,6 +157,8 @@ final class PostDownloadWorldModal {
         HBox.setHgrow(titleRow, Priority.ALWAYS);
 
         Button close = new Button(null, LauncherIcons.icon(LauncherIcons.Glyph.X, 18));
+        LauncherTooltips.install(close, "Close world selection");
+        close.setAccessibleText("Close world selection");
         close.getStyleClass().add("post-download-modal-close");
         close.setOnAction(event -> hide());
         header.getChildren().addAll(titleRow, close);
@@ -190,7 +194,7 @@ final class PostDownloadWorldModal {
             Label included = new Label("Configs included", LauncherIcons.icon(LauncherIcons.Glyph.SLIDERS, 14));
             included.getStyleClass().add("share-config-path");
             included.setAccessibleText("Configs included. Existing settings are kept.");
-            Tooltip.install(included, new Tooltip("Adds bundled configs to the selected worlds without replacing existing settings."));
+            net.modtale.launcher.ui.common.LauncherTooltips.install(included, new Tooltip("Adds bundled configs to the selected worlds without replacing existing settings."));
             Region spacer = new Region();
             HBox.setHgrow(spacer, Priority.ALWAYS);
             row.getChildren().addAll(included, spacer);

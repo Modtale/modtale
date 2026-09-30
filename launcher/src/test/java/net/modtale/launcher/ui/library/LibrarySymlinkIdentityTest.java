@@ -22,7 +22,7 @@ class LibrarySymlinkIdentityTest {
         Files.writeString(real, "one artifact");
         Path alias = root.resolve(".var/app/com.hypixel.HytaleLauncher/data/Hytale/UserData");
         Files.createDirectories(alias.getParent());
-        Files.createSymbolicLink(alias, root.resolve("UserData"));
+        net.modtale.launcher.TestSymlinks.createSymbolicLink(alias, root.resolve("UserData"));
         return new Path[]{real, alias.resolve("Mods/EyeSpy.jar")};
     }
 

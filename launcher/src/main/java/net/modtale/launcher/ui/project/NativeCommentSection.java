@@ -1,5 +1,7 @@
 package net.modtale.launcher.ui.project;
 
+import net.modtale.launcher.ui.common.LauncherTooltips;
+
 import static net.modtale.launcher.ui.browse.card.ProjectCardFormatter.timeAgo;
 import static net.modtale.launcher.ui.common.LauncherUi.primaryButton;
 import static net.modtale.launcher.ui.common.LauncherUi.secondaryButton;
@@ -390,6 +392,8 @@ final class NativeCommentSection {
     private Button actionButton(String text, LauncherIcons.Glyph glyph, Runnable action) {
         Button button = new Button(text, LauncherIcons.icon(glyph, 15));
         button.getStyleClass().add("project-comment-action");
+        LauncherTooltips.install(button, text.equals("Reply") ? "Reply to this comment"
+                : text.equals("Edit Reply") ? "Edit your reply" : text + " this comment");
         button.setOnAction(event -> action.run());
         return button;
     }
