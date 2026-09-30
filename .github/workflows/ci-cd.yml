@@ -680,6 +680,12 @@ jobs:
             echo "FINAL_FRONTEND_URL=${{ env.FRONTEND_DOMAIN }}" >> $GITHUB_ENV
           fi
 
+      - name: Verify synthetic finance preview route
+        if: env.ENV_TYPE == 'preview' && (steps.filter.outputs.frontend == 'true' || env.FRONTEND_EXISTS == 'false')
+        run: |
+          curl --fail --silent --show-error --retry 4 --retry-delay 3 "$FINAL_FRONTEND_URL/finance-preview" -o /tmp/finance-preview.html
+          grep -Fq '<title>Finance demo' /tmp/finance-preview.html
+
       - name: Update Backend CORS and Self-Awareness
         id: update_backend_self_awareness
         # Only preview URLs are unknown during the initial backend deploy. Production

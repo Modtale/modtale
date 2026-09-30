@@ -9,6 +9,6 @@ export default function FinanceShowcaseFrame() {
             <button type="button" aria-pressed={mobile} onClick={() => setMobile(true)} style={{ padding: '10px 16px', borderRadius: 10, border: '1px solid #94a3b8', background: mobile ? '#2563eb' : '#fff', color: mobile ? '#fff' : '#0f172a' }}>Mobile viewport</button>
             <span>{mobile ? '390 × 844 CSS pixels' : '1100 × 900 CSS pixels'} · Actual iframe viewport</span>
         </header>
-        <iframe title="Synthetic finance components" src="/__demo/finance?frame=1" style={{ display: 'block', width: mobile ? 390 : 1100, maxWidth: '100%', height: mobile ? 844 : 900, margin: '0 auto', border: '1px solid #94a3b8', borderRadius: mobile ? 24 : 12, background: '#fff' }} />
+        <iframe title="Synthetic finance components" src="/finance-preview?frame=1" style={{ display: 'block', width: mobile ? 390 : 1100, maxWidth: '100%', height: mobile ? 844 : 900, margin: '0 auto', border: '1px solid #94a3b8', borderRadius: mobile ? 24 : 12, background: '#fff' }} />
     </main>;
 }

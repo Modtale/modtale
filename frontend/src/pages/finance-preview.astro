@@ -1,7 +1,7 @@
 ---
-import '../../index.css';
-import FinanceShowcase from '../../modules/finance/demo/FinanceShowcase';
-import FinanceShowcaseFrame from '../../modules/finance/demo/FinanceShowcaseFrame';
+import '../index.css';
+import FinanceShowcase from '../modules/finance/demo/FinanceShowcase';
+import FinanceShowcaseFrame from '../modules/finance/demo/FinanceShowcaseFrame';
 const isFrame = Astro.url.searchParams.get('frame') === '1';
 if (import.meta.env.PUBLIC_FINANCE_DEMO !== 'true') {
     return new Response('Not found', { status: 404 });
