@@ -20,6 +20,8 @@ import net.modtale.model.project.ProjectVersion;
 import net.modtale.service.admin.review.ProjectReviewPersistence;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.web.multipart.MultipartFile;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
@@ -197,6 +199,33 @@ class ModpackArchiveServiceTest {
 
         assertThrows(IOException.class, () -> service.generateModpackZip(pack, version));
         verify(archiveSupport, never()).upload(any(), any());
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void dependencyChangingDuringCachedDownloadCannotBeDelivered(boolean withdrawn) throws Exception {
+        Project pack = pack();
+        ProjectVersion version = version("1.0.0", null);
+        ProjectDependency dependency = new ProjectDependency("plugin", "Plugin", "2.0.0");
+        version.setDependencies(List.of(dependency));
+        var approved = new DownloadArchiveSupport.ResolvedDependency(
+                dependencyProject("plugin", ProjectClassification.PLUGIN), version("2.0.0", "plugin-old.jar"));
+        var replacement = new DownloadArchiveSupport.ResolvedDependency(
+                dependencyProject("plugin", ProjectClassification.PLUGIN), version("2.0.0", "plugin-new.jar"));
+        when(archiveSupport.resolveDependency(dependency)).thenReturn(approved);
+        when(archiveSupport.download("plugin-old.jar")).thenReturn(bytes("old-approved-bytes"));
+        when(archiveSupport.extractOriginalFilename("plugin-old.jar")).thenReturn("plugin.jar");
+        byte[] cached = service.generateModpackZip(pack, version);
+
+        org.mockito.Mockito.clearInvocations(archiveSupport, reviewPersistence);
+        version.setFileUrl("modpacks/cached.zip");
+        when(archiveSupport.download("modpacks/cached.zip")).thenReturn(cached);
+        when(archiveSupport.resolveDependency(dependency)).thenReturn(approved, withdrawn ? null : replacement);
+
+        assertThrows(IOException.class, () -> service.generateModpackZip(pack, version));
+        verify(archiveSupport).download("modpacks/cached.zip");
+        verify(archiveSupport, never()).upload(any(), any());
+        verify(reviewPersistence, never()).cacheModpackArchive(any(), any(), any(), any(), any());
     }
 
     @Test

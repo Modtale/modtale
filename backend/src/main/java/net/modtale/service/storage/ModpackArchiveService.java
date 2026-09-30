@@ -56,15 +56,20 @@ final class ModpackArchiveService {
         List<String> dependencyBindings = currentDependencyBindings(version);
         byte[] cachedArchive = downloadCachedArchive(pack, version, dependencyBindings);
         if (cachedArchive != null) {
+            requireUnchangedDependencies(version, dependencyBindings);
             return cachedArchive;
         }
 
         byte[] zipBytes = buildArchive(pack, version);
-        if (!dependencyBindings.equals(currentDependencyBindings(version))) {
-            throw new IOException("A bundled Modtale dependency changed while the modpack was being built.");
-        }
+        requireUnchangedDependencies(version, dependencyBindings);
         cacheArchive(pack, version, zipBytes, projectToken, versionToken);
         return zipBytes;
+    }
+
+    private void requireUnchangedDependencies(ProjectVersion version, List<String> expected) throws IOException {
+        if (!expected.equals(currentDependencyBindings(version))) {
+            throw new IOException("A bundled Modtale dependency changed while the modpack was being prepared.");
+        }
     }
 
     private List<String> currentDependencyBindings(ProjectVersion version) throws IOException {
