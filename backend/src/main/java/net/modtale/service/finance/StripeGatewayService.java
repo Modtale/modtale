@@ -258,6 +258,11 @@ public class StripeGatewayService {
         return expected.equals(getProviderObject("/account", Map.of()).get("id"));
     }
 
+    public Map<String, Object> getBalanceTransaction(String id) {
+        if (id == null || !id.matches("txn_[A-Za-z0-9]+")) return Map.of();
+        return getProviderObject("/balance_transactions/" + id, Map.of());
+    }
+
     public Map<String, Object> getCurrentAccount() { return getProviderObject("/account", Map.of()); }
     public Map<String, Object> getBalance() { return getProviderObject("/balance", Map.of()); }
     public Map<String, Object> getWebhookEndpoint(String id) {

@@ -6,6 +6,7 @@ import { StatusModal } from '@/components/ui/StatusModal';
 import { theme } from '@/styles/theme';
 import { AdSettlementReview } from '@/modules/finance/components/AdSettlementReview';
 import { PayoutReconciliationReview } from '@/modules/finance/components/PayoutReconciliationReview';
+import { ProviderCostReview } from '@/modules/finance/components/ProviderCostReview';
 import { StripeReadiness } from '@/modules/finance/components/StripeReadiness';
 import { DisputeReconciliationReview } from '@/modules/finance/components/DisputeReconciliationReview';
 
@@ -279,7 +280,7 @@ export function FinanceAdmin({ canManageFinance }: FinanceAdminProps) {
                 <button onClick={saveSettings} className={theme.components.buttonPrimary}><Save className="h-4 w-4" /> Save Finance Settings</button>
             </div>
 
-            {canManageFinance && <><StripeReadiness /><DisputeReconciliationReview /></>}
+            {canManageFinance && <><StripeReadiness /><ProviderCostReview /><DisputeReconciliationReview /></>}
             {canManageFinance && <PayoutReconciliationReview />}
             {canManageFinance && <AdSettlementReview />}
 

@@ -242,6 +242,17 @@ class StripeGatewayHttpContractTest {
         assertTrue(gateway.createOrSimulateDonationCheckout("intent_fixture", "Fixture", 500, false, "https://modtale.test", "https://modtale.test", "usd", false).success());
         assertEquals("/v1/checkout/sessions", take().path());
     }
+    @Test void providerCostLookupReadsOnlyTheExactBalanceTransaction() throws Exception {
+        reply.set(new Reply(200, "{\"id\":\"txn_fixture\",\"object\":\"balance_transaction\"}", false));
+        assertEquals("txn_fixture", gateway.getBalanceTransaction("txn_fixture").get("id"));
+        Request request = take(); assertProviderHeaders(request);
+        assertEquals("GET", request.method()); assertEquals("/v1/balance_transactions/txn_fixture", request.path());
+        assertTrue(request.query().isEmpty()); assertTrue(request.form().isEmpty());
+    }
+    @Test void invalidCostTransactionIdsNeverReachProvider() {
+        for (String invalid : Arrays.asList(null, "", "txn_", "txn_bad/path", "txn_bad?query")) assertTrue(gateway.getBalanceTransaction(invalid).isEmpty());
+        assertTrue(requests.isEmpty());
+    }
     @Test void accountScopeComesFromCurrentPlatformAccountEndpoint() throws Exception {
         reply.set(new Reply(200, "{\"id\":\"acct_platform_fixture\"}", false));
         assertEquals("acct_platform_fixture", gateway.getPlatformAccountId());

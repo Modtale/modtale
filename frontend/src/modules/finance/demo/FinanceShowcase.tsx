@@ -5,6 +5,7 @@ import { financeClient } from '@/modules/finance/api/financeClient';
 import { api } from '@/utils/api';
 import { AdSettlementReview } from '@/modules/finance/components/AdSettlementReview';
 import { PayoutReconciliationReview } from '@/modules/finance/components/PayoutReconciliationReview';
+import { ProviderCostReview } from '@/modules/finance/components/ProviderCostReview';
 import { StripeReadiness } from '@/modules/finance/components/StripeReadiness';
 import { DisputeReconciliationReview } from '@/modules/finance/components/DisputeReconciliationReview';
 import { createAdSettlementFixture } from './adSettlementFixture';
@@ -30,6 +31,15 @@ export default function FinanceShowcase() {
     useEffect(() => {
         const previous = { ...financeClient };
         let active = true;
+        const costEvidence: any[] = [];
+        financeClient.getProviderCosts = async () => [...costEvidence];
+        financeClient.importStripeCost = async request => {
+            if (request.balanceTransactionId !== 'txn_demo' || request.expectedAccountId !== 'acct_demo' || !request.expectedTestMode) throw new Error('Synthetic mismatch. Use txn_demo, acct_demo and Test. No provider call was made.');
+            const existing = costEvidence.find(row => row.balanceTransactionId === request.balanceTransactionId);
+            if (existing) return existing;
+            const value = { id: 'demo-cost', providerAccountId: 'acct_demo', testMode: true, balanceTransactionId: 'txn_demo', currency: 'usd', costMinorUnits: 200, allocationStatus: 'UNALLOCATED', recordedBy: 'demo-reviewer', reason: request.reason, recordedAt: new Date().toISOString() };
+            costEvidence.push(value); return value;
+        };
         financeClient.getDonationConfig = async () => createDemoDonationConfig();
         financeClient.getStripeReadiness = async () => ({ mode: 'TEST', apiVersion: '2026-08-26.dahlia', livePaymentsEnabled: false, providerConfigurationVerified: false, checks: [{ code: 'platform_account', passed: false, action: 'Synthetic missing platform account configuration.' }], remainingChecks: ['Synthetic example: authentic platform-event delivery and live approvals are still required.'] });
         financeClient.verifyStripeReadiness = async () => ({ ...(await financeClient.getStripeReadiness()), verifiedAt: new Date().toISOString(), checks: [{ code: 'provider_account', passed: false, action: 'Synthetic restricted sandbox: account and Connect reads are unavailable. No provider request was made.' }] });
@@ -105,13 +115,14 @@ export default function FinanceShowcase() {
                     <button type="button" className="rounded border px-3 py-2 text-sm" onClick={() => setView('payout')}>Show transfer review</button>
                     <button type="button" className="rounded border px-3 py-2 text-sm" onClick={() => setView('dispute')}>Show dispute review</button>
                     <button type="button" className="rounded border px-3 py-2 text-sm" onClick={() => setView('setup')}>Show payment setup</button>
+                    <button type="button" className="rounded border px-3 py-2 text-sm" onClick={() => setView('costs')}>Show provider costs</button>
                     <label className="text-sm">Dashboard state <select value={scenario} onChange={event => setScenario(event.target.value)} className="rounded border bg-white px-2 py-2 text-slate-900"><option value="unavailable">Unavailable</option><option value="pending">Pending earnings</option><option value="settled">Settled earnings</option><option value="refund">Refund adjustment</option><option value="error">Service error</option></select></label>
                     <button className="rounded border px-3 py-2 text-sm" onClick={() => setDark(value => !value)}>Toggle theme</button>
                     <button disabled={!supportConfig} className="rounded bg-blue-600 px-3 py-2 text-sm text-white" onClick={() => { setNotice(''); setShowSupport(true); }}>Open support dialog</button>
                 </div>
             </header>
             {notice && <p role="status" className="mb-4 rounded-xl border border-blue-300 p-3 text-sm">{notice}</p>}
-            {view === 'setup' ? <StripeReadiness /> : view === 'creator' ? <FinanceManager key={scenario} /> : view === 'payout' ? <PayoutReconciliationReview /> : view === 'dispute' ? <DisputeReconciliationReview /> : <AdSettlementReview />}
+            {view === 'costs' ? <ProviderCostReview /> : view === 'setup' ? <StripeReadiness /> : view === 'creator' ? <FinanceManager key={scenario} /> : view === 'payout' ? <PayoutReconciliationReview /> : view === 'dispute' ? <DisputeReconciliationReview /> : <AdSettlementReview />}
             <DonationPromptModal show={showSupport} suggestedAmountCents={supportConfig?.suggestedDonationCents ?? 500} recurringDefault={false} allowRecurring={supportConfig?.recurringEnabled} platformCutBps={supportConfig?.donationPlatformCutBps} testMode isProcessing={processing}
                 onClose={() => { setShowSupport(false); setNotice('Demo: dialog closed; the free download continues.'); }}
                 onSkip={() => { setShowSupport(false); setNotice('Demo: download continues without a tip.'); }}

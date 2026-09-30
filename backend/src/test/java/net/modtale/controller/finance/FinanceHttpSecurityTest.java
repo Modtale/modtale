@@ -62,6 +62,7 @@ class FinanceHttpSecurityTest {
     private static final String RECONCILE = "/api/v1/admin/finance/payout-reconciliation";
     private static final String DISPUTES = "/api/v1/admin/finance/dispute-reconciliation";
     private static final String READINESS = "/api/v1/admin/finance/stripe-readiness";
+    private static final String COSTS = "/api/v1/admin/finance/provider-costs";
     private static final String SECRET = "fixture-signing-secret";
     private AnnotationConfigWebApplicationContext context;
     private MockMvc mvc;
@@ -109,6 +110,8 @@ class FinanceHttpSecurityTest {
         @Bean DisputeReconciliationController disputeController(PaymentAdjustmentService adjustments, AccountService accounts) { return new DisputeReconciliationController(adjustments, accounts); }
         @Bean StripeReadinessService readiness() { return mock(StripeReadinessService.class); }
         @Bean StripeReadinessController readinessController(StripeReadinessService readiness) { return new StripeReadinessController(readiness); }
+        @Bean ProviderCostEvidenceService costs() { return mock(ProviderCostEvidenceService.class); }
+        @Bean ProviderCostEvidenceController costController(ProviderCostEvidenceService costs, AccountService accounts) { return new ProviderCostEvidenceController(costs, accounts); }
         @Bean DonationController donationController() { return new DonationController(); }
         @Bean CreatorRevenueController creatorController() { return new CreatorRevenueController(); }
         @Bean RecurringSupportController recurringController(RecurringSupportService service, AccountService accounts) { return new RecurringSupportController(service, accounts); }
@@ -449,6 +452,37 @@ class FinanceHttpSecurityTest {
                 .andExpect(jsonPath("$.checks[0].passed").value(false));
         verify(bean(StripeReadinessService.class)).verifyProviderConfiguration();
         verify(bean(StripeReadinessService.class), never()).configuration();
+    }
+    private static String costBody() { return "{\"balanceTransactionId\":\"txn_fixture\",\"expectedAccountId\":\"acct_fixture\",\"expectedTestMode\":true,\"reason\":\"Verified provider record\",\"recordedBy\":\"other\"}"; }
+    @Test void providerCostEvidenceListRequiresBrowserFinanceManager() throws Exception {
+        mvc.perform(browser(get(COSTS))).andExpect(status().isForbidden());
+        mvc.perform(browser(get(COSTS)).with(authentication(session(owner)))).andExpect(status().isForbidden());
+        apiKey(reviewer);
+        mvc.perform(browser(get(COSTS)).header("X-MODTALE-KEY", "fixture-key")).andExpect(status().isForbidden());
+        verifyNoInteractions(bean(ProviderCostEvidenceService.class));
+        when(bean(ProviderCostEvidenceService.class).list(reviewer)).thenReturn(List.of());
+        mvc.perform(browser(get(COSTS)).with(authentication(session(reviewer)))).andExpect(status().isOk());
+        verify(bean(ProviderCostEvidenceService.class)).list(reviewer);
+    }
+    @Test void costImportRequiresCsrfAndBindsAuthenticatedReviewer() throws Exception {
+        String path = COSTS + "/import-stripe";
+        mvc.perform(browser(post(path)).with(authentication(session(reviewer))).contentType("application/json").content(costBody())).andExpect(status().isForbidden());
+        mvc.perform(csrf(browser(post(path))).with(authentication(session(owner))).contentType("application/json").content(costBody())).andExpect(status().isForbidden());
+        apiKey(reviewer);
+        mvc.perform(browser(post(path)).header("X-MODTALE-KEY", "fixture-key").contentType("application/json").content(costBody())).andExpect(status().isForbidden());
+        verifyNoInteractions(bean(ProviderCostEvidenceService.class));
+        mvc.perform(csrf(browser(post(path))).with(authentication(session(reviewer))).contentType("application/json").content(costBody())).andExpect(status().isOk());
+        verify(bean(ProviderCostEvidenceService.class)).retrieveAndImport(reviewer,
+                new ProviderCostEvidenceService.ImportRequest("txn_fixture", "acct_fixture", true, "Verified provider record"));
+        verifyNoInteractions(bean(FinanceWalletService.class));
+    }
+    @Test void malformedCostScopeAndMissingModeNeverReachImport() throws Exception {
+        for (String body : List.of(costBody().replace("txn_fixture", "txn_bad/path"), costBody().replace("acct_fixture", "acct_bad?query"),
+                costBody().replace("true", "null"), costBody().replace("Verified provider record", "  "))) {
+            mvc.perform(csrf(browser(post(COSTS + "/import-stripe"))).with(authentication(session(reviewer)))
+                    .contentType("application/json").content(body)).andExpect(status().isBadRequest());
+        }
+        verifyNoInteractions(bean(ProviderCostEvidenceService.class));
     }
     private static String event() { return "{\"id\":\"evt_fixture\",\"type\":\"checkout.session.completed\",\"livemode\":false,\"api_version\":\"" + StripeGatewayService.API_VERSION + "\",\"data\":{\"object\":{\"id\":\"cs_fixture\"}}}"; }
     private static String signature(String body) throws Exception {
