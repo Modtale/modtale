@@ -114,6 +114,12 @@ export const FinanceManager: React.FC = () => {
     const currency = (data?.currency || 'usd').toUpperCase();
     const availableCents = Number(data?.testMode ? data?.testAvailableCents || 0 : data?.availableCents || 0);
     const isOrgContext = data?.ownerAccountType === 'ORGANIZATION';
+    const savedRecipients = (data?.orgPayoutShares || []).filter((share: any) => Number(share.percent) > 0);
+    const recipientsReady = isOrgContext && data?.orgPayoutMode === 'DISTRIBUTE_TO_MEMBERS'
+        ? savedRecipients.length > 0 && savedRecipients.every((share: any) => orgMembers.some(member => member.userId === share.userId && member.stripeConnected && member.stripePayoutsEnabled))
+        : !!data?.stripeConnected && !!data?.stripeOnboardingComplete && !!data?.stripePayoutsEnabled;
+    const payoutReady = !!data?.withdrawalsEnabled && recipientsReady && !data?.payoutHold
+        && availableCents >= Number(data?.minPayoutCents || 1000);
 
     const formatMoney = (cents: number) => new Intl.NumberFormat(undefined, {
         style: 'currency',
@@ -226,7 +232,7 @@ export const FinanceManager: React.FC = () => {
     };
 
     const handleRequestPayout = async () => {
-        if (actionInFlightRef.current || !data?.withdrawalsEnabled) return;
+        if (actionInFlightRef.current || !payoutReady) return;
         const parsed = payoutAmount.trim() ? parseSupportAmount(payoutAmount, data?.minPayoutCents || 1000, availableCents) : undefined;
         if (parsed === null) { setStatus({ type: 'warning', title: 'Check Amount', msg: 'Enter a valid amount between the minimum payout and your available balance.' }); return; }
         actionInFlightRef.current = true; setBusyAction('payout');
@@ -480,11 +486,12 @@ export const FinanceManager: React.FC = () => {
                             className={inputNoNativeUi}
                         />
                     </div>
-                    <button onClick={handleRequestPayout} disabled={!!busyAction || !data?.withdrawalsEnabled || data?.payoutHold || Number(availableCents) < Number(data?.minPayoutCents || 1000)} className={theme.components.buttonPrimary + ' h-[46px]'}>
+                    <button onClick={handleRequestPayout} disabled={!!busyAction || !payoutReady} className={theme.components.buttonPrimary + ' h-[46px]'}>
                         <CreditCard className="h-4 w-4" /> Request Payout
                     </button>
                 </div>
                 <p className="text-xs text-slate-500 dark:text-slate-400">Minimum payout: {formatMoney(data?.minPayoutCents || 1000)}</p>
+                {!recipientsReady && <p className="text-sm text-slate-500 dark:text-slate-400">Complete and refresh payout onboarding for every recipient before requesting a transfer.</p>}
             </div>
 
             <section className={theme.components.panel + ' p-5'} aria-labelledby="payout-history-title">

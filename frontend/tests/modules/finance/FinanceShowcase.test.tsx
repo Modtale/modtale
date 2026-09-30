@@ -18,6 +18,7 @@ describe('synthetic finance showcase', () => {
         expect(host.textContent).toContain('Finance demo');
         expect(host.textContent).toContain('Your monthly support');
         expect(host.textContent).toContain('Synthetic preview data only');
+        expect([...host.querySelectorAll('button')].find(button => button.textContent?.includes('Request Payout'))?.disabled).toBe(true);
         await act(async () => [...host.querySelectorAll('button')].find(button => button.textContent === 'Open support dialog')!.click());
         expect(host.querySelector('[role="dialog"]')).not.toBeNull();
         expect(host.textContent).toContain('Payment processing fees');
@@ -30,6 +31,28 @@ describe('synthetic finance showcase', () => {
         await act(async () => { state.value = 'settled'; state.dispatchEvent(new Event('change', { bubbles: true })); });
         expect(host.textContent).toContain('$65.00');
         expect(host.textContent).toContain('$30.00');
+        expect([...host.querySelectorAll('button')].find(button => button.textContent?.includes('Request Payout'))?.disabled).toBe(false);
         expect(host.textContent).not.toContain('No data selected');
+    });
+    it('shows provisional ad review and audit without any account or payment request', async () => {
+        const read = vi.spyOn(api, 'get'); const write = vi.spyOn(api, 'post');
+        await act(async () => root.render(<FinanceShowcase />));
+        await act(async () => [...host.querySelectorAll('button')].find(button => button.textContent === 'Show ad review')!.click());
+        await act(async () => [...host.querySelectorAll('button')].find(button => button.textContent?.includes('demo-network · demo-2026-08'))!.click());
+        expect(host.textContent).toContain('Credit release locked');
+        expect(host.textContent).toContain('$1,200.00');
+        expect(host.textContent).toContain('$900.00');
+        expect(host.textContent).toContain('historical owner identity needs review');
+        const review = [...host.querySelectorAll('button')].find(button => button.textContent === 'Mark provisionally reviewed')!;
+        expect(review.disabled).toBe(true);
+        const reason = host.querySelector('textarea')!;
+        await act(async () => {
+            Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!.call(reason, 'Synthetic review only; no verified funding.');
+            reason.dispatchEvent(new Event('input', { bubbles: true }));
+        });
+        await act(async () => review.click());
+        expect(host.textContent).toContain('Creator credit release remains locked');
+        expect(host.textContent).toContain('REVIEWED PROVISIONAL');
+        expect(read).not.toHaveBeenCalled(); expect(write).not.toHaveBeenCalled();
     });
 });

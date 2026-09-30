@@ -3,9 +3,12 @@ import { FinanceManager } from '@/modules/user/views/FinanceManager';
 import { DonationPromptModal } from '@/modules/project/components/dialogs/DonationPromptModal';
 import { financeClient } from '@/modules/finance/api/financeClient';
 import { api } from '@/utils/api';
+import { AdSettlementReview } from '@/modules/finance/components/AdSettlementReview';
+import { createAdSettlementFixture } from './adSettlementFixture';
 
 export default function FinanceShowcase() {
     const [scenario, setScenario] = useState('unavailable');
+    const [view, setView] = useState('creator');
     const scenarioRef = useRef(scenario);
     scenarioRef.current = scenario;
     const [ready, setReady] = useState(false);
@@ -15,6 +18,15 @@ export default function FinanceShowcase() {
     const [processing, setProcessing] = useState(false);
     useEffect(() => {
         const previous = { ...financeClient };
+        let adStage = createAdSettlementFixture();
+        financeClient.getAdSettlementStages = async () => [{ ...adStage, ...adStage.snapshots.at(-1), snapshots: undefined, audit: undefined }];
+        financeClient.getAdSettlementStage = async () => adStage;
+        financeClient.stageAdSettlement = async () => { throw new Error('Demo only: no report is stored.'); };
+        financeClient.amendAdSettlement = async () => { throw new Error('Demo only: no report is amended.'); };
+        financeClient.reviewAdSettlement = async (_id, review) => {
+            adStage = { ...adStage, status: review.decision || 'REVIEWED_PROVISIONAL', audit: [...adStage.audit, { operationId: review.operationId, action: review.decision || 'REVIEWED_PROVISIONAL', revision: 1, actorId: 'demo-reviewer', reason: review.reason, createdAt: new Date().toISOString() }] };
+            return adStage;
+        };
         const interceptor = api.interceptors.request.use(() => { throw new Error('Network access is disabled in the finance demo.'); });
         financeClient.getFinanceContexts = async () => [{ id: 'synthetic-creator', username: 'Demo creator', isPersonal: true }];
         financeClient.getSupportSubscriptions = async () => [{ id: 'demo-subscription', projectId: 'demo-project', projectTitle: 'Demo monthly support', projectUrl: '', amountCents: 500, currency: 'usd', status: 'active', cancelAtPeriodEnd: true, testMode: true }];
@@ -29,7 +41,7 @@ export default function FinanceShowcase() {
         const support = settledEarnings.map((point, index) => ({ ...point, count: point.count - ads[index].count }));
         if (scenario === 'error') throw new Error('Synthetic finance service interruption.');
         return { ownerId: 'synthetic-creator', ownerAccountType: 'PERSONAL', currency: 'usd', testMode: true,
-            withdrawalsEnabled: !disabled, onboardingEnabled: false, stripeConnected: false, stripePayoutsEnabled: false,
+            withdrawalsEnabled: !disabled, onboardingEnabled: false, stripeConnected: scenario === 'settled', stripeOnboardingComplete: scenario === 'settled', stripePayoutsEnabled: scenario === 'settled',
             availableCents: 0, testAvailableCents: scenario === 'settled' ? 2500 : 0,
             pendingCents: scenario === 'pending' ? 1850 : 0, paidOutCents: scenario === 'settled' ? 4000 : scenario === 'pending' ? 1000 : 0,
             adjustmentOwedCents: scenario === 'refund' ? 45 : 0, payoutHold: scenario === 'refund',
@@ -50,13 +62,14 @@ export default function FinanceShowcase() {
             <header className="mb-6 rounded-2xl border-2 border-dashed border-blue-500 bg-blue-50 p-4 dark:bg-blue-950/30">
                 <h1 className="font-black">Finance demo · No payments</h1><p className="mt-1 text-sm">Synthetic component showcase. Account and payment network requests are disabled. This page is excluded from normal production access.</p>
                 <div className="mt-4 flex flex-wrap gap-2">
+                    <button type="button" className="rounded border px-3 py-2 text-sm" onClick={() => setView(value => value === 'creator' ? 'admin' : 'creator')}>{view === 'creator' ? 'Show ad review' : 'Show creator dashboard'}</button>
                     <label className="text-sm">Dashboard state <select value={scenario} onChange={event => setScenario(event.target.value)} className="rounded border bg-white px-2 py-2 text-slate-900"><option value="unavailable">Unavailable</option><option value="pending">Pending earnings</option><option value="settled">Settled earnings</option><option value="refund">Refund adjustment</option><option value="error">Service error</option></select></label>
                     <button className="rounded border px-3 py-2 text-sm" onClick={() => setDark(value => !value)}>Toggle theme</button>
                     <button className="rounded bg-blue-600 px-3 py-2 text-sm text-white" onClick={() => { setNotice(''); setShowSupport(true); }}>Open support dialog</button>
                 </div>
             </header>
             {notice && <p role="status" className="mb-4 rounded-xl border border-blue-300 p-3 text-sm">{notice}</p>}
-            <FinanceManager key={scenario} />
+            {view === 'creator' ? <FinanceManager key={scenario} /> : <AdSettlementReview />}
             <DonationPromptModal show={showSupport} suggestedAmountCents={500} recurringDefault={false} allowRecurring platformCutPercent={10} testMode isProcessing={processing}
                 onClose={() => { setShowSupport(false); setNotice('Demo: dialog closed; the free download continues.'); }}
                 onSkip={() => { setShowSupport(false); setNotice('Demo: download continues without a tip.'); }}

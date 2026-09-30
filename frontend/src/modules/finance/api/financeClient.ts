@@ -1,6 +1,12 @@
 import { api } from '@/utils/api';
+import type { AdStageReport } from '@/modules/finance/components/AdSettlementReview';
 
 export const financeClient = {
+    getAdSettlementStages: async () => (await api.get('/finance/admin/ad-settlements')).data,
+    getAdSettlementStage: async (id: string) => (await api.get(`/finance/admin/ad-settlements/${encodeURIComponent(id)}`)).data,
+    stageAdSettlement: async (report: AdStageReport) => (await api.post('/finance/admin/ad-settlements', report)).data,
+    amendAdSettlement: async (id: string, amendment: { expectedRevision: number; operationId: string; report: AdStageReport; reason: string }) => (await api.post(`/finance/admin/ad-settlements/${encodeURIComponent(id)}/amendments`, amendment)).data,
+    reviewAdSettlement: async (id: string, review: { expectedRevision: number; operationId: string; decision?: string; reason: string }) => (await api.post(`/finance/admin/ad-settlements/${encodeURIComponent(id)}/reviews`, review)).data,
     getCreatorOverview: async (range: string, ownerId?: string) => (
         await api.get('/finance/creator/overview', { params: { range, ownerId } })
     ).data,
