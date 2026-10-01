@@ -25,6 +25,7 @@ public class ModjamSubmission {
 
     private String submitterId;
     private List<Vote> votes = new ArrayList<>();
+    private long voteRevision;
 
     private Map<String, Double> categoryScores;
     private Double totalScore;
@@ -95,6 +96,8 @@ public class ModjamSubmission {
     public void setSubmitterId(String submitterId) { this.submitterId = submitterId; }
     public List<Vote> getVotes() { return votes; }
     public void setVotes(List<Vote> votes) { this.votes = votes; }
+    public long getVoteRevision() { return voteRevision; }
+    public void setVoteRevision(long voteRevision) { this.voteRevision = voteRevision; }
     public Map<String, Double> getCategoryScores() { return categoryScores; }
     public void setCategoryScores(Map<String, Double> categoryScores) { this.categoryScores = categoryScores; }
     public Double getTotalScore() { return totalScore; }

@@ -187,6 +187,7 @@ public class Project {
     private List<String> childProjectIds;
 
     private List<String> modjamIds = new ArrayList<>();
+    private boolean modjamPublicationPending;
 
     private boolean allowModpacks = true;
     private boolean allowComments = true;
@@ -292,6 +293,8 @@ public class Project {
 
     public List<String> getModjamIds() { return modjamIds; }
     public void setModjamIds(List<String> modjamIds) { this.modjamIds = modjamIds; }
+    public boolean isModjamPublicationPending() { return modjamPublicationPending; }
+    public void setModjamPublicationPending(boolean modjamPublicationPending) { this.modjamPublicationPending = modjamPublicationPending; }
 
     public boolean isAllowModpacks() { return allowModpacks; }
     public void setAllowModpacks(boolean allowModpacks) { this.allowModpacks = allowModpacks; }

@@ -31,7 +31,7 @@ public class ModjamCustomizationService {
         if (jam.getTitle() == null || jam.getTitle().trim().length() < 5 || jam.getTitle().length() > 150) {
             throw new IllegalArgumentException("Jam title must be 5–150 characters.");
         }
-        if (!Set.of("DRAFT", "UPCOMING", "ACTIVE", "VOTING", "AWAITING_WINNERS", "COMPLETED").contains(jam.getStatus())) {
+        if (jam.getStatus() == null || !Set.of("DRAFT", "UPCOMING", "ACTIVE", "VOTING", "AWAITING_WINNERS", "COMPLETED").contains(jam.getStatus())) {
             throw new IllegalArgumentException("Invalid jam status.");
         }
         if (!"DRAFT".equals(jam.getStatus())) {

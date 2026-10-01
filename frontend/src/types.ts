@@ -408,6 +408,11 @@ export interface ModjamCategory {
     maxScore: number;
 }
 
+export type JamPermission = 'EDIT_DETAILS' | 'EDIT_RULES' | 'MANAGE_SETTINGS' | 'MANAGE_JUDGES' | 'VIEW_RESULTS' | 'ANNOUNCE_WINNERS';
+export interface JamOrganizerRole { id: string; name: string; color: string; permissions: JamPermission[]; }
+export interface JamOrganizerMember { userId: string; roleId: string; }
+export interface JamOrganizerInvite { userId: string; username: string; roleId: string; }
+
 export interface ModjamRestrictions {
     requireNewProject?: boolean;
     requireSourceRepo?: boolean;
@@ -449,6 +454,9 @@ export interface Modjam {
     participantIds: string[];
     judgeIds?: string[];
     pendingJudgeInvites?: string[];
+    organizerRoles?: JamOrganizerRole[];
+    organizerMembers?: JamOrganizerMember[];
+    pendingOrganizerInvites?: JamOrganizerInvite[];
     categories: ModjamCategory[];
     allowPublicVoting: boolean;
     allowConcurrentVoting: boolean;

@@ -33,8 +33,11 @@ class ModjamServiceTest {
         modjamRepository = mock(ModjamRepository.class);
         storageService = mock(StorageService.class);
         ReflectionTestUtils.setField(service, "modjamRepository", modjamRepository);
+        ReflectionTestUtils.setField(service, "feedService", mock(net.modtale.service.jam.ModjamDiscordFeedService.class));
         ReflectionTestUtils.setField(service, "storageService", storageService);
         ReflectionTestUtils.setField(service, "userRepository", mock(UserRepository.class));
+        ReflectionTestUtils.setField(service, "organizerService", new net.modtale.service.jam.ModjamOrganizerService(
+                modjamRepository, mock(UserRepository.class), mock(org.springframework.data.mongodb.core.MongoTemplate.class)));
     }
 
     @Test

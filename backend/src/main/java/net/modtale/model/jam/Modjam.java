@@ -8,6 +8,8 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.LinkedHashMap;
 
 @Document(collection = "modjams")
 public class Modjam {
@@ -35,6 +37,18 @@ public class Modjam {
     private List<String> participantIds = new ArrayList<>();
     private List<String> judgeIds = new ArrayList<>();
     private List<String> pendingJudgeInvites = new ArrayList<>();
+    private Map<String, String> pendingJudgeInviteUsers = new LinkedHashMap<>();
+    private List<OrganizerRole> organizerRoles = new ArrayList<>();
+    private List<OrganizerMember> organizerMembers = new ArrayList<>();
+    private List<OrganizerInvite> pendingOrganizerInvites = new ArrayList<>();
+
+    public enum JamPermission {
+        EDIT_DETAILS, EDIT_RULES, MANAGE_SETTINGS, MANAGE_JUDGES, VIEW_RESULTS, ANNOUNCE_WINNERS
+    }
+
+    public record OrganizerRole(String id, String name, String color, Set<JamPermission> permissions) {}
+    public record OrganizerMember(String userId, String roleId) {}
+    public record OrganizerInvite(String userId, String username, String roleId) {}
 
     @Transient
     private List<Map<String, String>> judgeProfiles = new ArrayList<>();
@@ -128,6 +142,8 @@ public class Modjam {
     private boolean oneEntryPerPerson = true;
     private boolean hideSubmissions;
 
+    private Instant publishedAt;
+    private Instant winnersAnnouncedAt;
     private Instant createdAt = Instant.now();
     private Instant updatedAt = Instant.now();
 
@@ -165,6 +181,14 @@ public class Modjam {
     public void setJudgeIds(List<String> judgeIds) { this.judgeIds = judgeIds; }
     public List<String> getPendingJudgeInvites() { return pendingJudgeInvites; }
     public void setPendingJudgeInvites(List<String> pendingJudgeInvites) { this.pendingJudgeInvites = pendingJudgeInvites; }
+    public Map<String, String> getPendingJudgeInviteUsers() { return pendingJudgeInviteUsers; }
+    public void setPendingJudgeInviteUsers(Map<String, String> values) { pendingJudgeInviteUsers = values; }
+    public List<OrganizerRole> getOrganizerRoles() { return organizerRoles; }
+    public void setOrganizerRoles(List<OrganizerRole> values) { organizerRoles = values; }
+    public List<OrganizerMember> getOrganizerMembers() { return organizerMembers; }
+    public void setOrganizerMembers(List<OrganizerMember> values) { organizerMembers = values; }
+    public List<OrganizerInvite> getPendingOrganizerInvites() { return pendingOrganizerInvites; }
+    public void setPendingOrganizerInvites(List<OrganizerInvite> values) { pendingOrganizerInvites = values; }
     public List<Map<String, String>> getJudgeProfiles() { return judgeProfiles; }
     public void setJudgeProfiles(List<Map<String, String>> judgeProfiles) { this.judgeProfiles = judgeProfiles; }
     public List<Category> getCategories() { return categories; }
@@ -181,6 +205,10 @@ public class Modjam {
     public void setOneEntryPerPerson(boolean oneEntryPerPerson) { this.oneEntryPerPerson = oneEntryPerPerson; }
     public boolean isHideSubmissions() { return hideSubmissions; }
     public void setHideSubmissions(boolean hideSubmissions) { this.hideSubmissions = hideSubmissions; }
+    public Instant getWinnersAnnouncedAt() { return winnersAnnouncedAt; }
+    public void setWinnersAnnouncedAt(Instant value) { winnersAnnouncedAt = value; }
+    public Instant getPublishedAt() { return publishedAt; }
+    public void setPublishedAt(Instant value) { publishedAt = value; }
     public Instant getCreatedAt() { return createdAt; }
     public void setCreatedAt(Instant createdAt) { this.createdAt = createdAt; }
     public Instant getUpdatedAt() { return updatedAt; }

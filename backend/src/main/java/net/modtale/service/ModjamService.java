@@ -11,7 +11,17 @@ import net.modtale.repository.jam.ModjamSubmissionRepository;
 import net.modtale.repository.project.ProjectRepository;
 import net.modtale.repository.user.UserRepository;
 import net.modtale.service.storage.StorageService;
+import net.modtale.service.security.validation.FileValidationService;
 import net.modtale.service.jam.ModjamCustomizationService;
+import net.modtale.service.jam.ModjamOrganizerService;
+import net.modtale.service.jam.ModjamDiscordFeedService;
+import net.modtale.model.jam.Modjam.JamPermission;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.beans.BeanWrapperImpl;
+import net.modtale.service.jam.ModjamPhase;
+import net.modtale.service.jam.ModjamVotePersistence;
+import net.modtale.service.jam.ModjamMembershipPersistence;
+import net.modtale.service.security.access.AccessControlService;
 import net.modtale.service.project.lifecycle.LifecycleService;
 import net.modtale.service.user.account.AccountService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -22,6 +32,7 @@ import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.http.HttpStatus;
 import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
@@ -36,6 +47,9 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.nio.file.Files;
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -53,10 +67,16 @@ public class ModjamService {
     @Autowired private UserRepository userRepository;
     @Autowired private ProjectRepository projectRepository;
     @Autowired private StorageService storageService;
+    @Autowired private FileValidationService fileValidationService;
     @Autowired private MongoTemplate mongoTemplate;
     @Autowired private AccountService accountService;
     @Autowired private ModjamCustomizationService customizationService;
+    @Autowired private ModjamOrganizerService organizerService;
+    @Autowired private ModjamDiscordFeedService feedService;
     @Autowired private LifecycleService lifecycleService;
+    @Autowired private AccessControlService accessControlService;
+    @Autowired private ModjamVotePersistence votePersistence;
+    @Autowired private ModjamMembershipPersistence membershipPersistence;
 
     @Value("${app.r2.public-domain:#{null}}")
     private String publicDomain;
@@ -163,6 +183,89 @@ public class ModjamService {
         return jam;
     }
 
+    private User browserViewer() {
+        var auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null && auth.getAuthorities().stream().anyMatch(authority -> "ROLE_API".equals(authority.getAuthority()))) return null;
+        return accountService.getCurrentUser();
+    }
+
+    private Modjam publicJam(Modjam jam) {
+        Modjam response = new Modjam();
+        BeanUtils.copyProperties(jam, response);
+        response.setPendingJudgeInvites(new ArrayList<>());
+        response.setPendingJudgeInviteUsers(new LinkedHashMap<>());
+        response.setPendingOrganizerInvites(new ArrayList<>());
+        return enrichAndReturn(response);
+    }
+
+    public Modjam jamForViewer(Modjam jam, User viewer) {
+        return jamForViewer(jam, viewer == null ? null : viewer.getId(), viewer == null ? null : viewer.getUsername());
+    }
+
+    private Modjam jamForViewer(Modjam jam, String viewerId, String viewerName) {
+        if (jam == null) return null;
+        if (viewerId != null && Objects.equals(jam.getHostId(), viewerId)) return enrichAndReturn(jam);
+        Modjam response = publicJam(jam);
+        if (viewerId != null && jam.getPendingOrganizerInvites() != null) {
+            response.setPendingOrganizerInvites(jam.getPendingOrganizerInvites().stream().filter(invite -> viewerId.equals(invite.userId())).toList());
+        }
+        if (viewerId != null && jam.getPendingJudgeInviteUsers() != null && jam.getPendingJudgeInviteUsers().containsKey(viewerId)) {
+            String name = viewerName == null ? jam.getPendingJudgeInviteUsers().get(viewerId) : viewerName;
+            if (name != null) response.setPendingJudgeInvites(List.of(name));
+        }
+        return response;
+    }
+
+    private void requireUpdatePermissions(Modjam jam, Modjam update, String userId) {
+        if (Objects.equals(jam.getHostId(), userId)) return;
+        if (!organizerService.isOrganizer(jam, userId)) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only organizers can edit this jam.");
+        if (!Objects.equals(jam.getTitle(), update.getTitle()) || !Objects.equals(jam.getDescription(), update.getDescription())
+                || !Objects.equals(jam.getSlug(), update.getSlug()) || !Objects.equals(jam.getCustomCss(), update.getCustomCss())) {
+            organizerService.require(jam, userId, JamPermission.EDIT_DETAILS);
+        }
+        if (!Objects.equals(jam.getRules(), update.getRules())) organizerService.require(jam, userId, JamPermission.EDIT_RULES);
+        if (!Objects.equals(jam.getStartDate(), update.getStartDate()) || !Objects.equals(jam.getEndDate(), update.getEndDate())
+                || !Objects.equals(jam.getVotingEndDate(), update.getVotingEndDate()) || !Objects.equals(jam.getStatus(), update.getStatus())
+                || jam.isAllowPublicVoting() != update.isAllowPublicVoting() || jam.isAllowConcurrentVoting() != update.isAllowConcurrentVoting()
+                || jam.isShowResultsBeforeVotingEnds() != update.isShowResultsBeforeVotingEnds() || jam.isOneEntryPerPerson() != update.isOneEntryPerPerson()
+                || jam.isHideSubmissions() != update.isHideSubmissions() || !Objects.equals(beanProperties(jam.getRestrictions()), beanProperties(update.getRestrictions()))
+                || !Objects.equals(categoryProperties(jam.getCategories()), categoryProperties(update.getCategories()))) {
+            organizerService.require(jam, userId, JamPermission.MANAGE_SETTINGS);
+        }
+    }
+
+    private Modjam persistEditableFields(Modjam jam, String expectedStatus) {
+        // Host edits must not replace participants, ballots, invitations or role
+        // grants changed by another request while the edit form was open.
+        org.springframework.data.mongodb.core.query.Update update = new org.springframework.data.mongodb.core.query.Update();
+        for (String field : List.of("slug", "title", "description", "rules", "customCss", "startDate", "endDate", "votingEndDate",
+                "allowPublicVoting", "allowConcurrentVoting", "showResultsBeforeVotingEnds", "oneEntryPerPerson", "hideSubmissions",
+                "restrictions", "categories", "status", "publishedAt", "updatedAt")) {
+            update.set(field, new BeanWrapperImpl(jam).getPropertyValue(field));
+        }
+        Criteria expected = Criteria.where("_id").is(jam.getId()).and("status").is(expectedStatus);
+        if (!"COMPLETED".equals(expectedStatus)) expected.and("finalizationHash").exists(false);
+        var persisted = mongoTemplate.updateFirst(Query.query(expected), update, Modjam.class);
+        if (persisted.getMatchedCount() == 0) throw new ResponseStatusException(HttpStatus.CONFLICT, "This jam changed or was finalized. Refresh before saving.");
+        return jam;
+    }
+
+    private static Map<String, Object> beanProperties(Object bean) {
+        if (bean == null) return Map.of();
+        var wrapper = new BeanWrapperImpl(bean);
+        Map<String, Object> result = new HashMap<>();
+        for (var property : wrapper.getPropertyDescriptors()) {
+            if (!"class".equals(property.getName()) && wrapper.isReadableProperty(property.getName())) {
+                result.put(property.getName(), wrapper.getPropertyValue(property.getName()));
+            }
+        }
+        return result;
+    }
+
+    private static List<Map<String, Object>> categoryProperties(List<Modjam.Category> categories) {
+        return categories == null ? List.of() : categories.stream().map(ModjamService::beanProperties).toList();
+    }
+
     private void requireHost(Modjam jam, String userId) {
         if (!Objects.equals(jam.getHostId(), userId)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only the host can manage this jam");
@@ -171,19 +274,12 @@ public class ModjamService {
 
 
     private static String effectivePhase(Modjam jam, Instant now) {
-        if ("DRAFT".equals(jam.getStatus()) || "COMPLETED".equals(jam.getStatus())) {
-            return jam.getStatus();
-        }
-        if (jam.getStartDate() != null && now.isBefore(jam.getStartDate())) return "UPCOMING";
-        if (jam.getEndDate() != null && now.isBefore(jam.getEndDate())) return "ACTIVE";
-        if (jam.getVotingEndDate() != null && now.isBefore(jam.getVotingEndDate())) return "VOTING";
-        if (jam.getEndDate() != null || jam.getVotingEndDate() != null) return "AWAITING_WINNERS";
-        return jam.getStatus() == null ? "" : jam.getStatus();
+        return ModjamPhase.current(jam, now);
     }
 
 
     private boolean canManageResults(Modjam jam, String userId) {
-        return userId != null && (Objects.equals(jam.getHostId(), userId)
+        return userId != null && (organizerService.permits(jam, userId, JamPermission.VIEW_RESULTS)
                 || (jam.getJudgeIds() != null && jam.getJudgeIds().contains(userId)));
     }
 
@@ -197,8 +293,7 @@ public class ModjamService {
                 .toList());
 
         boolean resultsVisible = canManage || jam.isShowResultsBeforeVotingEnds()
-                || List.of("COMPLETED", "AWAITING_WINNERS").contains(jam.getStatus())
-                || (jam.getVotingEndDate() != null && !Instant.now().isBefore(jam.getVotingEndDate()));
+                || List.of("COMPLETED", "AWAITING_WINNERS").contains(effectivePhase(jam, Instant.now()));
         if (!resultsVisible) {
             response.setCategoryScores(null);
             response.setTotalScore(null);
@@ -273,27 +368,41 @@ public class ModjamService {
     }
 
     public List<Modjam> getAllJams() {
-        return modjamRepository.findAll().stream().map(this::enrichAndReturn).collect(Collectors.toList());
+        return modjamRepository.findAll().stream().filter(jam -> !"DRAFT".equals(jam.getStatus())).map(this::publicJam).collect(Collectors.toList());
     }
 
     public List<Modjam> getUserHostedJams(String hostId) {
-        return modjamRepository.findByHostId(hostId).stream().map(this::enrichAndReturn).collect(Collectors.toList());
+        return modjamRepository.findAll().stream().filter(jam -> organizerService.isOrganizer(jam, hostId)).map(jam -> jamForViewer(jam, hostId, null)).collect(Collectors.toList());
     }
 
     public Modjam getJamBySlug(String slug) {
-        return enrichAndReturn(modjamRepository.findBySlug(slug)
-                .orElseThrow(() -> new IllegalArgumentException("Jam not found")));
+        Modjam jam = modjamRepository.findBySlug(slug).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Jam not found"));
+        User viewer = browserViewer();
+        String viewerId = viewer == null ? null : viewer.getId();
+        boolean invited = viewerId != null && jam.getPendingOrganizerInvites() != null
+                && jam.getPendingOrganizerInvites().stream().anyMatch(invite -> viewerId.equals(invite.userId()));
+        if ("DRAFT".equals(jam.getStatus()) && !organizerService.isOrganizer(jam, viewerId) && !invited) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Jam not found");
+        }
+        return jamForViewer(jam, viewerId, viewer == null ? null : viewer.getUsername());
     }
 
     public Modjam createJam(Modjam jam, String hostId, String hostName) {
         jam.setId(null);
         jam.setHostId(hostId);
         jam.setHostName(hostName);
+        jam.setPublishedAt(null);
+        jam.setWinnersAnnouncedAt(null);
         customizationService.validate(jam);
+        if ("COMPLETED".equals(jam.getStatus())) throw new IllegalArgumentException("Create a draft and announce winners after voting closes.");
         // Incoming document fields do not confer membership or management authority.
         jam.setParticipantIds(new ArrayList<>());
         jam.setJudgeIds(new ArrayList<>());
         jam.setPendingJudgeInvites(new ArrayList<>());
+        jam.setPendingJudgeInviteUsers(new LinkedHashMap<>());
+        jam.setOrganizerRoles(new ArrayList<>());
+        jam.setOrganizerMembers(new ArrayList<>());
+        jam.setPendingOrganizerInvites(new ArrayList<>());
 
         if (jam.getSlug() == null || jam.getSlug().trim().isEmpty()) {
             throw new IllegalArgumentException("A custom URL slug is required.");
@@ -307,10 +416,9 @@ public class ModjamService {
         }
         jam.setSlug(newSlug);
 
-        if (!"DRAFT".equals(jam.getStatus()) && jam.getStartDate() != null && jam.getStartDate().isAfter(Instant.now())) {
-            jam.setStatus("UPCOMING");
-        } else if (!"DRAFT".equals(jam.getStatus())) {
-            jam.setStatus("ACTIVE");
+        if (!"DRAFT".equals(jam.getStatus())) {
+            jam.setStatus(effectivePhase(jam, Instant.now()));
+            jam.setPublishedAt(Instant.now());
         }
 
         jam.setCreatedAt(Instant.now());
@@ -329,13 +437,15 @@ public class ModjamService {
         if (jam.getJudgeIds() == null) jam.setJudgeIds(new ArrayList<>());
         if (jam.getPendingJudgeInvites() == null) jam.setPendingJudgeInvites(new ArrayList<>());
 
-        return enrichAndReturn(modjamRepository.save(jam));
+        Modjam saved = modjamRepository.save(jam);
+        feedService.recordMilestones(saved);
+        return enrichAndReturn(saved);
     }
 
     public Modjam updateJam(String id, Modjam updatedJam, String userId) {
         Modjam jam = modjamRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Jam not found"));
-        requireHost(jam, userId);
+        requireUpdatePermissions(jam, updatedJam, userId);
         customizationService.validate(updatedJam);
         if ("COMPLETED".equals(updatedJam.getStatus()) != "COMPLETED".equals(jam.getStatus())) {
             throw new IllegalArgumentException("Announce winners to complete a jam; completed jams cannot be reopened.");
@@ -404,6 +514,7 @@ public class ModjamService {
         }
 
         jam.setStatus(targetStatus);
+        if ("DRAFT".equals(oldStatus) && !"DRAFT".equals(targetStatus) && jam.getPublishedAt() == null) jam.setPublishedAt(Instant.now());
         jam.setUpdatedAt(Instant.now());
 
         if (jam.isHideSubmissions() && !List.of("VOTING", "COMPLETED", "AWAITING_WINNERS").contains(oldStatus)
@@ -411,17 +522,18 @@ public class ModjamService {
             revealHiddenJamProjects(jam.getId());
         }
 
-        return enrichAndReturn(modjamRepository.save(jam));
+        Modjam saved = persistEditableFields(jam, oldStatus);
+        feedService.recordMilestones(saved);
+        return enrichAndReturn(saved);
     }
 
     public Modjam inviteJudge(String jamId, String username, String hostId) {
         Modjam jam = modjamRepository.findById(jamId).orElseThrow(() -> new IllegalArgumentException("Jam not found"));
-        if (!jam.getHostId().equals(hostId)) throw new SecurityException("Only the host can invite judges.");
+        organizerService.require(jam, hostId, JamPermission.MANAGE_JUDGES);
 
-        Query query = new Query(Criteria.where("username").regex("^" + username + "$", "i"));
-        User targetUser = mongoTemplate.findOne(query, User.class);
+        User targetUser = username == null ? null : userRepository.findByUsernameIgnoreCase(username.trim()).orElse(null);
 
-        if (targetUser == null) {
+        if (targetUser == null || targetUser.isDeleted()) {
             throw new IllegalArgumentException("User '" + username + "' not found.");
         }
 
@@ -435,11 +547,14 @@ public class ModjamService {
         if (jam.getJudgeIds().contains(targetUser.getId())) {
             throw new IllegalArgumentException("User is already a judge.");
         }
-        if (jam.getPendingJudgeInvites().contains(targetUser.getUsername())) {
+        if (jam.getPendingJudgeInviteUsers() != null && jam.getPendingJudgeInviteUsers().containsKey(targetUser.getId())) {
             throw new IllegalArgumentException("User is already invited.");
         }
 
-        jam.getPendingJudgeInvites().add(targetUser.getUsername());
+        Modjam updated = membershipPersistence.inviteJudge(jamId, targetUser.getId(), targetUser.getUsername());
+        if (updated == null) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "This invitation changed. Refresh the jam before inviting again.");
+        }
 
         org.bson.Document notif = new org.bson.Document();
         notif.put("userId", targetUser.getId());
@@ -450,59 +565,54 @@ public class ModjamService {
         notif.put("createdAt", Instant.now());
         mongoTemplate.save(notif, "notifications");
 
-        return enrichAndReturn(modjamRepository.save(jam));
+        return enrichAndReturn(updated);
     }
 
     public Modjam removeJudge(String jamId, String username, String hostId) {
         Modjam jam = modjamRepository.findById(jamId).orElseThrow(() -> new IllegalArgumentException("Jam not found"));
-        if (!jam.getHostId().equals(hostId)) throw new SecurityException("Only the host can remove judges.");
+        organizerService.require(jam, hostId, JamPermission.MANAGE_JUDGES);
 
-        if (jam.getPendingJudgeInvites() != null) {
-            jam.getPendingJudgeInvites().removeIf(u -> u.equalsIgnoreCase(username));
+        Set<String> userIds = new LinkedHashSet<>();
+        if (jam.getPendingJudgeInviteUsers() != null) {
+            jam.getPendingJudgeInviteUsers().entrySet().stream()
+                    .filter(entry -> entry.getValue() != null && entry.getValue().equalsIgnoreCase(username))
+                    .forEach(entry -> userIds.add(entry.getKey()));
         }
-
-        if (jam.getJudgeIds() != null) {
-            Query query = new Query(Criteria.where("username").regex("^" + username + "$", "i"));
-            User targetUser = mongoTemplate.findOne(query, User.class);
-            if (targetUser != null) {
-                jam.getJudgeIds().remove(targetUser.getId());
-            }
-        }
-
-        return enrichAndReturn(modjamRepository.save(jam));
+        User targetUser = username == null ? null : userRepository.findByUsernameIgnoreCase(username.trim()).orElse(null);
+        if (targetUser != null) userIds.add(targetUser.getId());
+        Modjam updated = membershipPersistence.removeJudges(jamId, new ArrayList<>(userIds));
+        if (updated == null) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Jam no longer exists.");
+        return enrichAndReturn(updated);
     }
 
     public Modjam acceptJudgeInvite(String jamId, String userId, String username) {
         Modjam jam = modjamRepository.findById(jamId).orElseThrow(() -> new IllegalArgumentException("Jam not found"));
 
-        if (jam.getPendingJudgeInvites() == null || jam.getPendingJudgeInvites().stream().noneMatch(u -> u.equalsIgnoreCase(username))) {
+        if (jam.getPendingJudgeInviteUsers() == null || !jam.getPendingJudgeInviteUsers().containsKey(userId)) {
             throw new IllegalArgumentException("You don't have a pending invite for this jam.");
         }
 
-        jam.getPendingJudgeInvites().removeIf(u -> u.equalsIgnoreCase(username));
-
-        if (jam.getJudgeIds() == null) jam.setJudgeIds(new ArrayList<>());
-        if (!jam.getJudgeIds().contains(userId)) {
-            jam.getJudgeIds().add(userId);
-        }
-
-        return enrichAndReturn(modjamRepository.save(jam));
+        Modjam updated = membershipPersistence.answerJudgeInvite(jamId, userId, true);
+        if (updated == null) throw new ResponseStatusException(HttpStatus.CONFLICT, "This invitation is no longer pending.");
+        return jamForViewer(updated, userId, username);
     }
 
-    public Modjam declineJudgeInvite(String jamId, String username) {
+    public Modjam declineJudgeInvite(String jamId, String userId, String username) {
         Modjam jam = modjamRepository.findById(jamId).orElseThrow(() -> new IllegalArgumentException("Jam not found"));
 
-        if (jam.getPendingJudgeInvites() != null) {
-            jam.getPendingJudgeInvites().removeIf(u -> u.equalsIgnoreCase(username));
+        if (jam.getPendingJudgeInviteUsers() == null || !jam.getPendingJudgeInviteUsers().containsKey(userId)) {
+            return jamForViewer(jam, userId, username);
         }
-
-        return enrichAndReturn(modjamRepository.save(jam));
+        Modjam updated = membershipPersistence.answerJudgeInvite(jamId, userId, false);
+        if (updated == null) throw new ResponseStatusException(HttpStatus.CONFLICT, "This invitation is no longer pending.");
+        return jamForViewer(updated, userId, username);
     }
 
     public void updateIcon(String jamId, MultipartFile file, String userId) {
         Modjam jam = modjamRepository.findById(jamId)
                 .orElseThrow(() -> new IllegalArgumentException("Jam not found"));
-        requireHost(jam, userId);
+        organizerService.require(jam, userId, JamPermission.EDIT_DETAILS);
+        fileValidationService.validateIcon(file);
 
         try {
             String pathPrefix = "modjams/" + jamId + "/icon";
@@ -510,7 +620,8 @@ public class ModjamService {
             String publicUrl = storageService.getPublicUrl(storageKey);
             jam.setImageUrl(publicUrl);
             jam.setUpdatedAt(Instant.now());
-            modjamRepository.save(jam);
+            mongoTemplate.updateFirst(Query.query(Criteria.where("_id").is(jamId)),
+                    new org.springframework.data.mongodb.core.query.Update().set("imageUrl", publicUrl).set("updatedAt", jam.getUpdatedAt()), Modjam.class);
         } catch (Exception e) {
             throw new RuntimeException("Failed to upload icon", e);
         }
@@ -519,7 +630,8 @@ public class ModjamService {
     public void updateBanner(String jamId, MultipartFile file, String userId) {
         Modjam jam = modjamRepository.findById(jamId)
                 .orElseThrow(() -> new IllegalArgumentException("Jam not found"));
-        requireHost(jam, userId);
+        organizerService.require(jam, userId, JamPermission.EDIT_DETAILS);
+        fileValidationService.validateBanner(file);
 
         try {
             String pathPrefix = "modjams/" + jamId + "/banner";
@@ -527,7 +639,8 @@ public class ModjamService {
             String publicUrl = storageService.getPublicUrl(storageKey);
             jam.setBannerUrl(publicUrl);
             jam.setUpdatedAt(Instant.now());
-            modjamRepository.save(jam);
+            mongoTemplate.updateFirst(Query.query(Criteria.where("_id").is(jamId)),
+                    new org.springframework.data.mongodb.core.query.Update().set("bannerUrl", publicUrl).set("updatedAt", jam.getUpdatedAt()), Modjam.class);
         } catch (Exception e) {
             throw new RuntimeException("Failed to upload banner", e);
         }
@@ -557,10 +670,12 @@ public class ModjamService {
         if (allSubs == null || allSubs.isEmpty()) return new ArrayList<>();
 
         User currentUser = accountService.getCurrentUser();
-        boolean isAdmin = currentUser != null && currentUser.getRoles() != null && currentUser.getRoles().contains("ADMIN");
-        boolean isHost = currentUser != null && currentUser.getId().equals(jam.getHostId());
+        // A scoped API key is never a browser viewer with its owner's private access.
+        if (accessControlService.isApiKey(SecurityContextHolder.getContext().getAuthentication())) currentUser = null;
+        boolean isAdmin = accessControlService.canViewPrivilegedProjectData(currentUser);
+        boolean isHost = currentUser != null && organizerService.permits(jam, currentUser.getId(), JamPermission.VIEW_RESULTS);
 
-        boolean isJamHiding = jam.isHideSubmissions() && List.of("DRAFT", "UPCOMING", "ACTIVE").contains(jam.getStatus());
+        boolean isJamHiding = ModjamPhase.hidesEntries(jam, Instant.now());
 
         List<String> projectIds = allSubs.stream().map(ModjamSubmission::getProjectId).toList();
         Iterable<Project> projectsIterable = projectRepository.findAllById(projectIds);
@@ -624,25 +739,9 @@ public class ModjamService {
             }
         }
 
-        if (jam.getParticipantIds() == null) {
-            jam.setParticipantIds(new ArrayList<>());
-        }
-
-        if (!jam.getParticipantIds().contains(userId)) {
-            jam.getParticipantIds().add(userId);
-            modjamRepository.save(jam);
-        }
-
-        if (user.getJoinedModjamIds() == null) {
-            user.setJoinedModjamIds(new ArrayList<>());
-        }
-
-        if (!user.getJoinedModjamIds().contains(jamId)) {
-            user.getJoinedModjamIds().add(jamId);
-            userRepository.save(user);
-        }
-
-        return enrichAndReturn(jam);
+        Modjam updated = membershipPersistence.participate(jamId, userId, true);
+        if (updated == null) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Jam no longer exists.");
+        return jamForViewer(updated, userId, null);
     }
 
     public Modjam leaveJam(String jamId, String userId) {
@@ -656,17 +755,9 @@ public class ModjamService {
             throw new IllegalArgumentException("Cannot leave a jam after submitting a project.");
         }
 
-        if (jam.getParticipantIds() != null) {
-            jam.getParticipantIds().remove(userId);
-            modjamRepository.save(jam);
-        }
-
-        if (user.getJoinedModjamIds() != null) {
-            user.getJoinedModjamIds().remove(jamId);
-            userRepository.save(user);
-        }
-
-        return enrichAndReturn(jam);
+        Modjam updated = membershipPersistence.participate(jamId, userId, false);
+        if (updated == null) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Jam no longer exists.");
+        return jamForViewer(updated, userId, null);
     }
 
     public ModjamSubmission submitProject(String jamId, String projectId, String userId) {
@@ -696,7 +787,7 @@ public class ModjamService {
             throw new IllegalArgumentException("Project cannot be submitted in its current state.");
         }
 
-        if (jam.isHideSubmissions() && project.getStatus() == ProjectStatus.PUBLISHED) {
+        if (jam.isHideSubmissions() && accessControlService.isPubliclyReadable(project)) {
             throw new IllegalArgumentException("This jam hides submissions until voting opens. You cannot submit an already-public project.");
         }
 
@@ -708,6 +799,9 @@ public class ModjamService {
 
         if (existing.stream().anyMatch(s -> s.getProjectId().equals(projectId))) {
             throw new IllegalArgumentException("Already submitted.");
+        }
+        if (submissionRepository.findByProjectId(projectId).stream().anyMatch(s -> Objects.equals(s.getJamId(), jamId))) {
+            throw new IllegalArgumentException("This project already has an entry in this jam.");
         }
 
         Modjam.Restrictions res = jam.getRestrictions();
@@ -832,9 +926,9 @@ public class ModjamService {
                 String storageKey = extractStorageKey(fileUrl);
                 File tempFile = null;
                 try {
-                    InputStream is = storageService.getStream(storageKey);
                     tempFile = Files.createTempFile("jam_check_", ".jar").toFile();
-                    try (FileOutputStream fos = new FileOutputStream(tempFile)) {
+                    try (InputStream is = storageService.getStream(storageKey);
+                         FileOutputStream fos = new FileOutputStream(tempFile)) {
                         is.transferTo(fos);
                     }
 
@@ -859,26 +953,42 @@ public class ModjamService {
         if (project.getStatus() == ProjectStatus.DRAFT) {
             User user = userRepository.findById(userId)
                     .orElseThrow(() -> new IllegalArgumentException("User not found"));
-            lifecycleService.submitProject(projectId, user);
+            lifecycleService.submitProjectForModjam(projectId, user, jamId);
             project = projectRepository.findById(projectId)
                     .orElseThrow(() -> new IllegalArgumentException("Project not found"));
         }
 
         ModjamSubmission sub = new ModjamSubmission();
+        sub.setId(submissionIdentity(jamId, projectId, userId, jam.isOneEntryPerPerson()));
         sub.setJamId(jamId);
         sub.setProjectId(projectId);
         sub.setSubmitterId(userId);
 
-        submissionRepository.save(sub);
+        try {
+            submissionRepository.insert(sub);
+        } catch (org.springframework.dao.DuplicateKeyException duplicate) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "This project or participant already has an entry in this jam.");
+        }
 
         if (project.getModjamIds() == null) project.setModjamIds(new ArrayList<>());
         if (!project.getModjamIds().contains(jamId)) {
             project.getModjamIds().add(jamId);
-            projectRepository.save(project);
+            mongoTemplate.updateFirst(Query.query(Criteria.where("_id").is(projectId)),
+                    new org.springframework.data.mongodb.core.query.Update().addToSet("modjamIds", jamId), Project.class);
         }
 
         enrichSubmissions(jamId, Collections.singletonList(sub));
         return sub;
+    }
+
+    private static String submissionIdentity(String jamId, String projectId, String userId, boolean oneEntryPerPerson) {
+        String key = jamId + "\0" + (oneEntryPerPerson ? "person\0" + userId : "project\0" + projectId);
+        try {
+            return "modjam-" + HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
+                    .digest(key.getBytes(StandardCharsets.UTF_8)));
+        } catch (NoSuchAlgorithmException impossible) {
+            throw new IllegalStateException("Submission identity could not be generated.", impossible);
+        }
     }
 
     public ModjamSubmission vote(String jamId, String submissionId, String categoryId, int score, String userId) {
@@ -886,7 +996,7 @@ public class ModjamService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Jam not found"));
         Instant now = Instant.now();
         Instant votingStart = jam.isAllowConcurrentVoting() ? jam.getStartDate() : jam.getEndDate();
-        if (!List.of("ACTIVE", "VOTING").contains(jam.getStatus()) || votingStart == null
+        if (!List.of("ACTIVE", "VOTING").contains(effectivePhase(jam, now)) || votingStart == null
                 || jam.getVotingEndDate() == null || now.isBefore(votingStart)
                 || !now.isBefore(jam.getVotingEndDate())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Voting is closed for this jam.");
@@ -895,7 +1005,8 @@ public class ModjamService {
         if (userId == null) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Sign in to vote.");
         }
-        boolean isJudge = canManageResults(jam, userId);
+        boolean isJudge = Objects.equals(jam.getHostId(), userId)
+                || jam.getJudgeIds() != null && jam.getJudgeIds().contains(userId);
         if (!isJudge && !jam.isAllowPublicVoting()) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only the host and invited judges can vote.");
         }
@@ -914,21 +1025,19 @@ public class ModjamService {
         Project project = projectRepository.findById(sub.getProjectId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Project not found"));
         if (Objects.equals(sub.getSubmitterId(), userId) || Objects.equals(project.getAuthorId(), userId)
-                || (project.getTeamMembers() != null && project.getTeamMembers().contains(userId))) {
+                || (project.getTeamMembers() != null && project.getTeamMembers().stream()
+                .filter(Objects::nonNull).anyMatch(member -> Objects.equals(member.getUserId(), userId)))) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You cannot vote on your own entry.");
         }
         if (!List.of(ProjectStatus.PUBLISHED, ProjectStatus.ARCHIVED).contains(project.getStatus())
-                || (jam.isHideSubmissions() && "ACTIVE".equals(jam.getStatus()))) {
+                || ModjamPhase.hidesEntries(jam, now)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "This entry is not available for voting.");
         }
 
-        if (sub.getVotes() == null) sub.setVotes(new ArrayList<>());
-        sub.getVotes().removeIf(v -> Objects.equals(v.getVoterId(), userId) && Objects.equals(v.getCategoryId(), categoryId));
-
         ModjamSubmission.Vote vote = new ModjamSubmission.Vote(UUID.randomUUID().toString(), userId, categoryId, score, isJudge);
-        sub.getVotes().add(vote);
-
-        submissionRepository.save(sub);
+        if (votePersistence.replaceBallot(jamId, submissionId, vote) == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Submission no longer exists in this jam.");
+        }
         calculateScores(jamId);
 
         ModjamSubmission updated = submissionRepository.findById(submissionId).orElse(sub);
@@ -970,7 +1079,7 @@ public class ModjamService {
         int rank = 1;
         for (ModjamSubmission sub : submissions) {
             sub.setRank(rank++);
-            submissionRepository.save(sub);
+            votePersistence.saveScores(sub);
         }
     }
 
@@ -993,9 +1102,21 @@ public class ModjamService {
         return count > 0 ? totalSum / count : 0.0;
     }
 
+    private static String finalizationHash(Map<String, String> awards) {
+        StringBuilder canonical = new StringBuilder();
+        new TreeMap<>(awards).forEach((id, title) -> canonical.append(id.length()).append(':').append(id)
+                .append(title.length()).append(':').append(title));
+        try {
+            return HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256")
+                    .digest(canonical.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+        } catch (java.security.NoSuchAlgorithmException unavailable) {
+            throw new IllegalStateException("SHA-256 is required for finalization integrity.", unavailable);
+        }
+    }
+
     public Modjam finalizeJam(String jamId, String userId, List<Map<String, String>> winnersData) {
         Modjam jam = modjamRepository.findById(jamId).orElseThrow(() -> new IllegalArgumentException("Jam not found"));
-        requireHost(jam, userId);
+        organizerService.require(jam, userId, JamPermission.ANNOUNCE_WINNERS);
         String phase = effectivePhase(jam, Instant.now());
         if (!"AWAITING_WINNERS".equals(phase) && !"COMPLETED".equals(phase)) {
             throw new IllegalArgumentException("Wait for voting to close before finalizing this jam.");
@@ -1033,18 +1154,35 @@ public class ModjamService {
             return enrichAndReturn(jam);
         }
 
+        String finalizationHash = finalizationHash(awards);
+        Criteria matchingClaim = new Criteria().orOperator(Criteria.where("finalizationHash").exists(false),
+                Criteria.where("finalizationHash").is(finalizationHash));
+        Query claim = Query.query(new Criteria().andOperator(Criteria.where("_id").is(jamId).and("status").is(jam.getStatus()).and("updatedAt").is(jam.getUpdatedAt())
+                .and("startDate").is(jam.getStartDate()).and("endDate").is(jam.getEndDate()).and("votingEndDate").is(jam.getVotingEndDate()), matchingClaim));
+        Modjam claimed = mongoTemplate.findAndModify(claim,
+                new org.springframework.data.mongodb.core.query.Update().set("finalizationHash", finalizationHash).set("finalizationAwards", awards),
+                org.springframework.data.mongodb.core.FindAndModifyOptions.options().returnNew(true), Modjam.class);
+        if (claimed == null) throw new ResponseStatusException(HttpStatus.CONFLICT, "This jam is already finalizing or completed. Refresh to see its winners.");
+
         calculateScores(jamId);
         allSubs = submissionRepository.findByJamId(jamId);
         if (allSubs == null) allSubs = new ArrayList<>();
         for (ModjamSubmission sub : allSubs) {
             sub.setWinner(awards.containsKey(sub.getId()));
             sub.setAwardTitle(awards.get(sub.getId()));
-            submissionRepository.save(sub);
+            votePersistence.saveAward(sub);
         }
 
         jam.setStatus("COMPLETED");
+        jam.setWinnersAnnouncedAt(Instant.now());
         jam.setUpdatedAt(Instant.now());
-        return enrichAndReturn(modjamRepository.save(jam));
+        var persisted = mongoTemplate.updateFirst(Query.query(Criteria.where("_id").is(jamId).and("status").ne("COMPLETED").and("finalizationHash").is(finalizationHash)),
+                new org.springframework.data.mongodb.core.query.Update().set("status", "COMPLETED")
+                        .set("updatedAt", jam.getUpdatedAt()).set("winnersAnnouncedAt", jam.getWinnersAnnouncedAt()), Modjam.class);
+        if (persisted.getMatchedCount() == 0) return enrichAndReturn(modjamRepository.findById(jamId).orElse(jam));
+        Modjam saved = jam;
+        feedService.recordMilestones(saved);
+        return enrichAndReturn(saved);
     }
 
     @Scheduled(fixedDelay = 60000)
@@ -1052,7 +1190,11 @@ public class ModjamService {
         List<Modjam> jams = modjamRepository.findAll();
         Instant now = Instant.now();
         for (Modjam jam : jams) {
-            if ("DRAFT".equals(jam.getStatus()) || "COMPLETED".equals(jam.getStatus())) continue;
+            if ("DRAFT".equals(jam.getStatus())) continue;
+            if ("COMPLETED".equals(jam.getStatus())) {
+                revealHiddenJamProjects(jam.getId());
+                continue;
+            }
 
             String newStatus = jam.getStatus();
             if (jam.getStartDate() != null && now.isBefore(jam.getStartDate())) {
@@ -1068,13 +1210,13 @@ public class ModjamService {
             if (!newStatus.equals(jam.getStatus())) {
                 String oldStatus = jam.getStatus();
                 jam.setStatus(newStatus);
-                modjamRepository.save(jam);
+                mongoTemplate.updateFirst(Query.query(Criteria.where("_id").is(jam.getId()).and("status").is(oldStatus).and("finalizationHash").exists(false)),
+                        new org.springframework.data.mongodb.core.query.Update().set("status", newStatus), Modjam.class);
 
-                if (jam.isHideSubmissions() && !List.of("VOTING", "COMPLETED", "AWAITING_WINNERS").contains(oldStatus)
-                        && List.of("VOTING", "COMPLETED", "AWAITING_WINNERS").contains(newStatus)) {
-                    revealHiddenJamProjects(jam.getId());
-                }
             }
+            // Retry release independently of a one-time phase transition. Review
+            // and scanning can complete after the jam enters its voting phase.
+            if (!ModjamPhase.hidesEntries(jam, now)) revealHiddenJamProjects(jam.getId());
         }
     }
 
@@ -1091,13 +1233,13 @@ public class ModjamService {
     private void revealHiddenJamProjects(String jamId) {
         Query query = new Query(
                 Criteria.where("modjamIds").is(jamId)
-                        .and("status").is(ProjectStatus.UNLISTED)
+                        .and("modjamPublicationPending").is(true)
+                        .and("status").is(ProjectStatus.PRIVATE)
                         .and("deletedAt").is(null)
         );
         List<Project> hidden = mongoTemplate.find(query, Project.class);
         for (Project project : hidden) {
-            project.setStatus(ProjectStatus.PUBLISHED);
-            projectRepository.save(project);
+            lifecycleService.releaseModjamEmbargo(project);
         }
     }
 }

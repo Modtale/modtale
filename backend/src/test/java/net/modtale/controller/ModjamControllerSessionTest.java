@@ -18,9 +18,14 @@ import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.web.server.ResponseStatusException;
+import org.springframework.http.HttpStatus;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 class ModjamControllerSessionTest {
     private ModjamController controller;
@@ -91,5 +96,31 @@ class ModjamControllerSessionTest {
     void anonymousMutationCannotCallService() {
         assertEquals(401, controller.createJam(new Modjam()).getStatusCode().value());
         verifyNoInteractions(modjamService);
+    }
+
+    @Test
+    void typedVoteBodyRejectsMissingFractionalAndMalformedFieldsAsBadRequests() throws Exception {
+        var mvc = MockMvcBuilders.standaloneSetup(controller)
+                .setControllerAdvice(new net.modtale.exception.GlobalExceptionHandler()).build();
+        for (String body : List.of("{}", "{\"submissionId\":\"sub\",\"categoryId\":\"cat\",\"score\":1.5}",
+                "{\"submissionId\":\"sub\",\"categoryId\":\"cat\",\"score\":{}}")) {
+            mvc.perform(post("/api/v1/modjams/jam-1/vote").contentType("application/json").content(body))
+                    .andExpect(status().isBadRequest());
+        }
+        verifyNoInteractions(modjamService);
+    }
+
+    @Test
+    void voteErrorPreservesItsHttpStatusThroughGlobalAdvice() throws Exception {
+        User user = new User();
+        user.setId("user-1");
+        when(accountService.getCurrentUser()).thenReturn(user);
+        when(modjamService.vote("jam-1", "sub", "cat", 5, "user-1"))
+                .thenThrow(new ResponseStatusException(HttpStatus.NOT_FOUND, "Submission not found in this jam."));
+        var mvc = MockMvcBuilders.standaloneSetup(controller)
+                .setControllerAdvice(new net.modtale.exception.GlobalExceptionHandler()).build();
+        mvc.perform(post("/api/v1/modjams/jam-1/vote").contentType("application/json")
+                .content("{\"submissionId\":\"sub\",\"categoryId\":\"cat\",\"score\":5}"))
+                .andExpect(status().isNotFound());
     }
 }

@@ -1,7 +1,7 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { useParams, useNavigate, Link, useLocation } from 'react-router-dom';
-import { api, BACKEND_URL } from '@/utils/api';
-import type { Modjam, ModjamSubmission, User, Project } from '@/types';
+import { api, BACKEND_URL, extractApiErrorMessage } from '@/utils/api';
+import type { JamPermission, Modjam, ModjamSubmission, User, Project } from '@/types';
 import { Spinner } from '@/components/ui/Spinner';
 import { StatusModal } from '@/components/ui/StatusModal';
 import { Trophy, Users, Upload, LayoutGrid, AlertCircle, Scale, Star, Edit3, Trash2, Clock, CheckCircle2, ChevronRight, X, Crown, Check, BookOpen, MessageSquare, LogOut, ShieldCheck, ExternalLink, EyeOff } from 'lucide-react';
@@ -10,6 +10,11 @@ import { JamBuilder } from '@/modules/jam/components/JamBuilder';
 import { JamSubmissionWizard } from '@/modules/jam/components/JamSubmissionWizard';
 import NotFound from '@/components/ui/error/NotFound';
 import { MarkdownRenderer } from '@/components/ui/MarkdownRenderer';
+import { OptimizedImage } from '@/components/ui/OptimizedImage';
+import { getScopedJamCss } from '@/modules/jam/utils/customCss';
+import { hasJamPermission } from '@/modules/jam/utils/permissions';
+import { useDialogFocus } from '@/hooks/useDialogFocus';
+import { useScrollLock } from '@/hooks/useScrollLock';
 
 const MiniTimeline: React.FC<{ jam: Modjam, now: number }> = ({ jam, now }) => {
     if (now === 0) return null;
@@ -118,19 +123,25 @@ const MiniTimeline: React.FC<{ jam: Modjam, now: number }> = ({ jam, now }) => {
 };
 
 const JudgesModal: React.FC<{ judgeIds: string[], onClose: () => void }> = ({ judgeIds, onClose }) => {
+    const dialogRef = useRef<HTMLDivElement>(null);
+    useScrollLock(true);
+    useDialogFocus(true, dialogRef);
+    useEffect(() => { const escape = (event: KeyboardEvent) => { if (event.key === 'Escape') onClose(); }; document.addEventListener('keydown', escape); return () => document.removeEventListener('keydown', escape); }, [onClose]);
     const [judges, setJudges] = useState<User[]>([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
+        const controller = new AbortController();
         const fetchJudges = async () => {
             setLoading(true);
             try {
-                const res = await api.post('/users/batch/ids', { ids: judgeIds });
+                const res = await api.post('/users/batch/ids', { ids: judgeIds }, { signal: controller.signal });
+                if (controller.signal.aborted) return;
                 setJudges(res.data || []);
             } catch (e) {
                 console.error("Failed to fetch judges", e);
             } finally {
-                setLoading(false);
+                if (!controller.signal.aborted) setLoading(false);
             }
         };
 
@@ -139,16 +150,17 @@ const JudgesModal: React.FC<{ judgeIds: string[], onClose: () => void }> = ({ ju
         } else {
             setLoading(false);
         }
+        return () => controller.abort();
     }, [judgeIds]);
 
     return (
         <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-300" onClick={onClose}>
-            <div className="bg-white dark:bg-slate-900 w-full max-w-sm rounded-[2rem] shadow-2xl border border-slate-200 dark:border-white/10 overflow-hidden animate-in zoom-in-95 flex flex-col max-h-[80vh]" onClick={e => e.stopPropagation()}>
+            <div ref={dialogRef} role="dialog" aria-modal="true" aria-label="Event judges" className="bg-white dark:bg-slate-900 w-full max-w-sm rounded-[2rem] shadow-2xl border border-slate-200 dark:border-white/10 overflow-hidden animate-in zoom-in-95 flex flex-col max-h-[80vh]" onClick={e => e.stopPropagation()}>
                 <div className="p-6 border-b border-slate-200 dark:border-white/5 flex items-center justify-between bg-slate-50 dark:bg-slate-800/50">
                     <h3 className="text-xl font-black text-slate-900 dark:text-white flex items-center gap-3">
                         <ShieldCheck className="w-6 h-6 text-blue-500" /> Event Judges
                     </h3>
-                    <button onClick={onClose} className="p-2 bg-slate-200 dark:bg-white/10 text-slate-500 hover:text-slate-900 dark:hover:text-white rounded-xl transition-colors">
+                    <button aria-label="Close judges" onClick={onClose} className="p-2 bg-slate-200 dark:bg-white/10 text-slate-500 hover:text-slate-900 dark:hover:text-white rounded-xl transition-colors">
                         <X className="w-5 h-5" />
                     </button>
                 </div>
@@ -165,7 +177,7 @@ const JudgesModal: React.FC<{ judgeIds: string[], onClose: () => void }> = ({ ju
                                     className="flex items-center gap-4 p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/5 hover:border-blue-500/50 dark:hover:border-blue-500/50 hover:shadow-md transition-all group"
                                 >
                                     <div className="w-12 h-12 rounded-xl bg-slate-200 dark:bg-slate-800 overflow-hidden shrink-0">
-                                        <img src={judge.avatarUrl} alt={judge.username} className="w-full h-full object-cover" />
+                                        <OptimizedImage baseWidth={96} src={judge.avatarUrl} alt={judge.username} className="w-full h-full object-cover" />
                                     </div>
                                     <div className="flex-1 min-w-0">
                                         <div className="flex items-center gap-2">
@@ -220,8 +232,17 @@ export const JamDetail: React.FC<{ currentUser: User | null }> = ({ currentUser 
 
     const [showInviteModal, setShowInviteModal] = useState(true);
     const [isResolvingInvite, setIsResolvingInvite] = useState(false);
+    const savePending = useRef(false);
+    const invitePending = useRef(false);
+    const interactionPending = useRef(new Set<string>());
+    const activeContext = useRef(slug || id);
+    activeContext.current = slug || id;
+    const jamRef = useRef(jam);
+    jamRef.current = jam;
 
     const isEditRoute = location.pathname.endsWith('/edit');
+    const editablePermissions: JamPermission[] = ['EDIT_DETAILS', 'EDIT_RULES', 'MANAGE_SETTINGS', 'MANAGE_JUDGES'];
+    const canEditJam = !!jam && editablePermissions.some(permission => hasJamPermission(jam, currentUser?.id, permission));
 
     const activeTab = useMemo(() => {
         if (location.pathname.endsWith('/entries')) return 'entries';
@@ -238,47 +259,54 @@ export const JamDetail: React.FC<{ currentUser: User | null }> = ({ currentUser 
     }, []);
 
     useEffect(() => {
+        const controller = new AbortController();
+        const jamIdentifier = slug || id;
+        const cached = jamRef.current;
+        if (cached?.slug !== jamIdentifier && cached?.id !== jamIdentifier) {
+            setLoading(true);
+            setJam(null);
+            setSubmissions([]);
+            setMetaData(null);
+            setIsSubmittingModalOpen(false);
+            setVotingSubmissionId(null);
+            setPickingWinners(false);
+            setStatusModal(null);
+            setShowInviteModal(true);
+        }
+        setIsFollowing(false);
+        setMyProjects([]);
         const fetchJamData = async () => {
             try {
-                const jamIdentifier = slug || id;
-                const res = await api.get(`/modjams/${jamIdentifier}`);
+                const res = await api.get(`/modjams/${jamIdentifier}`, { signal: controller.signal });
+                if (controller.signal.aborted) return;
                 setJam(res.data);
-
-                const subRes = await api.get(`/modjams/${res.data.id}/submissions`);
+                const subRes = await api.get(`/modjams/${res.data.id}/submissions`, { signal: controller.signal });
+                if (controller.signal.aborted) return;
                 setSubmissions(subRes.data);
-
                 if (currentUser && res.data.hostName && res.data.hostName !== currentUser.username) {
                     try {
-                        const followRes = await api.get(`/user/following/${res.data.hostName}`);
-                        setIsFollowing(Boolean(followRes.data));
-                    } catch (e) {
-                        setIsFollowing(false);
-                    }
+                        const followRes = await api.get(`/user/following/${res.data.hostName}`, { signal: controller.signal });
+                        if (!controller.signal.aborted) setIsFollowing(Boolean(followRes.data));
+                    } catch { /* Following is optional; the jam can still load. */ }
                 }
             } catch (err) {
-                console.error(err);
+                if (!controller.signal.aborted) console.error(err);
             } finally {
-                setLoading(false);
-            }
-
-            if (currentUser?.id) {
-                try {
-                    const projRes = await api.get(`/creators/${currentUser.id}/projects?size=100`);
-                    const allProjects: Project[] = projRes.data.content || [];
-                    setMyProjects(allProjects);
-                } catch (e) {
-                    console.error("Failed to fetch user projects for jam submission", e);
-                }
+                if (!controller.signal.aborted) setLoading(false);
             }
         };
         fetchJamData();
+        if (currentUser?.id) api.get(`/creators/${currentUser.id}/projects?size=100`, { signal: controller.signal })
+            .then(res => { if (!controller.signal.aborted) setMyProjects(res.data.content || []); })
+            .catch(() => {});
+        return () => controller.abort();
     }, [slug, id, currentUser?.id, currentUser?.username]);
 
     useEffect(() => {
-        if (jam && isEditRoute && currentUser?.id !== jam.hostId) {
+        if (jam && isEditRoute && !canEditJam) {
             navigate(`/jam/${jam.slug}/overview`, { replace: true });
         }
-    }, [jam, isEditRoute, currentUser, navigate]);
+    }, [jam, isEditRoute, canEditJam, navigate]);
 
     useEffect(() => {
         if (jam && isEditRoute) {
@@ -302,43 +330,46 @@ export const JamDetail: React.FC<{ currentUser: User | null }> = ({ currentUser 
                 restrictions: (jam as any).restrictions || {},
                 judgeIds: (jam as any).judgeIds || [],
                 pendingJudgeInvites: (jam as any).pendingJudgeInvites || [],
+                hostId: jam.hostId,
+                hostName: jam.hostName,
+                organizerRoles: jam.organizerRoles || [],
+                organizerMembers: jam.organizerMembers || [],
+                pendingOrganizerInvites: jam.pendingOrganizerInvites || [],
+                customCss: jam.customCss || '',
                 status: jam.status
             });
         }
-    }, [jam, isEditRoute]);
+    }, [jam?.id, isEditRoute]);
 
     const handleFollowToggle = async () => {
         if (!jam || !currentUser) return;
+        const key = `follow:${jam.id}`;
+        if (interactionPending.current.has(key)) return;
+        interactionPending.current.add(key);
+        const context = activeContext.current;
         try {
-            if (isFollowing) {
-                await api.post(`/user/unfollow/${jam.hostName}`);
-                setIsFollowing(false);
-            } else {
-                await api.post(`/user/follow/${jam.hostName}`);
-                setIsFollowing(true);
-            }
-        } catch (err) {
-            console.error("Follow toggle failed", err);
-        }
+            await api.post(`/user/${isFollowing ? 'unfollow' : 'follow'}/${jam.hostName}`);
+            if (context === activeContext.current) setIsFollowing(!isFollowing);
+        } catch (err) { console.error('Follow toggle failed', err); }
+        finally { interactionPending.current.delete(key); }
     };
 
     const handleJoin = async () => {
-        if (!jam || !currentUser) return;
+        if (!jam || !currentUser || jam.participantIds?.includes(currentUser.id)) return;
+        const key = `participation:${jam.id}`;
+        if (interactionPending.current.has(key)) return;
+        interactionPending.current.add(key);
+        const context = activeContext.current;
+        const targetId = jam.id;
         try {
-            await api.post(`/modjams/${jam.id}/participate`, {});
+            await api.post(`/modjams/${targetId}/participate`, {});
+            if (context !== activeContext.current) return;
             setStatusModal({ type: 'success', title: 'Joined!', message: 'Successfully joined the jam.' });
-            setJam({ ...jam, participantIds: [...(jam.participantIds || []), currentUser.id] });
+            setJam(previous => previous?.id === targetId ? { ...previous, participantIds: [...new Set([...(previous.participantIds || []), currentUser.id])] } : previous);
         } catch (err: any) {
-            if (err.response?.status === 409) {
-                setStatusModal({
-                    type: 'warning',
-                    title: 'Uniqueness Conflict',
-                    message: err.response.data.message || 'You must leave your conflicting jam first.'
-                });
-            } else {
-                setStatusModal({ type: 'error', title: 'Error', message: 'Failed to join the jam.' });
-            }
-        }
+            if (context !== activeContext.current) return;
+            setStatusModal({ type: err.response?.status === 409 ? 'warning' : 'error', title: 'Unable to join', message: extractApiErrorMessage(err, 'Failed to join the jam.') });
+        } finally { interactionPending.current.delete(key); }
     };
 
     const handleLeave = () => {
@@ -408,36 +439,44 @@ export const JamDetail: React.FC<{ currentUser: User | null }> = ({ currentUser 
         navigate(`/jam/${jam.slug}/edit`);
     };
 
-    const handleSaveJam = async () => {
+    const handleSaveJam = async (publish = false) => {
+        if (savePending.current || !metaData) return null;
+        savePending.current = true;
         setIsSavingJam(true);
+        const snapshot = metaData;
+        const context = activeContext.current;
         try {
-            let res = await api.put(`/modjams/${metaData.id}`, metaData);
+            let res = await api.put(`/modjams/${snapshot.id}`, snapshot);
             let filesUploaded = false;
-
-            if (metaData.iconFile) {
+            if (snapshot.iconFile) {
                 const fd = new FormData();
-                fd.append('file', metaData.iconFile);
-                await api.put(`/modjams/${metaData.id}/icon`, fd, { headers: { 'Content-Type': 'multipart/form-data' }});
+                fd.append('file', snapshot.iconFile);
+                await api.put(`/modjams/${snapshot.id}/icon`, fd, { headers: { 'Content-Type': 'multipart/form-data' } });
                 filesUploaded = true;
             }
-
-            if (metaData.bannerFile) {
+            if (snapshot.bannerFile) {
                 const fd = new FormData();
-                fd.append('file', metaData.bannerFile);
-                await api.put(`/modjams/${metaData.id}/banner`, fd, { headers: { 'Content-Type': 'multipart/form-data' }});
+                fd.append('file', snapshot.bannerFile);
+                await api.put(`/modjams/${snapshot.id}/banner`, fd, { headers: { 'Content-Type': 'multipart/form-data' } });
                 filesUploaded = true;
             }
-
-            if (filesUploaded) {
-                res = await api.get(`/modjams/${metaData.slug}`);
-            }
-
+            if (filesUploaded) res = await api.get(`/modjams/${res.data.slug}`);
+            if (publish) res = await api.put(`/modjams/${snapshot.id}`, { ...res.data, status: 'UPCOMING' });
+            if (context !== activeContext.current) return null;
             setJam(res.data);
+            setMetaData((current: any) => {
+                if (current === snapshot) return { ...res.data, restrictions: res.data.restrictions || {}, customCss: res.data.customCss || '' };
+                return { ...current,
+                    ...(current.imageUrl === snapshot.imageUrl ? { imageUrl: res.data.imageUrl, iconFile: undefined } : {}),
+                    ...(current.bannerUrl === snapshot.bannerUrl ? { bannerUrl: res.data.bannerUrl, bannerFile: undefined } : {})
+                };
+            });
+            if (publish) navigate(`/jam/${res.data.slug}/overview`);
+            else if (res.data.slug !== slug) navigate(`/jam/${res.data.slug}/edit`, { replace: true });
+            return res.data;
+        } finally {
+            savePending.current = false;
             setIsSavingJam(false);
-            return true;
-        } catch (e) {
-            setIsSavingJam(false);
-            return false;
         }
     };
 
@@ -462,69 +501,100 @@ export const JamDetail: React.FC<{ currentUser: User | null }> = ({ currentUser 
     };
 
     const handleFinalizeJam = async (winners: { submissionId: string, awardTitle: string }[]) => {
-        if (!jam) return;
+        if (!jam || savePending.current) return;
+        savePending.current = true;
         setIsSavingJam(true);
+        const context = activeContext.current;
         try {
-            await api.post(`/modjams/${jam.id}/finalize`, winners);
-            window.location.reload();
-        } catch (e) {
-            setStatusModal({ type: 'error', title: 'Error', message: 'Failed to finalize jam and pick winners.' });
-            setIsSavingJam(false);
-        }
+            const response = await api.post(`/modjams/${jam.id}/finalize`, winners);
+            if (context !== activeContext.current) return;
+            setJam(response.data);
+            const awards = new Map(winners.map(winner => [winner.submissionId, winner.awardTitle]));
+            setSubmissions(current => current.map(submission => ({ ...submission, winner: awards.has(submission.id), awardTitle: awards.get(submission.id) })));
+            setPickingWinners(false);
+            setStatusModal({ type: 'success', title: 'Jam completed', message: 'The winners and awards are now published.' });
+        } catch (failure) {
+            if (context === activeContext.current) setStatusModal({ type: 'error', title: 'Finalization failed', message: extractApiErrorMessage(failure, 'Failed to finalize jam and pick winners.') });
+        } finally { savePending.current = false; setIsSavingJam(false); }
     };
 
     const handleAcceptJudge = async () => {
-        if (!jam) return;
+        if (!jam || invitePending.current) return;
+        invitePending.current = true;
+        const context = activeContext.current;
         setIsResolvingInvite(true);
         try {
             const res = await api.post(`/modjams/${jam.id}/judges/accept`);
+            if (context !== activeContext.current) return;
             setJam(res.data);
             setShowInviteModal(false);
             setStatusModal({ type: 'success', title: 'Accepted!', message: 'You are now an official judge for this jam.' });
         } catch (e: any) {
             setStatusModal({ type: 'error', title: 'Error', message: e.response?.data?.message || 'Failed to accept invitation.' });
         } finally {
+            invitePending.current = false;
             setIsResolvingInvite(false);
         }
     };
 
     const handleDeclineJudge = async () => {
-        if (!jam) return;
+        if (!jam || invitePending.current) return;
+        invitePending.current = true;
+        const context = activeContext.current;
         setIsResolvingInvite(true);
         try {
             const res = await api.post(`/modjams/${jam.id}/judges/decline`);
+            if (context !== activeContext.current) return;
             setJam(res.data);
             setShowInviteModal(false);
         } catch (e: any) {
             setStatusModal({ type: 'error', title: 'Error', message: e.response?.data?.message || 'Failed to decline invitation.' });
         } finally {
+            invitePending.current = false;
             setIsResolvingInvite(false);
         }
+    };
+
+    const answerOrganizerInvite = async (accept: boolean) => {
+        if (!jam || invitePending.current) return;
+        invitePending.current = true;
+        setIsResolvingInvite(true);
+        const context = activeContext.current;
+        try {
+            const response = await api.post(`/modjams/${jam.id}/organizers/${accept ? 'accept' : 'decline'}`, {});
+            if (context !== activeContext.current) return;
+            setJam(response.data);
+            setStatusModal({ type: 'success', title: accept ? 'Invitation accepted' : 'Invitation declined', message: accept ? 'Your organizer role is active. The actions available to you match its permissions.' : 'The organizer invitation has been declined.' });
+        } catch (failure) {
+            if (context === activeContext.current) setStatusModal({ type: 'error', title: 'Invitation unavailable', message: extractApiErrorMessage(failure, 'We could not update this invitation.') });
+        } finally { invitePending.current = false; setIsResolvingInvite(false); }
     };
 
     const memoizedDescription = useMemo(() => {
         if (!jam?.description) return <p className="text-slate-500 italic">No description provided.</p>;
 
-        return <MarkdownRenderer content={jam.description} />;
+        return <div className="jam-custom-content"><MarkdownRenderer content={jam.description} /></div>;
     }, [jam?.description]);
 
     const memoizedRules = useMemo(() => {
         const rulesContent = (jam as any)?.rules;
         if (!rulesContent) return <p className="text-slate-500 italic">No rules have been established for this jam.</p>;
 
-        return <MarkdownRenderer content={rulesContent} />;
+        return <div className="jam-custom-content"><MarkdownRenderer content={rulesContent} /></div>;
     }, [(jam as any)?.rules]);
 
-    if (loading) return <div className="min-h-screen bg-slate-950 flex items-center justify-center"><Spinner fullScreen={false} className="w-8 h-8" /></div>;
+    if (loading) return <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center"><Spinner fullScreen={false} className="w-8 h-8" /></div>;
     if (!jam) return <NotFound />;
 
-    if (isEditRoute && metaData) {
+    if (isEditRoute && metaData && canEditJam) {
         return (
             <JamBuilder
+                currentUser={currentUser}
+                onOrganizerUpdate={(updated: Modjam) => setJam(current => current ? ({ ...current, organizerRoles: updated.organizerRoles, organizerMembers: updated.organizerMembers, pendingOrganizerInvites: updated.pendingOrganizerInvites }) : current)}
                 metaData={metaData}
                 setMetaData={setMetaData}
                 handleSave={handleSaveJam}
-                onPublish={async () => { await handleSaveJam(); navigate(`/jam/${jam.slug}/overview`); }}
+                onPublish={() => handleSaveJam(true)}
                 isLoading={isSavingJam}
                 activeTab={builderTab}
                 setActiveTab={setBuilderTab}
@@ -540,10 +610,11 @@ export const JamDetail: React.FC<{ currentUser: User | null }> = ({ currentUser 
 
     const votingClosed = Boolean(jam.votingEndDate && now > new Date(jam.votingEndDate).getTime());
     const canVote = Boolean(!votingClosed && jam.status !== 'COMPLETED' && jam.status !== 'AWAITING_WINNERS' && (jam.status === 'VOTING' || (jam.status === 'ACTIVE' && jam.allowConcurrentVoting)) && (jam.allowPublicVoting || currentUser?.id === jam.hostId || isJudge));
-    const canSeeResults = Boolean(jam.status === 'COMPLETED' || jam.status === 'AWAITING_WINNERS' || jam.showResultsBeforeVotingEnds || currentUser?.id === jam.hostId || isJudge);
+    const canSeeResults = Boolean(jam.status === 'COMPLETED' || jam.status === 'AWAITING_WINNERS' || jam.showResultsBeforeVotingEnds || hasJamPermission(jam, currentUser?.id, 'VIEW_RESULTS') || isJudge);
 
     return (
         <>
+            {getScopedJamCss(jam.customCss) && <style>{getScopedJamCss(jam.customCss)}</style>}
             {statusModal && (
                 <StatusModal
                     type={statusModal.type}
@@ -568,7 +639,7 @@ export const JamDetail: React.FC<{ currentUser: User | null }> = ({ currentUser 
                     jam={jam}
                     myProjects={myProjects}
                     onSuccess={(sub) => {
-                        setSubmissions([...submissions, sub]);
+                        setSubmissions(current => [...current.filter(entry => entry.id !== sub.id), sub]);
                         setIsSubmittingModalOpen(false);
                         setStatusModal({ type: 'success', title: 'Submitted!', message: 'Project submitted successfully.' });
                     }}
@@ -621,6 +692,7 @@ export const JamDetail: React.FC<{ currentUser: User | null }> = ({ currentUser 
                 </div>
             )}
 
+            {jam.pendingOrganizerInvites?.some(invite => invite.userId === currentUser?.id) && <div className="mx-auto max-w-[112rem] px-6 sm:px-12 md:px-16 lg:px-20 xl:px-28 py-4"><section className="flex flex-col sm:flex-row sm:items-center gap-4 rounded-2xl border border-blue-500/20 bg-blue-500/10 p-4"><div className="flex-1"><h2 className="font-black text-slate-900 dark:text-white">Organizer invitation</h2><p className="mt-1 text-sm text-slate-600 dark:text-slate-300">{jam.hostName} invited you to help run {jam.title}. Accept to activate your assigned role.</p></div><div className="flex gap-2"><button type="button" disabled={isResolvingInvite} onClick={() => answerOrganizerInvite(false)} className="rounded-xl px-4 py-2 text-sm font-bold text-slate-500 disabled:opacity-50">Decline</button><button type="button" disabled={isResolvingInvite} onClick={() => answerOrganizerInvite(true)} className="rounded-xl bg-modtale-accent px-4 py-2 text-sm font-bold text-white disabled:opacity-50">Accept organizer role</button></div></section></div>}
             <JamDetailView
                 jam={jam}
                 submissions={submissions}
@@ -693,7 +765,7 @@ const JamDetailView: React.FC<{
             entries = entries.filter(s => (s as any).winner !== true);
         }
 
-        if (isSecretPhase) {
+        if (isSecretPhase && !hasJamPermission(jam, currentUser?.id, 'VIEW_RESULTS') && !currentUser?.roles?.includes('ADMIN')) {
             entries = entries.filter(s => s.submitterId === currentUser?.id);
         }
 
@@ -751,19 +823,19 @@ const JamDetailView: React.FC<{
             }
             actionContent={
                 <>
-                    {currentUser?.id === jam.hostId && (
+                    {(currentUser?.id === jam.hostId || ['EDIT_DETAILS', 'EDIT_RULES', 'MANAGE_SETTINGS', 'MANAGE_JUDGES', 'ANNOUNCE_WINNERS'].some(permission => hasJamPermission(jam, currentUser?.id, permission as JamPermission))) && (
                         <div className="flex gap-2 shrink-0">
-                            {(jam.status === 'AWAITING_WINNERS' || (jam.status === 'VOTING' && jam.votingEndDate && now > new Date(jam.votingEndDate).getTime())) && (
+                            {hasJamPermission(jam, currentUser?.id, 'ANNOUNCE_WINNERS') && (jam.status === 'AWAITING_WINNERS' || (jam.status === 'VOTING' && jam.votingEndDate && now > new Date(jam.votingEndDate).getTime())) && (
                                 <button onClick={() => setPickingWinners(true)} className="h-12 px-6 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-black text-sm shadow-lg shadow-amber-500/20 flex items-center justify-center gap-2 transition-all active:scale-95" title="Finalize Jam">
                                     <Trophy className="w-4 h-4" /> Pick Winners
                                 </button>
                             )}
-                            <button onClick={startEditing} className="h-12 px-5 flex items-center justify-center gap-2 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-100 dark:bg-slate-800/60 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:border-slate-300 dark:hover:border-white/20 transition-all text-sm font-bold" title="Edit Jam">
+                            {['EDIT_DETAILS', 'EDIT_RULES', 'MANAGE_SETTINGS', 'MANAGE_JUDGES'].some(permission => hasJamPermission(jam, currentUser?.id, permission as JamPermission)) && <button onClick={startEditing} className="h-12 px-5 flex items-center justify-center gap-2 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-100 dark:bg-slate-800/60 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:border-slate-300 dark:hover:border-white/20 transition-all text-sm font-bold" title="Edit Jam">
                                 <Edit3 className="w-4 h-4 transition-colors" /> Edit
-                            </button>
-                            <button onClick={handleDelete} className="h-12 px-5 flex items-center justify-center gap-2 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-100 dark:bg-slate-800/60 text-slate-600 dark:text-slate-300 hover:text-red-500 hover:border-red-500/30 transition-all text-sm font-bold" title="Delete Jam">
+                            </button>}
+                            {currentUser?.id === jam.hostId && <button onClick={handleDelete} className="h-12 px-5 flex items-center justify-center gap-2 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-100 dark:bg-slate-800/60 text-slate-600 dark:text-slate-300 hover:text-red-500 hover:border-red-500/30 transition-all text-sm font-bold" title="Delete Jam">
                                 <Trash2 className="w-4 h-4 transition-colors" /> Delete
-                            </button>
+                            </button>}
                         </div>
                     )}
 
@@ -951,13 +1023,10 @@ const JamDetailView: React.FC<{
 
                                                     <div className="block relative w-full aspect-[3/1] bg-slate-100 dark:bg-slate-800 shrink-0 overflow-hidden border-b border-amber-500/20">
                                                         {resolvedProjectBanner ? (
-                                                            <img
+                                                            <OptimizedImage baseWidth={640}
                                                                 src={resolvedProjectBanner}
                                                                 alt=""
-                                                                fetchPriority="high"
-                                                                loading="eager"
-                                                                decoding="sync"
-                                                                className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                                                                                                                                                                                                                                                                className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
                                                             />
                                                         ) : null}
                                                     </div>
@@ -965,7 +1034,7 @@ const JamDetailView: React.FC<{
                                                     <div className="px-6 flex-1 flex flex-col relative items-center text-center -mt-10 z-20 pointer-events-none">
                                                         <div className="block w-20 h-20 rounded-xl bg-white dark:bg-slate-900 shadow-xl border-[4px] border-amber-500 overflow-hidden relative group-hover:scale-105 transition-transform mb-4 shrink-0 pointer-events-auto">
                                                             {resolvedProjectImage ? (
-                                                                <img src={resolvedProjectImage} alt={sub.projectTitle} className="w-full h-full object-cover" />
+                                                                <OptimizedImage baseWidth={96} src={resolvedProjectImage} alt={sub.projectTitle || 'Jam entry'} className="w-full h-full object-cover" />
                                                             ) : (
                                                                 <div className="w-full h-full flex items-center justify-center text-slate-400 bg-slate-100 dark:bg-slate-800">
                                                                     <LayoutGrid className="w-8 h-8 opacity-20" />
@@ -1024,13 +1093,10 @@ const JamDetailView: React.FC<{
                                             <Link to={`/mod/${sub.projectId}`} className="absolute inset-0 z-10"><span className="sr-only">View {sub.projectTitle}</span></Link>
                                             <div className="block relative w-full aspect-[3/1] bg-slate-100 dark:bg-slate-800 shrink-0 overflow-hidden border-b border-slate-200/50 dark:border-white/5">
                                                 {resolvedProjectBanner ? (
-                                                    <img
+                                                    <OptimizedImage baseWidth={640}
                                                         src={resolvedProjectBanner}
                                                         alt=""
-                                                        fetchPriority="high"
-                                                        loading="eager"
-                                                        decoding="sync"
-                                                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                                                                                                                                                                                                                                className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
                                                     />
                                                 ) : null}
                                             </div>
@@ -1038,7 +1104,7 @@ const JamDetailView: React.FC<{
                                             <div className="px-6 flex-1 flex flex-col relative items-center text-center -mt-10 z-20 pointer-events-none">
                                                 <div className="block w-20 h-20 rounded-xl bg-white dark:bg-slate-900 shadow-xl border-[4px] border-white/90 dark:border-slate-800 overflow-hidden relative group-hover:scale-105 transition-transform mb-4 shrink-0 pointer-events-auto">
                                                     {resolvedProjectImage ? (
-                                                        <img src={resolvedProjectImage} alt={sub.projectTitle} className="w-full h-full object-cover" />
+                                                        <OptimizedImage baseWidth={96} src={resolvedProjectImage} alt={sub.projectTitle || 'Jam entry'} className="w-full h-full object-cover" />
                                                     ) : (
                                                         <div className="w-full h-full flex items-center justify-center text-slate-400 bg-slate-100 dark:bg-slate-800">
                                                             <LayoutGrid className="w-8 h-8 opacity-20" />
@@ -1125,6 +1191,10 @@ const VotingModal: React.FC<{
     handleVote: (sid: string, cid: string, s: number) => void,
     onClose: () => void
 }> = ({ jam, submission, currentUser, handleVote, onClose }) => {
+    const dialogRef = useRef<HTMLDivElement>(null);
+    useScrollLock(!!submission);
+    useDialogFocus(!!submission, dialogRef);
+    useEffect(() => { const escape = (event: KeyboardEvent) => { if (event.key === 'Escape') onClose(); }; document.addEventListener('keydown', escape); return () => document.removeEventListener('keydown', escape); }, [onClose]);
     if (!submission) return null;
 
     const resolveUrl = (url?: string | null) => {
@@ -1137,11 +1207,11 @@ const VotingModal: React.FC<{
 
     return (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200" onClick={onClose}>
-            <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-2xl w-full max-w-md rounded-2xl shadow-2xl border border-white/20 dark:border-white/10 overflow-hidden flex flex-col animate-in zoom-in-95" onClick={e => e.stopPropagation()}>
+            <div ref={dialogRef} role="dialog" aria-modal="true" aria-label="Cast your vote" className="max-h-[calc(100dvh-2rem)] overflow-y-auto bg-white/90 dark:bg-slate-900/90 backdrop-blur-2xl w-full max-w-md rounded-2xl shadow-2xl border border-white/20 dark:border-white/10 overflow-hidden flex flex-col animate-in zoom-in-95" onClick={e => e.stopPropagation()}>
                 <div className="p-10 border-b border-slate-200/50 dark:border-white/5 text-center">
                     <div className="w-24 h-24 rounded-xl bg-white dark:bg-slate-800 shadow-lg overflow-hidden mx-auto mb-6 border-[3px] border-white dark:border-slate-700">
                         {submission.projectImageUrl ? (
-                            <img src={resolveUrl(submission.projectImageUrl)} className="w-full h-full object-cover" alt="" />
+                            <OptimizedImage baseWidth={96} src={resolveUrl(submission.projectImageUrl)} className="w-full h-full object-cover" alt="" />
                         ) : (
                             <LayoutGrid className="w-10 h-10 m-auto mt-6 text-slate-400 opacity-20" />
                         )}
@@ -1189,6 +1259,10 @@ const PickWinnersModal: React.FC<{
     onSubmit: (winners: { submissionId: string, awardTitle: string }[]) => void,
     isSaving: boolean
 }> = ({ submissions, onClose, onSubmit, isSaving }) => {
+    const dialogRef = useRef<HTMLDivElement>(null);
+    useScrollLock(true);
+    useDialogFocus(true, dialogRef);
+    useEffect(() => { const escape = (event: KeyboardEvent) => { if (event.key === 'Escape' && !isSaving) onClose(); }; document.addEventListener('keydown', escape); return () => document.removeEventListener('keydown', escape); }, [onClose, isSaving]);
     const [selectedWinners, setSelectedWinners] = useState<Record<string, string>>({});
     const sortedSubmissions = useMemo(() => [...submissions].sort((a, b) => (b.totalScore || 0) - (a.totalScore || 0)), [submissions]);
 
@@ -1209,6 +1283,7 @@ const PickWinnersModal: React.FC<{
     };
 
     const handleSubmit = () => {
+        if (isSaving) return;
         const winnersArr = Object.entries(selectedWinners).map(([submissionId, awardTitle]) => ({
             submissionId,
             awardTitle
@@ -1223,8 +1298,8 @@ const PickWinnersModal: React.FC<{
     };
 
     return (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200" onClick={onClose}>
-            <div className="bg-white dark:bg-slate-900 w-full max-w-2xl rounded-3xl shadow-2xl border border-white/20 dark:border-white/10 overflow-hidden flex flex-col animate-in zoom-in-95 max-h-[90vh]" onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200" onClick={() => { if (!isSaving) onClose(); }}>
+            <div ref={dialogRef} role="dialog" aria-modal="true" aria-label="Finalize jam" className="bg-white dark:bg-slate-900 w-full max-w-2xl rounded-3xl shadow-2xl border border-white/20 dark:border-white/10 overflow-hidden flex flex-col animate-in zoom-in-95 max-h-[90vh]" onClick={e => e.stopPropagation()}>
                 <div className="p-8 border-b border-slate-200 dark:border-white/5 flex justify-between items-center bg-slate-50 dark:bg-slate-950/50">
                     <div>
                         <h3 className="text-2xl font-black text-slate-900 dark:text-white flex items-center gap-3">
@@ -1232,7 +1307,7 @@ const PickWinnersModal: React.FC<{
                         </h3>
                         <p className="text-sm font-medium text-slate-500 mt-1">Select the winners and assign them custom awards.</p>
                     </div>
-                    <button onClick={onClose} className="p-2 bg-slate-200 dark:bg-white/10 text-slate-500 hover:text-slate-900 dark:hover:text-white rounded-xl transition-colors">
+                    <button onClick={() => { if (!isSaving) onClose(); }} className="p-2 bg-slate-200 dark:bg-white/10 text-slate-500 hover:text-slate-900 dark:hover:text-white rounded-xl transition-colors">
                         <X className="w-5 h-5" />
                     </button>
                 </div>
@@ -1257,7 +1332,7 @@ const PickWinnersModal: React.FC<{
 
                                         <div className="w-12 h-12 rounded-xl bg-slate-200 dark:bg-slate-800 overflow-hidden shrink-0 border border-slate-200 dark:border-white/5">
                                             {sub.projectImageUrl ? (
-                                                <img src={resolveUrl(sub.projectImageUrl)} className="w-full h-full object-cover" alt="" />
+                                                <OptimizedImage baseWidth={96} src={resolveUrl(sub.projectImageUrl)} className="w-full h-full object-cover" alt="" />
                                             ) : (
                                                 <LayoutGrid className="w-6 h-6 m-auto mt-3 text-slate-400 opacity-20" />
                                             )}
@@ -1312,7 +1387,8 @@ const PickWinnersModal: React.FC<{
 
                 <div className="p-6 border-t border-slate-200 dark:border-white/5 bg-slate-50 dark:bg-slate-950/50 flex justify-end gap-3">
                     <button
-                        onClick={onClose}
+                        onClick={() => { if (!isSaving) onClose(); }}
+                        disabled={isSaving}
                         className="px-6 py-3 rounded-xl font-bold text-sm bg-slate-200 dark:bg-white/10 text-slate-600 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-white/20 transition-all"
                     >
                         Cancel

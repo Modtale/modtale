@@ -44,10 +44,16 @@ class ModjamSubmissionLifecycleTest {
         userRepository = mock(UserRepository.class);
         lifecycleService = mock(LifecycleService.class);
         ReflectionTestUtils.setField(service, "modjamRepository", jamRepository);
+        ReflectionTestUtils.setField(service, "feedService", mock(net.modtale.service.jam.ModjamDiscordFeedService.class));
         ReflectionTestUtils.setField(service, "submissionRepository", submissionRepository);
         ReflectionTestUtils.setField(service, "projectRepository", projectRepository);
         ReflectionTestUtils.setField(service, "userRepository", userRepository);
         ReflectionTestUtils.setField(service, "lifecycleService", lifecycleService);
+        ReflectionTestUtils.setField(service, "mongoTemplate", mock(org.springframework.data.mongodb.core.MongoTemplate.class));
+        ReflectionTestUtils.setField(service, "customizationService", mock(net.modtale.service.jam.ModjamCustomizationService.class));
+        ReflectionTestUtils.setField(service, "accessControlService", mock(net.modtale.service.security.access.AccessControlService.class));
+        ReflectionTestUtils.setField(service, "organizerService", new net.modtale.service.jam.ModjamOrganizerService(
+                jamRepository, userRepository, mock(org.springframework.data.mongodb.core.MongoTemplate.class)));
         jam = new Modjam();
         jam.setId("jam-1");
         jam.setStatus("ACTIVE");
@@ -67,7 +73,7 @@ class ModjamSubmissionLifecycleTest {
         when(userRepository.findById("user-1")).thenReturn(Optional.of(user));
         when(submissionRepository.findByJamIdAndSubmitterId("jam-1", "user-1")).thenReturn(List.of());
         when(projectRepository.findAllById(any())).thenReturn(List.of(project));
-        when(submissionRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(submissionRepository.insert(any(ModjamSubmission.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(projectRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
     }
 
@@ -79,19 +85,19 @@ class ModjamSubmissionLifecycleTest {
         assertEquals(ProjectStatus.DRAFT, project.getStatus());
         verifyNoInteractions(lifecycleService);
         verify(projectRepository, never()).save(any());
-        verify(submissionRepository, never()).save(any());
+        verify(submissionRepository, never()).insert(any(ModjamSubmission.class));
     }
 
     @Test
     void eligibleDraftUsesCanonicalReviewWorkflowBeforeCreatingSubmission() {
         doAnswer(invocation -> {
             assertEquals(ProjectStatus.DRAFT, project.getStatus());
-            verify(submissionRepository, never()).save(any());
+            verify(submissionRepository, never()).insert(any(ModjamSubmission.class));
             project.setStatus(ProjectStatus.PENDING);
             return null;
-        }).when(lifecycleService).submitProject("project-1", user);
+        }).when(lifecycleService).submitProjectForModjam("project-1", user, "jam-1");
         ModjamSubmission submission = service.submitProject("jam-1", "project-1", "user-1");
-        verify(lifecycleService).submitProject("project-1", user);
+        verify(lifecycleService).submitProjectForModjam("project-1", user, "jam-1");
         assertEquals("project-1", submission.getProjectId());
         assertTrue(project.getModjamIds().contains("jam-1"));
     }
@@ -99,11 +105,11 @@ class ModjamSubmissionLifecycleTest {
     @Test
     void canonicalReviewFailureDoesNotCreateSubmission() {
         doThrow(new ProjectOperationForbiddenException("Verify your email address."))
-                .when(lifecycleService).submitProject("project-1", user);
+                .when(lifecycleService).submitProjectForModjam("project-1", user, "jam-1");
         assertThrows(ProjectOperationForbiddenException.class,
                 () -> service.submitProject("jam-1", "project-1", "user-1"));
         assertEquals(ProjectStatus.DRAFT, project.getStatus());
-        verify(submissionRepository, never()).save(any());
+        verify(submissionRepository, never()).insert(any(ModjamSubmission.class));
         verify(projectRepository, never()).save(any());
     }
 
@@ -128,7 +134,7 @@ class ModjamSubmissionLifecycleTest {
         jam.setStatus("UPCOMING");
         project.setStatus(ProjectStatus.PUBLISHED);
         service.submitProject("jam-1", "project-1", "user-1");
-        verify(submissionRepository).save(any());
+        verify(submissionRepository).insert(any(ModjamSubmission.class));
         verifyNoInteractions(lifecycleService);
     }
 
@@ -140,7 +146,7 @@ class ModjamSubmissionLifecycleTest {
         assertThrows(IllegalArgumentException.class,
                 () -> service.submitProject("jam-1", "project-1", "user-1"));
         verifyNoInteractions(lifecycleService);
-        verify(submissionRepository, never()).save(any());
+        verify(submissionRepository, never()).insert(any(ModjamSubmission.class));
     }
 
     @Test
@@ -155,5 +161,33 @@ class ModjamSubmissionLifecycleTest {
         }
         verify(userRepository, never()).save(any());
         verify(jamRepository, never()).save(any());
+    }
+
+    @Test
+    void competingEntryInsertFailsWithConflictWithoutReplacingExistingVotes() {
+        project.setStatus(ProjectStatus.PUBLISHED);
+        doThrow(new org.springframework.dao.DuplicateKeyException("existing submission"))
+                .when(submissionRepository).insert(any(ModjamSubmission.class));
+        var error = assertThrows(org.springframework.web.server.ResponseStatusException.class,
+                () -> service.submitProject("jam-1", "project-1", "user-1"));
+        assertEquals(org.springframework.http.HttpStatus.CONFLICT, error.getStatusCode());
+        verify(submissionRepository, never()).save(any());
+        verifyNoInteractions(lifecycleService);
+        verify(projectRepository, never()).save(any());
+    }
+
+    @Test
+    void submissionIdsEnforcePersonOrProjectUniquenessWithoutANewIndex() {
+        project.setStatus(ProjectStatus.PUBLISHED);
+        var first = service.submitProject("jam-1", "project-1", "user-1");
+        project.setId("project-2");
+        when(projectRepository.findById("project-2")).thenReturn(Optional.of(project));
+        var samePerson = service.submitProject("jam-1", "project-2", "user-1");
+        assertEquals(first.getId(), samePerson.getId());
+        jam.setOneEntryPerPerson(false);
+        var perProject = service.submitProject("jam-1", "project-2", "user-1");
+        assertNotEquals(first.getId(), perProject.getId());
+        assertTrue(perProject.getId().matches("modjam-[a-f0-9]{64}"));
+        verify(submissionRepository, never()).save(any());
     }
 }

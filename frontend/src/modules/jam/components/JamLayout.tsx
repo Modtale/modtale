@@ -173,7 +173,7 @@ export const JamLayout: React.FC<JamLayoutProps> = ({
                             ? 'absolute top-6 right-6 z-30 bg-black/60 hover:bg-black/80 text-white px-4 py-2 rounded-xl text-xs font-bold border border-white/20 backdrop-blur-sm shadow-lg hover:scale-105'
                             : 'absolute inset-0 z-30 flex flex-col items-center justify-center m-6 rounded-2xl border-2 border-dashed border-white/10 hover:border-white/30 bg-white/5 hover:bg-white/10 group/banner'
                     }`}>
-                        <input type="file" accept={IMAGE_ACCEPT} onChange={(e) => handleFileSelect(e, 'banner')} className="sr-only" aria-label="Upload jam image" />
+                        <input type="file" accept={IMAGE_ACCEPT} onChange={(e) => handleFileSelect(e, 'banner')} className="sr-only" aria-label="Upload jam banner" />
                         {finalBanner ? (
                             <div className="flex flex-col items-end">
                                 <div className="flex items-center gap-2"><ImageIcon className="w-4 h-4" /> Change Banner</div>
@@ -215,7 +215,7 @@ export const JamLayout: React.FC<JamLayoutProps> = ({
                             <div className="flex-shrink-0">
                                 <label className={`block w-24 h-24 rounded-2xl bg-transparent backdrop-blur-md shadow-md border-4 border-white dark:border-slate-800 ring-1 ring-black/5 dark:ring-white/10 overflow-hidden relative group ${isEditing ? 'cursor-pointer' : ''}`}>
                                     <div className="absolute inset-0 bg-white/40 dark:bg-slate-900/40 z-0 backdrop-blur-md" />
-                                    <input type="file" disabled={!isEditing} accept={IMAGE_ACCEPT} onChange={(e) => handleFileSelect(e, 'icon')} className="sr-only" aria-label="Upload jam image" />
+                                    <input type="file" disabled={!isEditing} accept={IMAGE_ACCEPT} onChange={(e) => handleFileSelect(e, 'icon')} className="sr-only" aria-label="Upload jam icon" />
                                     {finalIcon ? (
                                         <OptimizedImage
                                             src={finalIcon}
@@ -241,7 +241,7 @@ export const JamLayout: React.FC<JamLayoutProps> = ({
                             <div className="hidden md:block flex-shrink-0 relative z-50 -mt-14">
                                 <label className={`block w-36 h-36 lg:w-40 lg:h-40 rounded-2xl bg-transparent backdrop-blur-md shadow-xl border-[6px] border-white dark:border-slate-800 ring-1 ring-black/5 dark:ring-white/10 overflow-hidden group relative ${isEditing ? 'cursor-pointer' : ''}`}>
                                     <div className="absolute inset-0 bg-white/40 dark:bg-slate-900/40 z-0 backdrop-blur-md" />
-                                    <input type="file" disabled={!isEditing} accept={IMAGE_ACCEPT} onChange={(e) => handleFileSelect(e, 'icon')} className="sr-only" aria-label="Upload jam image" />
+                                    <input type="file" disabled={!isEditing} accept={IMAGE_ACCEPT} onChange={(e) => handleFileSelect(e, 'icon')} className="sr-only" aria-label="Upload jam icon" />
                                     {finalIcon ? (
                                         <OptimizedImage
                                             src={finalIcon}

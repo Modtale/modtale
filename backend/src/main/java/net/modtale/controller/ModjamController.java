@@ -7,6 +7,7 @@ import net.modtale.model.jam.ModjamSubmission;
 import net.modtale.model.user.User;
 import net.modtale.exception.ApiKeyOperationForbiddenException;
 import net.modtale.service.ModjamService;
+import net.modtale.service.jam.ModjamOrganizerService;
 import net.modtale.service.security.access.AccessControlService;
 import net.modtale.service.user.account.AccountService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -24,6 +25,7 @@ import java.util.Map;
 public class ModjamController {
 
     @Autowired private ModjamService modjamService;
+    @Autowired private ModjamOrganizerService organizerService;
     @Autowired private AccountService accountService;
     @Autowired private AccessControlService accessControlService;
 
@@ -62,7 +64,7 @@ public class ModjamController {
     public ResponseEntity<Modjam> updateJam(@PathVariable String id, @RequestBody Modjam jam) {
         User user = getBrowserUser();
         if (user == null) return ResponseEntity.status(401).build();
-        return ResponseEntity.ok(modjamService.updateJam(id, jam, user.getId()));
+        return ResponseEntity.ok(modjamService.jamForViewer(modjamService.updateJam(id, jam, user.getId()), user));
     }
 
     @PutMapping("/{id}/icon")
@@ -145,7 +147,7 @@ public class ModjamController {
     public ResponseEntity<Modjam> finalizeJam(@PathVariable String jamId, @RequestBody List<Map<String, String>> winners) {
         User user = getBrowserUser();
         if (user == null) return ResponseEntity.status(401).build();
-        return ResponseEntity.ok(modjamService.finalizeJam(jamId, user.getId(), winners));
+        return ResponseEntity.ok(modjamService.jamForViewer(modjamService.finalizeJam(jamId, user.getId(), winners), user));
     }
 
     // Judging Endpoints
@@ -167,7 +169,7 @@ public class ModjamController {
     public ResponseEntity<Modjam> declineJudge(@PathVariable String jamId) {
         User user = getBrowserUser();
         if (user == null) return ResponseEntity.status(401).build();
-        return ResponseEntity.ok(modjamService.declineJudgeInvite(jamId, user.getUsername()));
+        return ResponseEntity.ok(modjamService.declineJudgeInvite(jamId, user.getId(), user.getUsername()));
     }
 
     @DeleteMapping("/{jamId}/judges/{username}")
@@ -175,5 +177,47 @@ public class ModjamController {
         User user = getBrowserUser();
         if (user == null) return ResponseEntity.status(401).build();
         return ResponseEntity.ok(modjamService.removeJudge(jamId, username, user.getId()));
+    }
+
+    @PostMapping("/{jamId}/organizer-roles")
+    public ResponseEntity<Modjam> saveOrganizerRole(@PathVariable String jamId, @RequestBody Modjam.OrganizerRole role) {
+        User user = getBrowserUser();
+        if (user == null) return ResponseEntity.status(401).build();
+        return ResponseEntity.ok(modjamService.jamForViewer(organizerService.saveRole(jamId, user.getId(), role), user));
+    }
+
+    @DeleteMapping("/{jamId}/organizer-roles/{roleId}")
+    public ResponseEntity<Modjam> deleteOrganizerRole(@PathVariable String jamId, @PathVariable String roleId) {
+        User user = getBrowserUser();
+        if (user == null) return ResponseEntity.status(401).build();
+        return ResponseEntity.ok(modjamService.jamForViewer(organizerService.deleteRole(jamId, user.getId(), roleId), user));
+    }
+
+    @PostMapping("/{jamId}/organizers/invite")
+    public ResponseEntity<Modjam> inviteOrganizer(@PathVariable String jamId, @RequestBody Map<String, String> input) {
+        User user = getBrowserUser();
+        if (user == null) return ResponseEntity.status(401).build();
+        return ResponseEntity.ok(modjamService.jamForViewer(organizerService.invite(jamId, user.getId(), input.get("username"), input.get("roleId")), user));
+    }
+
+    @PostMapping("/{jamId}/organizers/accept")
+    public ResponseEntity<Modjam> acceptOrganizer(@PathVariable String jamId) {
+        User user = getBrowserUser();
+        if (user == null) return ResponseEntity.status(401).build();
+        return ResponseEntity.ok(modjamService.jamForViewer(organizerService.answerInvite(jamId, user.getId(), true), user));
+    }
+
+    @PostMapping("/{jamId}/organizers/decline")
+    public ResponseEntity<Modjam> declineOrganizer(@PathVariable String jamId) {
+        User user = getBrowserUser();
+        if (user == null) return ResponseEntity.status(401).build();
+        return ResponseEntity.ok(modjamService.jamForViewer(organizerService.answerInvite(jamId, user.getId(), false), user));
+    }
+
+    @DeleteMapping("/{jamId}/organizers/{userId}")
+    public ResponseEntity<Modjam> removeOrganizer(@PathVariable String jamId, @PathVariable String userId) {
+        User user = getBrowserUser();
+        if (user == null) return ResponseEntity.status(401).build();
+        return ResponseEntity.ok(modjamService.jamForViewer(organizerService.remove(jamId, user.getId(), userId), user));
     }
 }

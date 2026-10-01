@@ -9,7 +9,9 @@ import { OptimizedImage } from '@/components/ui/OptimizedImage';
 import { StatusModal } from '@/components/ui/StatusModal';
 import { normalizeJamSlug, validateJamSlug } from '@/modules/jam/utils/slug';
 import { getScopedJamCss } from '@/modules/jam/utils/customCss';
-import type { User } from '@/types';
+import { hasJamPermission } from '@/modules/jam/utils/permissions';
+import { JamOrganizersPanel } from '@/modules/jam/components/JamOrganizersPanel';
+import type { JamPermission, Modjam, User } from '@/types';
 import { getClampedJamMilestoneDate, getJamMilestoneMinimum } from '@/modules/jam/utils/timeline';
 
 const CalendarWidget = ({ viewDate, setViewDate, selectedDate, onSelect, minDate }: { viewDate: Date, setViewDate: (d: Date) => void, selectedDate: Date, onSelect: (d: Date) => void, minDate: Date }) => {
@@ -68,8 +70,10 @@ const TimeDropdown = ({ value, options, onChange }: { value: string | number, op
         const handleClickOutside = (e: MouseEvent) => {
             if (ref.current && !ref.current.contains(e.target as Node)) setIsOpen(false);
         };
+        const handleEscape = (event: KeyboardEvent) => { if (event.key === 'Escape') setIsOpen(false); };
         document.addEventListener('mousedown', handleClickOutside);
-        return () => document.removeEventListener('mousedown', handleClickOutside);
+        document.addEventListener('keydown', handleEscape);
+        return () => { document.removeEventListener('mousedown', handleClickOutside); document.removeEventListener('keydown', handleEscape); };
     }, []);
 
     const selectedLabel = options.find(o => o.value === value)?.label || value;
@@ -132,8 +136,10 @@ const CustomDateTimePicker: React.FC<{ label: string, icon: any, value: string, 
             const clickedPopup = popupRef.current?.contains(target);
             if (!clickedTrigger && !clickedPopup) setIsOpen(false);
         };
+        const handleEscape = (event: KeyboardEvent) => { if (event.key === 'Escape') setIsOpen(false); };
         document.addEventListener('mousedown', handleClickOutside);
-        return () => document.removeEventListener('mousedown', handleClickOutside);
+        document.addEventListener('keydown', handleEscape);
+        return () => { document.removeEventListener('mousedown', handleClickOutside); document.removeEventListener('keydown', handleEscape); };
     }, []);
 
     useEffect(() => {
@@ -141,7 +147,9 @@ const CustomDateTimePicker: React.FC<{ label: string, icon: any, value: string, 
         const updatePopupRect = () => {
             if (!buttonRef.current) return;
             const rect = buttonRef.current.getBoundingClientRect();
-            setPopupRect({ top: rect.bottom + 8, left: rect.left, width: rect.width });
+            const popupWidth = Math.min(window.innerWidth * 0.9, window.innerWidth >= 768 ? 320 : 300);
+            const center = Math.max(popupWidth / 2 + 8, Math.min(rect.left + rect.width / 2, window.innerWidth - popupWidth / 2 - 8));
+            setPopupRect({ top: Math.max(8, Math.min(rect.bottom + 8, window.innerHeight - 420)), left: center, width: popupWidth });
         };
         updatePopupRect();
         window.addEventListener('resize', updatePopupRect);
@@ -229,7 +237,7 @@ const CustomDateTimePicker: React.FC<{ label: string, icon: any, value: string, 
             </button>
 
             {isOpen && !isPassed && popupRect && createPortal(
-                <div ref={popupRef} className="w-[300px] md:w-[320px] max-w-[90vw] bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/10 rounded-2xl shadow-[0_10px_50px_rgba(0,0,0,0.25)] p-4 animate-in fade-in zoom-in-95 duration-200 origin-top" style={{ position: 'fixed', top: popupRect.top, left: popupRect.left + (popupRect.width / 2), transform: 'translateX(-50%)', zIndex: 10000 }}>
+                <div ref={popupRef} className="w-[300px] md:w-[320px] max-w-[90vw] max-h-[calc(100dvh-1rem)] overflow-y-auto bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/10 rounded-2xl shadow-[0_10px_50px_rgba(0,0,0,0.25)] p-4 animate-in fade-in zoom-in-95 duration-200 origin-top" style={{ position: 'fixed', top: popupRect.top, left: popupRect.left, transform: 'translateX(-50%)', zIndex: 10000 }}>
                     <CalendarWidget viewDate={viewDate} setViewDate={setViewDate} selectedDate={tempDate} onSelect={handleDateSelect} minDate={new Date(minimumDateMs)} />
 
                     <div className="mt-4 flex items-center justify-between gap-2 bg-slate-50 dark:bg-slate-800/50 p-3 rounded-xl border border-slate-200 dark:border-white/5">
@@ -268,8 +276,10 @@ const MultiSelectDropdown: React.FC<{ options: {label: string, value: string}[],
         const handleClickOutside = (e: MouseEvent) => {
             if (ref.current && !ref.current.contains(e.target as Node) && !menuRef.current?.contains(e.target as Node)) setIsOpen(false);
         };
+        const handleEscape = (event: KeyboardEvent) => { if (event.key === 'Escape') setIsOpen(false); };
         document.addEventListener('mousedown', handleClickOutside);
-        return () => document.removeEventListener('mousedown', handleClickOutside);
+        document.addEventListener('keydown', handleEscape);
+        return () => { document.removeEventListener('mousedown', handleClickOutside); document.removeEventListener('keydown', handleEscape); };
     }, []);
 
     useEffect(() => {
@@ -426,8 +436,13 @@ const JamDependencySelector: React.FC<{ selectedId: string | undefined, onChange
 };
 
 export const JamBuilder: React.FC<any> = ({
-                                              metaData, setMetaData, handleSave, isLoading, activeTab, setActiveTab, onBack, onPublish
+                                              metaData, setMetaData, handleSave, isLoading, activeTab, setActiveTab, onBack, onPublish, currentUser, onOrganizerUpdate
                                           }) => {
+    const can = (permission: JamPermission) => hasJamPermission(metaData as Modjam, currentUser?.id, permission);
+    const isHost = currentUser?.id === metaData.hostId;
+    const tabPermissions: Record<string, JamPermission> = { details: 'EDIT_DETAILS', schedule: 'MANAGE_SETTINGS', rules: 'EDIT_RULES', categories: 'MANAGE_SETTINGS', judges: 'MANAGE_JUDGES', restrictions: 'MANAGE_SETTINGS', appearance: 'EDIT_DETAILS', settings: 'MANAGE_SETTINGS' };
+    const allowedTabs = Object.keys(tabPermissions).filter(tab => can(tabPermissions[tab]));
+    useEffect(() => { if (!allowedTabs.includes(activeTab) && allowedTabs.length) setActiveTab(allowedTabs[0]); }, [activeTab, allowedTabs.join(',')]);
     const [isDirty, setIsDirty] = useState(false);
     const [isSaved, setIsSaved] = useState(false);
     const [isEditingTitle, setIsEditingTitle] = useState(false);
@@ -446,7 +461,7 @@ export const JamBuilder: React.FC<any> = ({
     const scopedCss = getScopedJamCss(metaData.customCss);
     const rangeMinimum = metaData.restrictions?.minimumGameVersion || '';
     const rangeMaximum = metaData.restrictions?.maximumGameVersion || '';
-    const rangeError = versionMode === 'range' && (!rangeMinimum || !rangeMaximum || gameVersionOptions.findIndex(version => version.value === rangeMinimum) < 0 || gameVersionOptions.findIndex(version => version.value === rangeMaximum) < gameVersionOptions.findIndex(version => version.value === rangeMinimum)) ? 'Choose an inclusive range with the first version no later than the last.' : null;
+    const rangeError = versionMode === 'range' && ((!rangeMinimum && !rangeMaximum) || (rangeMinimum && gameVersionOptions.findIndex(version => version.value === rangeMinimum) < 0) || (rangeMaximum && gameVersionOptions.findIndex(version => version.value === rangeMaximum) < 0) || (rangeMinimum && rangeMaximum && gameVersionOptions.findIndex(version => version.value === rangeMinimum) < gameVersionOptions.findIndex(version => version.value === rangeMaximum))) ? 'Choose supported range endpoints, with the first version no later than the last.' : null;
 
     // User search states
     const [inviteUsername, setInviteUsername] = useState('');
@@ -455,19 +470,25 @@ export const JamBuilder: React.FC<any> = ({
     const [searchResults, setSearchResults] = useState<any[]>([]);
     const [showResults, setShowResults] = useState(false);
     const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const searchSequence = useRef(0);
+    const judgeMutationPending = useRef(false);
+    const currentJamId = useRef(metaData.id);
+    currentJamId.current = metaData.id;
     const searchWrapperRef = useRef<HTMLDivElement>(null);
     const [judgeProfiles, setJudgeProfiles] = useState<Record<string, User>>({});
 
     useEffect(() => {
         const controller = new AbortController();
-        api.get('/meta/game-versions', { signal: controller.signal }).then(res => {
-            const versions = Array.isArray(res.data) ? res.data : (res.data.content || []);
+        api.get('/meta/game-versions/catalog', { signal: controller.signal }).then(res => {
+            const versions = Array.isArray(res.data) ? res.data : (res.data.allVersions || []);
+            if (controller.signal.aborted) return;
             setGameVersionOptions(versions.map((v: string) => ({ label: v, value: v })));
         }).catch(() => {});
         return () => controller.abort();
     }, []);
 
     useEffect(() => () => {
+        searchSequence.current += 1;
         if (searchTimeout.current) clearTimeout(searchTimeout.current);
         if (savedTimer.current) clearTimeout(savedTimer.current);
     }, []);
@@ -480,8 +501,10 @@ export const JamBuilder: React.FC<any> = ({
                 setShowResults(false);
             }
         };
+        const handleEscape = (event: KeyboardEvent) => { if (event.key === 'Escape') setShowResults(false); };
         document.addEventListener('mousedown', handleClickOutside);
-        return () => document.removeEventListener('mousedown', handleClickOutside);
+        document.addEventListener('keydown', handleEscape);
+        return () => { document.removeEventListener('mousedown', handleClickOutside); document.removeEventListener('keydown', handleEscape); };
     }, []);
 
     useEffect(() => {
@@ -585,15 +608,17 @@ export const JamBuilder: React.FC<any> = ({
     const handleInputSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const val = e.target.value;
         setInviteUsername(val);
+        const sequence = ++searchSequence.current;
         if (searchTimeout.current) clearTimeout(searchTimeout.current);
         if (val.trim().length > 1) {
             searchTimeout.current = setTimeout(async () => {
                 try {
                     const res = await api.get('/users/search', { params: { query: val } });
+                    if (sequence !== searchSequence.current) return;
                     setSearchResults(res.data);
                     setShowResults(true);
                 } catch (e) {
-                    setSearchResults([]);
+                    if (sequence === searchSequence.current) setSearchResults([]);
                 }
             }, 300);
         } else {
@@ -603,6 +628,7 @@ export const JamBuilder: React.FC<any> = ({
     };
 
     const handleSelectUser = (user: any) => {
+        searchSequence.current += 1;
         setInviteUsername(user.username);
         setShowResults(false);
     };
@@ -612,10 +638,13 @@ export const JamBuilder: React.FC<any> = ({
             setInviteStatus("Please save the jam draft first before inviting judges.");
             return;
         }
-        if (isInviting || !inviteUsername.trim()) return;
+        if (judgeMutationPending.current || !inviteUsername.trim()) return;
+        judgeMutationPending.current = true;
+        const target = metaData.id;
         setIsInviting(true);
         try {
-            const res = await api.post(`/modjams/${metaData.id}/judges/invite`, { username: inviteUsername });
+            const res = await api.post(`/modjams/${target}/judges/invite`, { username: inviteUsername });
+            if (currentJamId.current !== target) return;
             setMetaData((prev: any) => ({
                 ...prev,
                 pendingJudgeInvites: res.data.pendingJudgeInvites,
@@ -631,14 +660,19 @@ export const JamBuilder: React.FC<any> = ({
             errorMsg = errorMsg.replace(/^\d{3} [A-Z_]+ "(.*)"$/, '$1');
             setInviteStatus(errorMsg);
         } finally {
+            judgeMutationPending.current = false;
             setIsInviting(false);
         }
     };
 
     const handleRemoveJudge = async (username: string) => {
-        if (!metaData.id) return;
+        if (!metaData.id || judgeMutationPending.current) return;
+        judgeMutationPending.current = true;
+        const target = metaData.id;
+        setIsInviting(true);
         try {
-            const res = await api.delete(`/modjams/${metaData.id}/judges/${username}`);
+            const res = await api.delete(`/modjams/${target}/judges/${encodeURIComponent(username)}`);
+            if (currentJamId.current !== target) return;
             setMetaData((prev: any) => ({
                 ...prev,
                 pendingJudgeInvites: res.data.pendingJudgeInvites,
@@ -650,7 +684,7 @@ export const JamBuilder: React.FC<any> = ({
                 : e.response?.data?.message || 'Failed to remove judge.';
             errorMsg = errorMsg.replace(/^\d{3} [A-Z_]+ "(.*)"$/, '$1');
             setSaveError(errorMsg);
-        }
+        } finally { judgeMutationPending.current = false; setIsInviting(false); }
     };
 
     const generateRulesText = () => {
@@ -723,7 +757,7 @@ export const JamBuilder: React.FC<any> = ({
 
     return (
         <JamLayout
-            isEditing={true}
+            isEditing={can('EDIT_DETAILS')}
             onBack={() => { if (isLoading || savePending.current) return; if (isDirty) setConfirmBack(true); else onBack(); }}
             bannerUrl={metaData.bannerUrl}
             iconUrl={metaData.imageUrl}
@@ -745,6 +779,7 @@ export const JamBuilder: React.FC<any> = ({
                             />
                             <button
                                 type="button"
+                                onMouseDown={event => event.preventDefault()}
                                 onClick={() => { setMetaData((prev: any) => ({ ...prev, title: titleBeforeEdit })); setIsEditingTitle(false); }}
                                 className="absolute right-0 top-1/2 -translate-y-1/2 text-slate-400 hover:text-red-500 transition-colors"
                                 aria-label="Cancel title editing"
@@ -753,7 +788,7 @@ export const JamBuilder: React.FC<any> = ({
                             </button>
                         </div>
                     ) : (
-                        <button type="button" aria-label="Edit jam title"
+                        <button type="button" aria-label="Edit jam title" disabled={!can('EDIT_DETAILS')}
                             className="flex items-center gap-3 group text-left rounded-2xl -ml-3 px-3 py-1.5 cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
                             onClick={() => {
                                 setTitleBeforeEdit(metaData.title || '');
@@ -788,7 +823,7 @@ export const JamBuilder: React.FC<any> = ({
                         <span>{isLoading ? 'Saving…' : isSaved ? 'Saved!' : (isPublished ? 'Save Changes' : 'Save Draft')}</span>
                     </button>
 
-                    {!isPublished && (
+                    {!isPublished && can('MANAGE_SETTINGS') && (
                         <div className="relative group">
                             <div className="absolute bottom-full right-0 mb-3 w-64 bg-white dark:bg-slate-900 rounded-2xl shadow-2xl p-5 border border-slate-200 dark:border-white/10 opacity-0 group-hover:opacity-100 transition-all pointer-events-none translate-y-2 group-hover:translate-y-0 z-[100]">
                                 <div className="flex items-center justify-between mb-4 border-b border-slate-100 dark:border-white/5 pb-3">
@@ -831,8 +866,9 @@ export const JamBuilder: React.FC<any> = ({
                             {id: 'categories', icon: Scale, label: `Judging (${metaData.categories?.length || 0})`},
                             {id: 'judges', icon: Users, label: 'Judges'},
                             {id: 'restrictions', icon: Shield, label: 'Restrictions'},
+                            {id: 'appearance', icon: LayoutGrid, label: 'Appearance'},
                             {id: 'settings', icon: Settings, label: 'Settings'}
-                        ].map(t => (
+                        ].filter(t => can(tabPermissions[t.id])).map(t => (
                             <button
                                 key={t.id}
                                 type="button"
@@ -849,6 +885,7 @@ export const JamBuilder: React.FC<any> = ({
                     {scopedCss && <style>{scopedCss}</style>}
                     {saveError && <p role="alert" className="mb-5 rounded-xl border border-red-500/20 bg-red-500/10 p-4 text-sm text-red-600 dark:text-red-400">{saveError}</p>}
                     {confirmBack && <StatusModal type="warning" title="Leave the builder?" message="Your unsaved changes will be discarded. The saved draft will still be available." actionLabel="Discard changes" secondaryLabel="Keep editing" onClose={() => setConfirmBack(false)} onAction={() => { setConfirmBack(false); onBack(); }} />}
+                    {!isPublished && <details className="mb-5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 px-4 py-3"><summary className="cursor-pointer text-sm font-bold text-slate-700 dark:text-slate-300">Publishing checklist · {metCount}/{publishChecklist.length} ready</summary><ul className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">{publishChecklist.map(item => <li key={item.label} className="flex items-center gap-2 text-xs text-slate-500">{item.met ? <CheckCircle2 className="size-4 text-green-500" aria-hidden="true" /> : <Clock className="size-4" aria-hidden="true" />}<span>{item.label}<span className="sr-only">{item.met ? ': ready' : ': needed'}</span></span></li>)}</ul></details>}
                     {activeTab === 'details' && (
                         <div className="space-y-6">
                             <div className="flex items-center justify-between border-b border-slate-200/50 dark:border-white/5 pb-4">
@@ -862,6 +899,7 @@ export const JamBuilder: React.FC<any> = ({
                             </div>
                             {editorMode === 'write' ? (
                                 <textarea
+                                    aria-label="Jam description"
                                     value={metaData.description}
                                     onChange={e => updateField('description', e.target.value)}
                                     placeholder="# Welcome to the Jam!&#10;&#10;Describe the theme, goals, and glory..."
@@ -1499,8 +1537,8 @@ export const JamBuilder: React.FC<any> = ({
                                         </select>
                                         {versionMode === 'exact' && <MultiSelectDropdown options={gameVersionOptions} selected={metaData.restrictions?.allowedGameVersions || []} onChange={val => updateField('restrictions', {...metaData.restrictions, allowedGameVersions: val})} placeholder="Select game versions" />}
                                         {versionMode === 'range' && <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                            <label className="text-xs font-bold text-slate-500">First version<select aria-label="First game version" value={rangeMinimum} onChange={event => updateField('restrictions', {...metaData.restrictions, minimumGameVersion: event.target.value})} className="mt-1 w-full rounded-lg border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-900 p-2 text-sm"><option value="">Choose a version</option>{gameVersionOptions.map(version => <option key={version.value} value={version.value}>{version.label}</option>)}</select></label>
-                                            <label className="text-xs font-bold text-slate-500">Last version<select aria-label="Last game version" value={rangeMaximum} onChange={event => updateField('restrictions', {...metaData.restrictions, maximumGameVersion: event.target.value})} className="mt-1 w-full rounded-lg border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-900 p-2 text-sm"><option value="">Choose a version</option>{gameVersionOptions.map(version => <option key={version.value} value={version.value}>{version.label}</option>)}</select></label>
+                                            <label className="text-xs font-bold text-slate-500">First version (optional)<select aria-label="First game version" value={rangeMinimum} onChange={event => updateField('restrictions', {...metaData.restrictions, minimumGameVersion: event.target.value})} className="mt-1 w-full rounded-lg border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-900 p-2 text-sm"><option value="">Choose a version</option>{gameVersionOptions.map(version => <option key={version.value} value={version.value}>{version.label}</option>)}</select></label>
+                                            <label className="text-xs font-bold text-slate-500">Last version (optional)<select aria-label="Last game version" value={rangeMaximum} onChange={event => updateField('restrictions', {...metaData.restrictions, maximumGameVersion: event.target.value})} className="mt-1 w-full rounded-lg border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-900 p-2 text-sm"><option value="">Choose a version</option>{gameVersionOptions.map(version => <option key={version.value} value={version.value}>{version.label}</option>)}</select></label>
                                         </div>}
                                         {rangeError && <p role="alert" className="mt-2 text-xs text-red-600 dark:text-red-400">{rangeError}</p>}
                                     </div>
@@ -1533,8 +1571,19 @@ export const JamBuilder: React.FC<any> = ({
                         </div>
                     )}
 
+                    {activeTab === 'appearance' && (
+                                <section className="space-y-3 pb-6 border-b border-slate-200 dark:border-white/10">
+                                    <label htmlFor="jam-custom-css" className="block text-sm font-bold text-slate-900 dark:text-white">Custom content styles</label>
+                                    <p id="jam-custom-css-help" className="text-xs text-slate-500">Style the description and rules using h1, h2, h3, p, a, blockquote, ul, ol, li, code, pre, table, th, td, hr, strong and em. Only safe typography, color and spacing are supported. Network URLs, imports and page layout controls are blocked.</p>
+                                    <textarea id="jam-custom-css" aria-describedby="jam-custom-css-help" value={metaData.customCss || ''} maxLength={10000} onChange={event => updateField('customCss', event.target.value)} placeholder="h2 { color: #3b82f6; }" className="w-full min-h-36 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-900 p-4 font-mono text-sm outline-none focus:ring-2 focus:ring-modtale-accent" />
+                                    {metaData.customCss?.trim() && !scopedCss && <p role="alert" className="text-xs text-amber-700 dark:text-amber-300">These styles could not be safely previewed. Check the allowed selectors and properties before saving.</p>}
+                                    <div className="rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900 p-4"><p className="mb-3 text-xs font-bold uppercase text-slate-400">Content preview</p><div className="jam-custom-content"><MarkdownRenderer content={metaData.description || '## Your jam\n\nThis is how your description and rules will look.'} /></div></div>
+                                </section>
+                    )}
+
                     {activeTab === 'settings' && (
                         <div className="space-y-6">
+                            {isHost && <JamOrganizersPanel jam={metaData} onUpdate={updated => { setMetaData((previous: any) => ({ ...previous, organizerRoles: updated.organizerRoles, organizerMembers: updated.organizerMembers, pendingOrganizerInvites: updated.pendingOrganizerInvites })); onOrganizerUpdate?.(updated); }} />}
                             <h3 className="text-sm font-black uppercase text-slate-500 tracking-widest border-b border-slate-200/50 dark:border-white/5 pb-4 flex items-center gap-2">
                                 <Settings className="w-4 h-4" /> Configuration
                             </h3>
@@ -1550,13 +1599,7 @@ export const JamBuilder: React.FC<any> = ({
                                     </div>
                                 </div>
 
-                                <section className="space-y-3 pb-6 border-b border-slate-200 dark:border-white/10">
-                                    <label htmlFor="jam-custom-css" className="block text-sm font-bold text-slate-900 dark:text-white">Custom content styles</label>
-                                    <p id="jam-custom-css-help" className="text-xs text-slate-500">Style the description and rules using h1, h2, h3, p, a, blockquote, ul, ol, li, code, pre, table, th, td, hr, strong and em. Only safe typography, color and spacing are supported. Network URLs, imports and page layout controls are blocked.</p>
-                                    <textarea id="jam-custom-css" aria-describedby="jam-custom-css-help" value={metaData.customCss || ''} maxLength={10000} onChange={event => updateField('customCss', event.target.value)} placeholder="h2 { color: #3b82f6; }" className="w-full min-h-36 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-900 p-4 font-mono text-sm outline-none focus:ring-2 focus:ring-modtale-accent" />
-                                    {metaData.customCss?.trim() && !scopedCss && <p role="alert" className="text-xs text-amber-700 dark:text-amber-300">These styles could not be safely previewed. Check the allowed selectors and properties before saving.</p>}
-                                    <div className="rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900 p-4"><p className="mb-3 text-xs font-bold uppercase text-slate-400">Content preview</p><div className="jam-custom-content"><MarkdownRenderer content={metaData.description || '## Your jam\n\nThis is how your description and rules will look.'} /></div></div>
-                                </section>
+
 
                                 <label className="flex items-center justify-between p-4 bg-white dark:bg-slate-800/50 rounded-2xl cursor-pointer hover:border-modtale-accent border border-slate-200 dark:border-white/5 transition-all shadow-sm">
                                     <div className="flex flex-col">

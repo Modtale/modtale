@@ -58,7 +58,7 @@ describe('jam presentation', () => {
         expect(container.querySelector('img[alt="Summer Build"]')?.getAttribute('data-base-width')).toBe('64');
     });
 
-    it('uses a stable banner gradient and responsive content spacing', async () => {
+    it('uses the project scroll-linked banner fade and compact responsive content spacing', async () => {
         await act(async () => {
             root.render(
                 <MemoryRouter>
@@ -73,6 +73,8 @@ describe('jam presentation', () => {
 
         expect(container.querySelector('.bg-gradient-to-t')).not.toBeNull();
         expect(container.querySelector('.px-4.pb-8.pt-4')).not.toBeNull();
-        expect(container.innerHTML).not.toContain('--fade-base');
+        expect(container.querySelector('.modtale-project-banner-fade')).not.toBeNull();
+        expect(container.innerHTML).toContain('--fade-base');
+        expect(container.innerHTML).toContain('h-[clamp(140px,25vw,360px)]');
     });
 });
