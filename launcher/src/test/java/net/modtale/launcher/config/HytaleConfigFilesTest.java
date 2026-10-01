@@ -73,7 +73,7 @@ class HytaleConfigFilesTest {
         var snapshot = service.read(discover().getFirst());
         Path outside = write("outside.json", "{}");
         Files.delete(path);
-        Files.createSymbolicLink(path, outside);
+        net.modtale.launcher.TestSymlinks.createSymbolicLink(path, outside);
         assertTrue(discover().isEmpty());
         assertThrows(IOException.class, () -> service.save(snapshot, "{\"edited\":true}"));
         assertEquals("{}", Files.readString(outside));

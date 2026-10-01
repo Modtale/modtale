@@ -1,5 +1,7 @@
 package net.modtale.launcher.ui.activity;
 
+import net.modtale.launcher.ui.common.LauncherTooltips;
+
 import static net.modtale.launcher.ui.common.LauncherUi.dangerButton;
 import static net.modtale.launcher.ui.common.LauncherUi.emptyState;
 import static net.modtale.launcher.ui.common.LauncherUi.primaryButton;
@@ -154,6 +156,7 @@ public final class LauncherNotificationsMenu {
         refresh.setOnAction(event -> refresh(false));
 
         clearButton = new Button("Clear All", LauncherIcons.icon(LauncherIcons.Glyph.TRASH, 12));
+        LauncherTooltips.install(clearButton, "Delete all notifications");
         clearButton.getStyleClass().add("notification-menu-clear");
         clearButton.setOnAction(event -> clearAll());
 

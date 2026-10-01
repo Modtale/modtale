@@ -83,6 +83,7 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
     const [depMeta, setDepMeta] = useState<Record<string, { icon: string, title: string, slug?: string, classification?: string }>>({});
     const [showScanDetails, setShowScanDetails] = useState(false);
     const [rescanning, setRescanning] = useState(false);
+    const [deciding, setDeciding] = useState(false);
 
     const [inspectorData, setInspectorData] = useState<{ version: string, reviewToken: string, structure: string[], issues: ScanIssue[], initialFile?: string, initialLine?: number, initialLineEnd?: number } | null>(null);
     const [loadingInspector, setLoadingInspector] = useState(false);
@@ -331,6 +332,7 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
     };
 
     const handleVersionApprove = async () => {
+        if (deciding) return;
         if (!canDecide) {
             setStatus({ type: 'error', title: 'Permission Required', msg: 'You do not have permission to approve projects or versions.' });
             return;
@@ -339,6 +341,7 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
             setStatus({ type: 'error', title: 'Refresh Required', msg: 'Refresh this review to load its current evidence before deciding.' });
             return;
         }
+        setDeciding(true);
         try {
             if (isNewProject) {
                 await adminClient.publishProject(mod.id, mod.reviewToken, pendingVersion?.id);
@@ -352,6 +355,8 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
                 title: 'Error',
                 msg: extractApiErrorMessage(e, isNewProject ? 'We could not publish this project.' : 'We could not approve this version.')
             });
+        } finally {
+            setDeciding(false);
         }
     };
 
@@ -1249,10 +1254,10 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
                                 <div className="flex flex-col gap-4">
                                     <button
                                         onClick={handleVersionApprove}
-                                        disabled={!canDecide || decisionWritten}
+                                        disabled={!canDecide || decisionWritten || deciding || isScanning}
                                         className="w-full py-4 bg-emerald-500 hover:bg-emerald-600 text-white rounded-2xl font-black text-lg shadow-xl shadow-emerald-500/20 transition-all transform hover:scale-[1.02] active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
                                     >
-                                        Approve & Publish
+                                        {deciding ? 'Publishing...' : 'Approve & Publish'}
                                     </button>
                                 </div>
                             </div>

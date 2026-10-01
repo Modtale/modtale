@@ -52,6 +52,9 @@ public class ProjectReviewTransitionService {
                 () -> new ResourceNotFoundException("Version not found."));
         VersionReviewSnapshot.requireCurrent(version,reviewToken);
         var snapshot=reviewPersistence.capture(id,versionId,reviewToken);
+        if (version.getReviewStatus() == ProjectVersion.ReviewStatus.APPROVED) {
+            return new VersionReviewDecision(project, version, null, false);
+        }
         version.setReviewStatus(ProjectVersion.ReviewStatus.APPROVED);
         version.setRejectionReason(null);
         version.setScheduledPublishDate(null);
@@ -60,7 +63,7 @@ public class ProjectReviewTransitionService {
         project.setUpdatedAt(LocalDateTime.now().toString());
         if(!reviewPersistence.apply(snapshot,version)) throw VersionReviewPersistence.conflict();
         projectService.evictProjectCache(project);
-        return new VersionReviewDecision(project, version, null);
+        return new VersionReviewDecision(project, version, null, true);
     }
 
     public VersionReviewDecision rejectVersion(String id, String versionId, String reason, String reviewToken) {
@@ -78,7 +81,7 @@ public class ProjectReviewTransitionService {
         version.setScheduledPublishDate(null);
         if(!reviewPersistence.apply(snapshot,version)) throw VersionReviewPersistence.conflict();
         projectService.evictProjectCache(project);
-        return new VersionReviewDecision(project, version, reason);
+        return new VersionReviewDecision(project, version, reason, true);
     }
 
     public ProjectRejectionDecision rejectProject(String id, String reason, String reviewToken) {
@@ -101,7 +104,7 @@ public class ProjectReviewTransitionService {
         return project;
     }
 
-    public record VersionReviewDecision(Project project, ProjectVersion version, String reason) {
+    public record VersionReviewDecision(Project project, ProjectVersion version, String reason, boolean changed) {
     }
 
     public record ProjectRejectionDecision(Project project, String reason) {

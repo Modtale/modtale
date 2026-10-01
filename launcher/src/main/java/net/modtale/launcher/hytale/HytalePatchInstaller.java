@@ -135,6 +135,7 @@ final class HytalePatchInstaller {
         try (var input = response.body()) {
             if (response.statusCode() != 200) throw new IOException(label + " failed (HTTP " + response.statusCode() + ").");
             long total = response.headers().firstValueAsLong("Content-Length").orElse(-1);
+            if (total > 0) progress.accept(label + " (0%)...");
             long received = 0;
             int lastPercent = 0;
             try (var output = Files.newOutputStream(file)) {
@@ -144,7 +145,7 @@ final class HytalePatchInstaller {
                     output.write(buffer, 0, count);
                     received += count;
                     int percent = total > 0 ? (int) (received * 100 / total) : -1;
-                    if (percent >= lastPercent + 10) { lastPercent = percent; progress.accept(label + " (" + percent + "%)..."); }
+                    if (percent >= lastPercent + 1) { lastPercent = percent; progress.accept(label + " (" + percent + "%)..."); }
                 }
             }
             if (total >= 0 && received != total) throw new IOException("Incomplete game download.");

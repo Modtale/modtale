@@ -1,5 +1,7 @@
 package net.modtale.launcher.ui.wardrobe;
 
+import net.modtale.launcher.ui.common.LauncherTooltips;
+
 import javafx.application.ConditionalFeature;
 import javafx.application.Platform;
 import javafx.geometry.Bounds;
@@ -44,6 +46,7 @@ public final class WardrobePreview {
     private final Button reset = new Button("Reset");
     private final javafx.scene.control.ComboBox<AnimationChoice> animations = new javafx.scene.control.ComboBox<>();
     private final HBox animationControls = new HBox(6, animations);
+    private final HBox controls = new HBox(6);
     private LocalAvatarRenderer.Rig animationRig;
     private LocalAvatarRenderer.Clip animationClip;
     private AnimationChoice selectedAnimation;
@@ -117,17 +120,20 @@ public final class WardrobePreview {
         }
         reset.setText(""); reset.setAccessibleText("Reset view");
         reset.setTooltip(new javafx.scene.control.Tooltip("Reset view"));
+        LauncherTooltips.install(reset, "Reset the camera and preview animation without changing your outfit");
         reset.setGraphic(net.modtale.launcher.ui.common.LauncherIcons.icon(
                 net.modtale.launcher.ui.common.LauncherIcons.Glyph.ROTATE_CCW, 14));
         reset.getStyleClass().add("wardrobe-preview-reset");
         reset.setMinSize(30, 30); reset.setPrefSize(30, 30);
-        HBox controls = new HBox(6, animationControls, reset, retry);
+        controls.getChildren().addAll(animationControls, reset, retry);
+        animationControls.setMinWidth(0);
         HBox.setHgrow(animationControls, javafx.scene.layout.Priority.ALWAYS);
         controls.setAlignment(Pos.CENTER);
         animations.setId("wardrobe-preview-animation");
         animations.getStyleClass().addAll("select", "wardrobe-preview-motion");
         animations.setStyle("-fx-font-size: 11px;");
         animations.setAccessibleText("Preview animation");
+        LauncherTooltips.install(animations, "Choose a preview animation. This does not change your outfit.");
         animations.setMinWidth(0); animations.setMaxWidth(Double.MAX_VALUE);
         HBox.setHgrow(animations, javafx.scene.layout.Priority.ALWAYS);
         animationControls.setAlignment(Pos.CENTER);
@@ -167,6 +173,14 @@ public final class WardrobePreview {
     }
 
     public Node view() { return root; }
+
+    void addEditorActions(Button current, Button undo, Button redo, Button resetOutfit) {
+        requireFx();
+        controls.setSpacing(2);
+        reset.getStyleClass().add("cosmetic-look-action");
+        reset.setMinSize(24, 24); reset.setPrefSize(24, 24); reset.setMaxSize(24, 24);
+        controls.getChildren().setAll(animationControls, reset, current, undo, redo, resetOutfit, retry);
+    }
 
     /** Preview an arbitrary local cosmetic draft without applying it or contacting a rendering service. */
     public void showLocal(java.nio.file.Path assetsZip, com.fasterxml.jackson.databind.JsonNode cosmeticDefinition) {
@@ -308,7 +322,7 @@ public final class WardrobePreview {
         status.setContentDisplay(loading ? javafx.scene.control.ContentDisplay.GRAPHIC_ONLY : javafx.scene.control.ContentDisplay.TEXT_ONLY);
         status.setAccessibleText(message);
         status.setVisible(true);
-        javafx.scene.control.Tooltip.uninstall(viewport, interactionHelp);
+        net.modtale.launcher.ui.common.LauncherTooltips.uninstall(viewport, interactionHelp);
         viewport.setAccessibleHelp(message);
     }
 
@@ -319,8 +333,8 @@ public final class WardrobePreview {
         status.setAccessibleText(state);
         status.setVisible(false);
         interactionHelp.setText(help);
-        javafx.scene.control.Tooltip.uninstall(viewport, interactionHelp);
-        javafx.scene.control.Tooltip.install(viewport, interactionHelp);
+        net.modtale.launcher.ui.common.LauncherTooltips.uninstall(viewport, interactionHelp);
+        net.modtale.launcher.ui.common.LauncherTooltips.install(viewport, interactionHelp);
         viewport.setAccessibleHelp(help);
     }
 

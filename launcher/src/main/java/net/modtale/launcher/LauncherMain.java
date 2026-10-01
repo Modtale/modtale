@@ -5,6 +5,7 @@ import java.lang.reflect.Method;
 import net.modtale.launcher.logging.LauncherLogging;
 import net.modtale.launcher.logging.LauncherLog;
 import net.modtale.launcher.logging.LauncherLogger;
+import net.modtale.launcher.platform.WindowsAppIdentity;
 
 public final class LauncherMain {
 
@@ -14,6 +15,7 @@ public final class LauncherMain {
     }
 
     public static void main(String[] args) {
+        WindowsAppIdentity.initialize();
         LauncherLogging.initialize();
         LauncherRenderSettings.configure();
         LOG.info("Starting Modtale Launcher " + System.getProperty("modtale.launcherVersion", "dev"));

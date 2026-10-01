@@ -40,9 +40,18 @@ class ExternalDependencyArtifactServiceTest {
         ProjectDependency dependency = new ProjectDependency();
         dependency.setSource(ProjectDependency.Source.GITHUB);
         dependency.setExternalFileUrl("https://github.com/example/mod/releases/download/1/mod.jar");
-        InvalidVersionRequestException error = assertThrows(InvalidVersionRequestException.class,
-                () -> service.prepareExternalArtifacts(List.of(dependency)));
-        assertEquals("CurseForge files must be downloaded by the launcher. Add a CurseForge file reference instead.", error.getMessage());
+        // The transport is mocked, so DNS must also be deterministic: this test exercises
+        // the redirected-host policy, not the availability of the public resolvers.
+        java.net.InetAddress publicAddress = java.net.InetAddress.getByAddress(new byte[]{1, 1, 1, 1});
+        try (var dns = org.mockito.Mockito.mockStatic(java.net.InetAddress.class)) {
+            dns.when(() -> java.net.InetAddress.getAllByName("github.com"))
+                    .thenReturn(new java.net.InetAddress[]{publicAddress});
+            dns.when(() -> java.net.InetAddress.getAllByName("mediafilez.forgecdn.net"))
+                    .thenReturn(new java.net.InetAddress[]{publicAddress});
+            InvalidVersionRequestException error = assertThrows(InvalidVersionRequestException.class,
+                    () -> service.prepareExternalArtifacts(List.of(dependency)));
+            assertEquals("CurseForge files must be downloaded by the launcher. Add a CurseForge file reference instead.", error.getMessage());
+        }
         org.mockito.Mockito.verify(httpClient, org.mockito.Mockito.times(1)).send(
                 org.mockito.ArgumentMatchers.any(java.net.http.HttpRequest.class), org.mockito.ArgumentMatchers.any());
     }

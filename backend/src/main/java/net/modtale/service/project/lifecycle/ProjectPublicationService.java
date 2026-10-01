@@ -5,9 +5,11 @@ import net.modtale.service.admin.review.ProjectReviewPersistence;
 import net.modtale.service.admin.review.ProjectReviewSnapshot;
 import net.modtale.exception.InvalidProjectRequestException;
 import net.modtale.exception.ProjectOperationForbiddenException;
+import net.modtale.exception.VersionStateConflictException;
 import net.modtale.model.project.Project;
 import net.modtale.model.project.ProjectStatus;
 import net.modtale.model.project.ProjectVersion;
+import net.modtale.model.project.ScanStatus;
 import net.modtale.model.user.User;
 import net.modtale.service.analytics.ScoringService;
 import net.modtale.service.analytics.TrackingService;
@@ -164,6 +166,10 @@ public class ProjectPublicationService {
         }
         if (reviewed && selected == null && project.getVersions() != null && !project.getVersions().isEmpty()) {
             throw new InvalidProjectRequestException("Select the inspected version before publishing this project.");
+        }
+        if (project.getVersions() != null && project.getVersions().stream().anyMatch(version ->
+                version.getScanResult() != null && version.getScanResult().getStatus() == ScanStatus.SCANNING)) {
+            throw new VersionStateConflictException("Wait for the project scan to finish before publishing.");
         }
         project.setStatus(ProjectStatus.PUBLISHED);
         project.setExpiresAt(null);

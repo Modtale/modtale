@@ -1,5 +1,7 @@
 package net.modtale.launcher.ui.browse;
 
+import net.modtale.launcher.ui.common.LauncherTooltips;
+
 import static net.modtale.launcher.ui.common.LauncherUi.pseudo;
 import static net.modtale.launcher.ui.common.LauncherUi.secondaryButton;
 import static net.modtale.launcher.ui.common.LauncherUi.setVisibleManaged;
@@ -930,6 +932,7 @@ public final class ProjectBrowseController {
             button.setPrefSize(36, 36);
             button.setMaxSize(36, 36);
             button.setAccessibleText("Page " + (targetPage + 1));
+            LauncherTooltips.install(button, button.accessibleTextProperty());
             button.setOnAction(event -> goToPage(targetPage));
             pseudo(button, "selected", targetPage == currentPage);
             paginationPageButtons.getChildren().add(button);

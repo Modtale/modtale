@@ -11,6 +11,7 @@ import javafx.scene.control.ScrollPane;
 import javafx.scene.control.ToggleButton;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
+import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import net.modtale.launcher.api.ModtaleApiClient;
@@ -83,6 +84,56 @@ class LauncherSettingsLayoutTest {
                     }
                 }
             }
+            return null;
+        });
+        Platform.runLater(task);
+        task.get(30, TimeUnit.SECONDS);
+    }
+
+    @Test void maintenanceCardsCanScrollIntoViewInShortWindow() throws Exception {
+        FutureTask<Void> task = new FutureTask<>(() -> {
+            var controller = new LauncherSettingsController(
+                    new SettingsStore(directory.resolve("short-window-settings.json")),
+                    new ModtaleApiClient("http://localhost", directory.resolve("short-window-session.json")),
+                    () -> null, () -> LauncherView.SETTINGS);
+            var view = controller.view();
+            var deck = new StackPane(view);
+            deck.setMinHeight(Region.USE_PREF_SIZE);
+            var body = new VBox(deck);
+            body.setPadding(LauncherShell.contentBodyInsetsFor(LauncherView.SETTINGS));
+            body.setMinHeight(Region.USE_PREF_SIZE);
+            var scroll = new ScrollPane(body);
+            scroll.setFitToWidth(true);
+            scroll.setFitToHeight(!LauncherShell.usesDocumentHeight(LauncherView.SETTINGS));
+            scroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+            var host = new StackPane(scroll);
+            host.getStyleClass().add("app-root");
+            var scene = new Scene(host, 900, 600);
+            scene.getStylesheets().add(getClass().getResource(
+                    "/net/modtale/launcher/ui/nativefx/launcher.css").toExternalForm());
+
+            var maintenance = view.lookupAll(".settings-category").stream()
+                    .map(ToggleButton.class::cast)
+                    .filter(button -> button.getText().equals("Launcher Maintenance"))
+                    .findFirst().orElseThrow();
+            maintenance.fire();
+            for (int pass = 0; pass < 5; pass++) {
+                host.applyCss();
+                host.layout();
+            }
+            assertTrue(body.getLayoutBounds().getHeight() > scroll.getViewportBounds().getHeight());
+            scroll.setVvalue(scroll.getVmax());
+            host.layout();
+            var cache = view.lookupAll(".settings-action-card").stream()
+                    .filter(card -> card.lookup(".btn") != null
+                            && card.lookup(".btn") instanceof javafx.scene.control.Button button
+                            && button.getText().equals("Clear Cache"))
+                    .findFirst().orElseThrow();
+            var cacheBounds = cache.localToScene(cache.getLayoutBounds());
+            var viewport = scroll.lookup(".viewport");
+            var viewportBounds = viewport.localToScene(viewport.getLayoutBounds());
+            assertTrue(cacheBounds.getMaxY() <= viewportBounds.getMaxY() + 1,
+                    "Cache card should be reachable by scrolling to the bottom");
             return null;
         });
         Platform.runLater(task);

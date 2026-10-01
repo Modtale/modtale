@@ -44,6 +44,24 @@ class LauncherWardrobeControllerTest {
     private static final WardrobeItem SKIN = new WardrobeItem(UUID.fromString("00000000-0000-4000-8000-000000000004"),
             WardrobeItem.Kind.SKIN, "Catalog skin", false, "", "{\"skinId\":\"fixture\",\"skin\":{\"body\":\"fixture\"}}");
 
+    @Test void missingHytaleAssetsShowOnlyGuidanceAndSettingsAction() throws Exception {
+        try (Harness h = new Harness()) {
+            var opened = new java.util.concurrent.atomic.AtomicBoolean();
+            fx(() -> {
+                h.settings.get().setHytaleGamePath(directory.resolve("missing-game").toString());
+                h.controller.setOpenSettingsAction(() -> opened.set(true));
+                h.controller.open();
+                assertTrue(nodes(h.root(), Label.class).stream()
+                        .anyMatch(label -> label.getText().equals("Wardrobe needs Hytale game files")));
+                assertFalse(nodes(h.root(), ButtonBase.class).stream()
+                        .anyMatch(button -> "Apply".equals(button.getText()) || "Customize".equals(button.getText())));
+                button(h.root(), "Open Settings").fire();
+                return null;
+            });
+            assertTrue(opened.get());
+        }
+    }
+
     @BeforeAll static void toolkit() throws Exception {
         if (System.getProperty("os.name", "").toLowerCase().contains("linux"))
             assumeTrue(!System.getenv().getOrDefault("WAYLAND_DISPLAY", "").isBlank(), "JavaFX controller tests require WAYLAND_DISPLAY");
@@ -101,15 +119,15 @@ class LauncherWardrobeControllerTest {
     @Test void selectingALookKeepsLoadedThumbnailNodes() throws Exception {
         try (Harness h = new Harness()) {
             fx(() -> { button(h.root(), "Popular skins").fire(); return null; });
-            await(() -> h.root().lookup("#wardrobe-look-" + SKIN.id()) != null);
-            fx(() -> {
+            await(() -> {
                 Button original = (Button) h.root().lookup("#wardrobe-look-" + SKIN.id());
+                if (original == null || original.getGraphic() == null) return false;
                 Node artwork = original.getGraphic();
                 original.fire();
                 assertSame(original, h.root().lookup("#wardrobe-look-" + SKIN.id()));
                 assertSame(artwork, original.getGraphic());
                 assertTrue(original.getPseudoClassStates().contains(javafx.css.PseudoClass.getPseudoClass("selected")));
-                return null;
+                return true;
             });
         }
     }

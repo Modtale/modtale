@@ -25,7 +25,9 @@ public class ProjectReviewDecisionService {
     public void approveVersion(User adminUser, String id, String versionId, String reviewToken) {
         ProjectReviewTransitionService.VersionReviewDecision decision =
                 projectReviewTransitionService.approveVersion(id, versionId, reviewToken);
-        projectReviewEffectService.onVersionApproved(adminUser, id, versionId, decision);
+        if (decision.changed()) {
+            projectReviewEffectService.onVersionApproved(adminUser, id, versionId, decision);
+        }
     }
 
     public void rejectVersion(User adminUser, String id, String versionId, String reason, String reviewToken) {

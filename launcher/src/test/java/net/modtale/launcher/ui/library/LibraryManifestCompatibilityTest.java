@@ -77,7 +77,7 @@ class LibraryManifestCompatibilityTest {
     @Test void readsLinkedArtifactAndDoesNotInventCombinedPackCompatibility() throws Exception {
         Path jar = archive("mod.jar", "{\"ServerVersion\":\">=0.6.0\"}");
         Path link = temp.resolve("linked.jar");
-        Files.createSymbolicLink(link, jar);
+        net.modtale.launcher.TestSymlinks.createSymbolicLink(link, jar);
         var reader = new LibraryManifestCompatibility();
         assertEquals(List.of(">=0.6.0"), reader.forProject(installed("CURSEFORGE", link)));
         var pack = new InstalledProject("pack", "pack", "Pack", "MODPACK", "1.0", "v1", "0.5.5",

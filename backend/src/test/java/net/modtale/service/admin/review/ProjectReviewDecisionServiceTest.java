@@ -19,14 +19,17 @@ import net.modtale.service.project.query.ProjectService;
 import net.modtale.service.security.issue.SecurityIssueAnalysisService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.web.server.ResponseStatusException;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.when;
 
 class ProjectReviewDecisionServiceTest {
@@ -41,6 +44,7 @@ class ProjectReviewDecisionServiceTest {
     private SecurityIssueAnalysisService securityIssueAnalysisService;
     private ProjectVersionAccessService projectVersionAccessService;
     private AdminAuditLogger adminAuditLogger;
+    private VersionReviewPersistence persistence;
 
     @BeforeEach
     void setUp() {
@@ -54,7 +58,7 @@ class ProjectReviewDecisionServiceTest {
         projectVersionAccessService = mock(ProjectVersionAccessService.class);
         adminAuditLogger = mock(AdminAuditLogger.class);
 
-        var persistence=mock(VersionReviewPersistence.class);
+        persistence=mock(VersionReviewPersistence.class);
         when(persistence.apply(any(),any())).thenReturn(true);
         ProjectReviewTransitionService transitionService = new ProjectReviewTransitionService(
                 projectService,
@@ -98,6 +102,80 @@ class ProjectReviewDecisionServiceTest {
         verify(projectNotificationService).notifyUpdates(project, "1.0.0");
         verify(projectNotificationService).notifyDependents(project, "1.0.0");
         verify(adminAuditLogger).logAction("admin-1", "APPROVE_VERSION", "project-1", "VERSION", "VerID: version-1");
+    }
+
+    @Test
+    void repeatedApprovalWithCurrentTokenDoesNotRewriteOrRenotify() {
+        User admin = user("admin-1", "Ada");
+        Project project = project("project-1", "author-1");
+        ProjectVersion version = version("version-1", "1.0.0");
+        version.setReviewStatus(ProjectVersion.ReviewStatus.APPROVED);
+        project.getVersions().add(version);
+        when(projectService.getRawProjectById("project-1")).thenReturn(project);
+        when(projectVersionAccessService.requireById(eq(project), eq("version-1"), any())).thenReturn(version);
+        String token = VersionReviewSnapshot.token(version);
+
+        service.approveVersion(admin, "project-1", "version-1", token);
+
+        verify(persistence).capture("project-1", "version-1", token);
+        verify(persistence, never()).apply(any(), any());
+        verify(projectRepository, never()).save(any());
+        verify(securityIssueAnalysisService, never()).markIssuesAcceptedForApprovedVersion(any());
+        verify(projectNotificationService, never()).notifyUpdates(any(), any());
+        verify(projectNotificationService, never()).notifyDependents(any(), any());
+        verify(adminAuditLogger, never()).logAction(any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void repeatedApprovalStillRejectsAStaleReviewToken() {
+        User admin = user("admin-1", "Ada");
+        Project project = project("project-1", "author-1");
+        ProjectVersion version = version("version-1", "1.0.0");
+        version.setReviewStatus(ProjectVersion.ReviewStatus.APPROVED);
+        String stale = VersionReviewSnapshot.token(version);
+        version.setChangelog("Changed after inspection");
+        when(projectService.getRawProjectById("project-1")).thenReturn(project);
+        when(projectVersionAccessService.requireById(eq(project), eq("version-1"), any())).thenReturn(version);
+
+        assertThrows(ResponseStatusException.class,
+                () -> service.approveVersion(admin, "project-1", "version-1", stale));
+        verify(persistence, never()).apply(any(), any());
+        verify(projectNotificationService, never()).notifyUpdates(any(), any());
+    }
+
+    @Test
+    void repeatedApprovalStillRequiresAnAuthoritativeCurrentSnapshot() {
+        User admin = user("admin-1", "Ada");
+        Project project = project("project-1", "author-1");
+        ProjectVersion version = version("version-1", "1.0.0");
+        version.setReviewStatus(ProjectVersion.ReviewStatus.APPROVED);
+        when(projectService.getRawProjectById("project-1")).thenReturn(project);
+        when(projectVersionAccessService.requireById(eq(project), eq("version-1"), any())).thenReturn(version);
+        String token = VersionReviewSnapshot.token(version);
+        when(persistence.capture("project-1", "version-1", token)).thenThrow(VersionReviewPersistence.conflict());
+
+        assertThrows(ResponseStatusException.class,
+                () -> service.approveVersion(admin, "project-1", "version-1", token));
+        verify(persistence, never()).apply(any(), any());
+        verify(projectNotificationService, never()).notifyUpdates(any(), any());
+    }
+
+    @Test
+    void approvalFailsWhenTheBoundVersionChangesBeforeWrite() {
+        User admin = user("admin-1", "Ada");
+        Project project = project("project-1", "author-1");
+        ProjectVersion version = version("version-1", "1.0.0");
+        version.setReviewStatus(ProjectVersion.ReviewStatus.PENDING);
+        when(projectService.getRawProjectById("project-1")).thenReturn(project);
+        when(projectVersionAccessService.requireById(eq(project), eq("version-1"), any())).thenReturn(version);
+        when(persistence.apply(any(), any())).thenReturn(false);
+        String token = VersionReviewSnapshot.token(version);
+
+        assertThrows(ResponseStatusException.class,
+                () -> service.approveVersion(admin, "project-1", "version-1", token));
+        verify(projectRepository, never()).save(any());
+        verify(projectNotificationService, never()).notifyUpdates(any(), any());
+        verify(adminAuditLogger, never()).logAction(any(), any(), any(), any(), any());
     }
 
     @Test

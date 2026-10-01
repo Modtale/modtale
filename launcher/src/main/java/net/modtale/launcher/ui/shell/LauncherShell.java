@@ -24,7 +24,7 @@ import javafx.scene.control.Label;
 import javafx.scene.control.Labeled;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextField;
-import javafx.scene.image.ImageView;
+import javafx.scene.image.Image;
 import javafx.scene.input.MouseButton;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.BorderPane;
@@ -71,13 +71,16 @@ public final class LauncherShell {
 
     private static final LauncherI18n I18N = LauncherI18n.get();
 
-    private static final double DEFAULT_STAGE_WIDTH = 1320;
+    private static final double DEFAULT_STAGE_WIDTH = 1440;
     private static final double DEFAULT_STAGE_HEIGHT = 880;
     private static final double MIN_STAGE_WIDTH = 640;
     private static final double MIN_STAGE_HEIGHT = 480;
     private static final double STAGE_SCREEN_MARGIN = 48;
     private static final double WORKSPACE_SPACING = 44;
     private static final double RAIL_WIDTH = 238;
+    private static final double LAUNCHER_CONTENT_MAX_WIDTH = 1792;
+    // The Play cards sit inside 16px of padding and a 12px scroll gutter.
+    private static final double PLAY_SIDEBAR_TRAILING_SPACE = 28;
     private static final double BRAND_LOGO_HOVER_SCALE = 1.06;
     private static final Duration BRAND_LOGO_SCALE_DURATION = Duration.millis(140);
     private static final double NAVBAR_TEXT_FONT_SIZE = 14;
@@ -123,6 +126,7 @@ public final class LauncherShell {
     private final LauncherScrollSupport scrollSupport;
     private final LauncherHytaleAuthGate hytaleAuthGate;
     private final LauncherBrowseMenu browseMenu;
+    private final LauncherWardrobeMenu wardrobeMenu;
     private final LauncherAccountMenu accountMenu;
     private final LauncherToolbarActions toolbarActions;
     private final Map<LauncherView, Node> navButtons = new LinkedHashMap<>();
@@ -152,6 +156,8 @@ public final class LauncherShell {
     private boolean startupProtocolHandled;
     private boolean undecoratedWindow;
     private boolean nativeWindowMoveInProgress;
+    private WindowsWindowManager windowsWindowManager;
+    private MacWindowManager macWindowManager;
     private LinuxWindowManagerSupport.ResizeDirection fallbackResizeDirection;
     private double windowDragOffsetX;
     private double windowDragOffsetY;
@@ -201,6 +207,8 @@ public final class LauncherShell {
                 this::unlock
         );
         this.browseMenu = new LauncherBrowseMenu(browseController, () -> sceneLayer, navigation::currentView);
+        this.wardrobeMenu = new LauncherWardrobeMenu(() -> sceneLayer, navigation::currentView,
+                () -> wardrobeController, this::showView);
         this.browseController.addControlStateListener(this::refreshBrowseRail);
         this.accountMenu = new LauncherAccountMenu(
                 accountController,
@@ -211,6 +219,7 @@ public final class LauncherShell {
                 followingController::showModal,
                 () -> {
                     browseMenu.hide();
+                    wardrobeMenu.hide();
                     notificationsMenu.hide();
                     followingController.hideModal();
                 }
@@ -219,6 +228,7 @@ public final class LauncherShell {
                 () -> sceneLayer,
                 () -> {
                     browseMenu.hide();
+                    wardrobeMenu.hide();
                     accountMenu.hide();
                     followingController.hideModal();
                 }
@@ -234,6 +244,8 @@ public final class LauncherShell {
     public void start(Stage primaryStage, Application.Parameters parameters) {
         LauncherFonts.load();
         stage = primaryStage;
+        primaryStage.getIcons().add(new Image(Objects.requireNonNull(getClass()
+                .getResourceAsStream("/net/modtale/launcher/ui/nativefx/assets/favicon.png"))));
         launchParameters = parameters;
         undecoratedWindow = shouldUseUndecoratedWindow();
         if (undecoratedWindow) {
@@ -256,6 +268,7 @@ public final class LauncherShell {
         if (browseMenu.panel() != null) {
             root.getChildren().add(browseMenu.panel());
         }
+        root.getChildren().add(wardrobeMenu.panel());
         if (notificationsMenu.panel() != null) {
             root.getChildren().add(notificationsMenu.panel());
         }
@@ -279,6 +292,7 @@ public final class LauncherShell {
         scene.getStylesheets().add(Objects.requireNonNull(getClass()
                 .getResource("/net/modtale/launcher/ui/nativefx/launcher.css")).toExternalForm());
         LauncherPerformanceProbe.install(scene);
+        net.modtale.launcher.ui.common.LauncherTooltipOverlay.install(scene, root);
         scene.addEventFilter(MouseEvent.MOUSE_PRESSED, this::hideDropdownsOnOutsidePress);
         if (undecoratedWindow) {
             configureWindowResize(scene);
@@ -381,6 +395,7 @@ public final class LauncherShell {
             return;
         }
         browseMenu.hide();
+        wardrobeMenu.hide();
         notificationsMenu.hide();
         accountMenu.hide();
         followingController.hideModal();
@@ -440,6 +455,7 @@ public final class LauncherShell {
         navButtons.forEach((key, button) -> pseudo(button, "selected", key.equals(nextView)
                 || (nextView == LauncherView.PROJECT && key == LauncherView.DISCOVER)));
         browseMenu.updateSelected(nextView);
+        wardrobeMenu.updateSelected(nextView);
         accountMenu.updateSelected();
         updateRailButtons();
         pageTitle.setText(LauncherShellTitles.titleFor(nextView, browseController));
@@ -465,7 +481,8 @@ public final class LauncherShell {
                 || view == LauncherView.DISCOVER
                 || view == LauncherView.LIBRARY
                 || view == LauncherView.UPDATES
-                || view == LauncherView.WARDROBE;
+                || view == LauncherView.WARDROBE
+                || view == LauncherView.SETTINGS;
     }
 
     static Insets workspaceInsetsFor(LauncherView view) {
@@ -473,9 +490,12 @@ public final class LauncherShell {
             return Insets.EMPTY;
         }
         Insets pageInsets = LauncherLayout.WORKSPACE_INSETS;
-        boolean boundedWorkspace = view == LauncherView.DISCOVER || view == LauncherView.LIBRARY
+        boolean boundedWorkspace = view == LauncherView.PLAY || view == LauncherView.DISCOVER || view == LauncherView.LIBRARY
                 || view == LauncherView.WARDROBE || view == LauncherView.SETTINGS;
         double right = boundedWorkspace ? pageInsets.getRight() : 0;
+        if (view == LauncherView.PLAY) {
+            right -= PLAY_SIDEBAR_TRAILING_SPACE;
+        }
         return new Insets(pageInsets.getTop(), right, 0, pageInsets.getLeft());
     }
 
@@ -486,7 +506,7 @@ public final class LauncherShell {
         Insets pageInsets = LauncherLayout.WORKSPACE_INSETS;
         boolean launcherPage = view == LauncherView.PLAY || view == LauncherView.LIBRARY || view == LauncherView.WARDROBE;
         double top = view == LauncherView.DISCOVER || launcherPage ? 0 : 16;
-        boolean boundedWorkspace = view == LauncherView.DISCOVER || view == LauncherView.LIBRARY
+        boolean boundedWorkspace = view == LauncherView.PLAY || view == LauncherView.DISCOVER || view == LauncherView.LIBRARY
                 || view == LauncherView.WARDROBE || view == LauncherView.SETTINGS;
         double right = boundedWorkspace ? 0 : pageInsets.getRight();
         return new Insets(top, right, pageInsets.getBottom(), 0);
@@ -508,19 +528,25 @@ public final class LauncherShell {
 
     private Node navbar() {
         Button brand = LauncherNavbar.brand(() -> showView(LauncherView.PLAY));
-        configureBrandLogoHoverAnimation(brand, (ImageView) brand.getGraphic());
+        configureBrandLogoHoverAnimation(brand, brand.getGraphic());
         HBox navigation = new HBox();
         addLocalizedNav(navigation, LauncherView.PLAY, "nav.play", LauncherIcons.Glyph.ZAP);
         addLocalizedNav(navigation, LauncherView.LIBRARY, "nav.library", LauncherIcons.Glyph.SAVE);
-        addLocalizedNav(navigation, LauncherView.WARDROBE, "nav.wardrobe", LauncherIcons.Glyph.PALETTE);
+        Button wardrobeButton = wardrobeMenu.button();
+        navButtons.put(LauncherView.WARDROBE, wardrobeButton);
+        navigation.getChildren().add(wardrobeButton);
         Button browseButton = browseMenu.button();
         navButtons.put(LauncherView.DISCOVER, browseButton);
         List<Button> buttons = new ArrayList<>(navigation.getChildren().stream().map(Button.class::cast).toList());
         navigation.getChildren().clear();
         buttons.add(browseButton);
         HBox bar = LauncherNavbar.build(brand, buttons, notificationsMenu.button(), accountMenu.button());
-        if (undecoratedWindow) configureWindowDrag(bar);
-        return bar;
+        bar.getStyleClass().remove("navbar");
+        bar.setMaxWidth(LAUNCHER_CONTENT_MAX_WIDTH);
+        StackPane header = new StackPane(bar);
+        header.getStyleClass().add("navbar");
+        if (undecoratedWindow) configureWindowDrag(header);
+        return header;
     }
 
     private Node windowControls() {
@@ -529,12 +555,16 @@ public final class LauncherShell {
         controls.setAlignment(Pos.CENTER);
         controls.setMaxSize(Region.USE_PREF_SIZE, Region.USE_PREF_SIZE);
         Button minimize = windowControl("window.minimize", LauncherIcons.Glyph.MINUS);
-        minimize.setOnAction(event -> stage.setIconified(true));
+        minimize.setOnAction(event -> {
+            if (windowsWindowManager != null) windowsWindowManager.minimize();
+            else if (macWindowManager != null) macWindowManager.minimize();
+            else stage.setIconified(true);
+        });
         Button maximize = windowControl("window.maximize", LauncherIcons.Glyph.MAXIMIZE);
-        maximize.setOnAction(event -> stage.setMaximized(!stage.isMaximized()));
+        maximize.setOnAction(event -> toggleWindowMaximized());
         stage.maximizedProperty().addListener((observable, wasMaximized, isMaximized) ->
-                updateMaximizeControl(maximize, isMaximized));
-        updateMaximizeControl(maximize, stage.isMaximized());
+                updateMaximizeControl(maximize, isWindowMaximized()));
+        updateMaximizeControl(maximize, isWindowMaximized());
         Button close = windowControl("window.close", LauncherIcons.Glyph.X);
         close.getStyleClass().add("close");
         close.setOnAction(event -> stage.close());
@@ -567,12 +597,22 @@ public final class LauncherShell {
             if (!isPrimaryButtonEvent(event) || isWindowControlEvent(event) || event.getClickCount() > 1) {
                 return;
             }
+            if (windowsWindowManager != null && windowsWindowManager.beginMove()) {
+                nativeWindowMoveInProgress = true;
+                event.consume();
+                return;
+            }
+            if (macWindowManager != null && macWindowManager.beginMove()) {
+                nativeWindowMoveInProgress = true;
+                event.consume();
+                return;
+            }
             if (LinuxWindowManagerSupport.beginMove(stage, event)) {
                 nativeWindowMoveInProgress = true;
                 event.consume();
                 return;
             }
-            if (stage.isMaximized()) {
+            if (isWindowMaximized()) {
                 return;
             }
             windowDragOffsetX = event.getSceneX();
@@ -583,18 +623,54 @@ public final class LauncherShell {
                 event.consume();
                 return;
             }
-            if (isWindowControlEvent(event) || stage.isMaximized()) {
+            if (isWindowControlEvent(event) || isWindowMaximized()) {
                 return;
             }
             stage.setX(event.getScreenX() - windowDragOffsetX);
             stage.setY(event.getScreenY() - windowDragOffsetY);
         });
-        dragSurface.setOnMouseReleased(event -> nativeWindowMoveInProgress = false);
+        dragSurface.setOnMouseReleased(event -> {
+            nativeWindowMoveInProgress = false;
+        });
         dragSurface.setOnMouseClicked(event -> {
             if (event.getClickCount() == 2 && !isWindowControlEvent(event)) {
-                stage.setMaximized(!stage.isMaximized());
+                toggleWindowMaximized();
             }
         });
+    }
+
+    private boolean isWindowMaximized() {
+        return stage.isMaximized() || (macWindowManager != null && macWindowManager.isMaximized());
+    }
+
+    private void toggleWindowMaximized() {
+        if (windowsWindowManager != null) {
+            windowsWindowManager.toggleMaximized();
+        } else if (macWindowManager != null) {
+            macWindowManager.toggleMaximized(stage);
+        } else {
+            stage.setMaximized(!stage.isMaximized());
+        }
+        Platform.runLater(this::refreshMaximizeControl);
+    }
+
+    private void refreshMaximizeControl() {
+        if (windowControlsNode instanceof HBox controls && controls.getChildren().size() > 1
+                && controls.getChildren().get(1) instanceof Button maximize) {
+            updateMaximizeControl(maximize, isWindowMaximized());
+        }
+    }
+
+    private static boolean isWindows() {
+        return System.getProperty("os.name", "").toLowerCase().contains("win");
+    }
+
+    private static boolean isMac() {
+        return System.getProperty("os.name", "").toLowerCase().contains("mac");
+    }
+
+    private static boolean isLinux() {
+        return System.getProperty("os.name", "").toLowerCase().contains("linux");
     }
 
     private void configureWindowResize(Scene scene) {
@@ -607,11 +683,15 @@ public final class LauncherShell {
 
     private void startWindowResize(MouseEvent event) {
         fallbackResizeDirection = null;
-        if (!isPrimaryButtonEvent(event) || stage.isMaximized() || isWindowControlEvent(event)) {
+        if (!isPrimaryButtonEvent(event) || isWindowMaximized() || isWindowControlEvent(event)) {
             return;
         }
         LinuxWindowManagerSupport.ResizeDirection direction = resizeDirection(event);
         if (direction == null) {
+            return;
+        }
+        if (windowsWindowManager != null && windowsWindowManager.beginResize(direction)) {
+            event.consume();
             return;
         }
         if (LinuxWindowManagerSupport.beginResize(stage, event, direction)) {
@@ -672,7 +752,7 @@ public final class LauncherShell {
     }
 
     private void updateResizeCursor(MouseEvent event) {
-        if (stage.isMaximized() || isWindowControlEvent(event)) {
+        if (isWindowMaximized() || isWindowControlEvent(event)) {
             stage.getScene().setCursor(Cursor.DEFAULT);
             return;
         }
@@ -751,7 +831,7 @@ public final class LauncherShell {
         if (customWindowChrome != null && !customWindowChrome.isBlank()) {
             return Boolean.parseBoolean(customWindowChrome);
         }
-        return System.getProperty("os.name", "").toLowerCase().contains("linux");
+        return true;
     }
 
     private static void configureBrandLogoHoverAnimation(Button brand, Node logo) {
@@ -793,10 +873,16 @@ public final class LauncherShell {
         if (!primaryStage.isShowing()) {
             primaryStage.show();
         }
+        if (undecoratedWindow && isWindows() && windowsWindowManager == null) {
+            windowsWindowManager = WindowsWindowManager.attach(primaryStage);
+        }
+        if (undecoratedWindow && isMac() && macWindowManager == null) {
+            macWindowManager = MacWindowManager.attach(primaryStage);
+        }
         primaryStage.setIconified(false);
         primaryStage.toFront();
         primaryStage.requestFocus();
-        if (undecoratedWindow) {
+        if (undecoratedWindow && isLinux()) {
             primaryStage.setAlwaysOnTop(true);
             Platform.runLater(() -> primaryStage.setAlwaysOnTop(false));
         }
@@ -834,6 +920,8 @@ public final class LauncherShell {
                 0, LauncherLayout.WORKSPACE_INSETS.getLeft()));
         workspaceRoot.setFillHeight(true);
         workspaceRoot.setMaxHeight(Double.MAX_VALUE);
+        workspaceRoot.setMaxWidth(LAUNCHER_CONTENT_MAX_WIDTH);
+        BorderPane.setAlignment(workspaceRoot, Pos.TOP_CENTER);
         railNode = rail();
         workspaceRoot.getChildren().addAll(railNode, content());
         return workspaceRoot;
@@ -1021,14 +1109,12 @@ public final class LauncherShell {
         }
         pageTitle.setText(LauncherShellTitles.titleFor(current, browseController));
         pageSubtitle.setText(LauncherShellTitles.subtitleFor(current, browseController));
-        if (stage != null && stage.isMaximized() && windowControlsNode instanceof HBox controls
-                && controls.getChildren().size() > 1 && controls.getChildren().get(1) instanceof Button maximize) {
-            updateMaximizeControl(maximize, true);
-        }
+        if (stage != null) refreshMaximizeControl();
     }
 
     private void hideDropdownsOnOutsidePress(MouseEvent event) {
         browseMenu.hideOnOutsidePress(event.getTarget());
+        wardrobeMenu.hideOnOutsidePress(event.getTarget());
         notificationsMenu.hideOnOutsidePress(event.getTarget());
         accountMenu.hideOnOutsidePress(event.getTarget());
     }

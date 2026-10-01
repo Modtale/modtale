@@ -100,8 +100,9 @@ class LauncherUpdateControllerTest {
                     return Optional.of(update);
                 }
                 @Override public Optional<String> consumeUpdateFailure() { return Optional.empty(); }
-                @Override public Path downloadInstaller(LauncherUpdateCandidate candidate) {
+                @Override public Path downloadInstaller(LauncherUpdateCandidate candidate, java.util.function.DoubleConsumer progress) {
                     events.add("download");
+                    progress.accept(0.5);
                     return directory.resolve("update.zip");
                 }
                 @Override public void installUpdate(Path path, LauncherUpdateCandidate candidate) {

@@ -1,5 +1,5 @@
 import { SkeletonSurface } from '@/components/ui/Skeleton';
-import React from 'react';
+import React, { useState } from 'react';
 import type { AdminVerificationQueueItem, AdminVerificationQueueScan } from '@/types';
 import { CheckCircle, Clock, Shield, AlertCircle, ShieldAlert } from 'lucide-react';
 
@@ -28,6 +28,7 @@ const isServiceOnly = (mod: AdminVerificationQueueItem) => {
 export const VerificationQueue: React.FC<VerificationQueueProps> = ({
                                                                         pendingProjects, loadingQueue, loadFailed, loadingReview, reviewingId, onReview, hasMore = false, unavailableItems = 0, loaded = true
                                                                     }) => {
+    const [visibleCount, setVisibleCount] = useState(20);
     const Surface = loadingQueue && pendingProjects.length === 0 ? SkeletonSurface : React.Fragment;
     if (loadingQueue && pendingProjects.length === 0) {
         pendingProjects = Array.from({ length: 3 }, (_, index) => ({
@@ -46,7 +47,7 @@ export const VerificationQueue: React.FC<VerificationQueueProps> = ({
     }
     if (pendingProjects.length === 0) {
         return (
-            <div className="text-center py-32 bg-white/40 dark:bg-white/5 rounded-3xl border border-slate-200 dark:border-white/10 shadow-sm backdrop-blur-md">
+            <div className="text-center py-32 bg-white/80 dark:bg-slate-800/80 rounded-3xl border border-slate-200 dark:border-white/10 shadow-sm">
                 <div className="w-20 h-20 bg-emerald-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
                     <CheckCircle className="w-10 h-10 text-emerald-500" />
                 </div>
@@ -70,9 +71,9 @@ export const VerificationQueue: React.FC<VerificationQueueProps> = ({
         const risk = scan?.riskScore || 0;
 
         return (
-            <div key={JSON.stringify([mod.id, targetVersion?.id])} className="bg-white/40 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-3xl backdrop-blur-md p-6 flex flex-col md:flex-row gap-8 hover:shadow-xl transition-all duration-300 group hover:border-modtale-accent/20">
+            <div key={JSON.stringify([mod.id, targetVersion?.id])} className="bg-white/80 dark:bg-slate-800/80 border border-slate-200 dark:border-white/10 rounded-3xl p-6 flex flex-col md:flex-row gap-8 hover:shadow-xl transition-all duration-300 group hover:border-modtale-accent/20">
                 <div className="w-full md:w-32 h-32 rounded-2xl overflow-hidden bg-slate-100 dark:bg-white/5 relative shrink-0 shadow-inner">
-                    <img src={mod.imageUrl} className="w-full h-full object-cover" alt="" onError={(e) => e.currentTarget.src = '/assets/favicon.svg'} />
+                    <img src={mod.imageUrl} loading="lazy" decoding="async" className="w-full h-full object-cover" alt="" onError={(e) => e.currentTarget.src = '/assets/favicon.svg'} />
                     {isProjectPending && (
                         <div className="absolute top-0 left-0 right-0 bg-orange-500 text-white text-[10px] font-bold text-center py-1 uppercase">New Project</div>
                     )}
@@ -147,17 +148,24 @@ export const VerificationQueue: React.FC<VerificationQueueProps> = ({
         );
     };
 
+    const visibleProjects = pendingProjects.slice(0, visibleCount);
+
     return (
         <Surface><div className="grid gap-4">
-            {pendingProjects.some(mod => !isServiceOnly(mod)) && <section aria-label="Content and security review" className="grid gap-4">
+            {visibleProjects.some(mod => !isServiceOnly(mod)) && <section aria-label="Content and security review" className="grid gap-4">
                 <h2 className="text-lg font-bold dark:text-white">Content and security review</h2>
-                {pendingProjects.filter(mod => !isServiceOnly(mod)).map(renderQueueItem)}
+                {visibleProjects.filter(mod => !isServiceOnly(mod)).map(renderQueueItem)}
             </section>}
-            {pendingProjects.some(isServiceOnly) && <section aria-label="Review service attention" className="grid gap-4">
+            {visibleProjects.some(isServiceOnly) && <section aria-label="Review service attention" className="grid gap-4">
                 <div><h2 className="text-lg font-bold dark:text-white">Review service attention</h2>
                     <p className="text-sm text-slate-600 dark:text-slate-300">These security reviews did not complete. Inspect the failure before requesting another scan. Existing findings still require review.</p></div>
-                {pendingProjects.filter(isServiceOnly).map(renderQueueItem)}
+                {visibleProjects.filter(isServiceOnly).map(renderQueueItem)}
             </section>}
+            {pendingProjects.length > visibleCount && (
+                <button type="button" onClick={() => setVisibleCount(count => count + 20)} className="rounded-xl border border-slate-200 dark:border-white/10 px-5 py-3 text-sm font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-white/5">
+                    Show more ({pendingProjects.length - visibleCount} remaining on this page)
+                </button>
+            )}
         </div></Surface>
     );
 };

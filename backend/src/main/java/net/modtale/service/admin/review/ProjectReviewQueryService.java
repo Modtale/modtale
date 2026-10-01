@@ -5,11 +5,13 @@ import net.modtale.mapper.ProjectMapper;
 import net.modtale.model.dto.admin.AdminAuthorStatsDTO;
 import net.modtale.model.dto.admin.AdminProjectReviewDTO;
 import net.modtale.model.project.Project;
+import net.modtale.model.project.ProjectStatus;
 import net.modtale.model.user.User;
 import net.modtale.repository.user.UserRepository;
-import net.modtale.service.project.query.ProjectListingQueryService;
 import net.modtale.service.project.query.ProjectService;
-import org.springframework.data.domain.PageRequest;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -17,16 +19,16 @@ public class ProjectReviewQueryService {
 
     private final UserRepository userRepository;
     private final ProjectService projectService;
-    private final ProjectListingQueryService projectListingQueryService;
+    private final MongoTemplate mongoTemplate;
 
     public ProjectReviewQueryService(
             UserRepository userRepository,
             ProjectService projectService,
-            ProjectListingQueryService projectListingQueryService
+            MongoTemplate mongoTemplate
     ) {
         this.userRepository = userRepository;
         this.projectService = projectService;
-        this.projectListingQueryService = projectListingQueryService;
+        this.mongoTemplate = mongoTemplate;
     }
 
     public AdminProjectReviewDTO getProjectReviewDetails(String id) {
@@ -38,7 +40,8 @@ public class ProjectReviewQueryService {
                 author != null ? author.getTier().name() : "Unknown",
                 author != null && author.getAvatarUrl() != null ? author.getAvatarUrl() : "",
                 author != null
-                        ? projectListingQueryService.getCreatorProjects(author.getId(), PageRequest.of(0, 10_000)).getTotalElements()
+                        ? mongoTemplate.count(new Query(Criteria.where("authorId").is(author.getId())
+                                .and("status").is(ProjectStatus.PUBLISHED).and("deletedAt").is(null)), Project.class)
                         : 0
         );
 

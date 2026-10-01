@@ -86,3 +86,44 @@ it('keeps the focused review button mounted during refresh of loaded rows', asyn
     await act(async () => root.render(<VerificationQueue {...props} loadingQueue={false} />));
     expect(document.activeElement).toBe(button);
 });
+
+
+it('reveals later rows on the current page without changing their exact review target', async () => {
+    const pendingProjects = Array.from({ length: 25 }, (_, index) => ({
+        ...item(`Project ${index}`, 'SUSPICIOUS'),
+        id: `project-${index}`,
+        imageUrl: '/assets/favicon.svg',
+        pendingVersion: { ...item('', 'SUSPICIOUS').pendingVersion!, id: `version-${index}` },
+    }));
+    const onReview = vi.fn();
+    await act(async () => root.render(<VerificationQueue pendingProjects={pendingProjects}
+        loadingQueue={false} loadingReview={false} onReview={onReview} />));
+    expect(container.querySelectorAll('img')).toHaveLength(20);
+    expect(container.textContent).toContain('5 remaining on this page');
+    const showMore = [...container.querySelectorAll('button')].find(button => button.textContent?.includes('Show more'))!;
+    await act(async () => showMore.click());
+    expect(container.querySelectorAll('img')).toHaveLength(25);
+    expect(container.textContent).not.toContain('Show more');
+    const reviewButtons = [...container.querySelectorAll('button')].filter(button => button.textContent?.includes('Verify Project'));
+    await act(async () => reviewButtons[24].click());
+    expect(onReview).toHaveBeenCalledWith('project-24', 'version-24');
+    expect(container.querySelector('img')?.getAttribute('loading')).toBe('lazy');
+    expect(container.querySelector('img')?.getAttribute('decoding')).toBe('async');
+});
+
+it('preserves service diagnostics when revealing the remaining page rows', async () => {
+    const pendingProjects = Array.from({ length: 21 }, (_, index) => item(`Project ${index}`, 'SUSPICIOUS'));
+    const service = item('Provider', 'FAILED', 'REMOTE_HELD');
+    service.pendingVersion!.scan!.newIssueCount = 0;
+    pendingProjects[20] = service;
+    await act(async () => root.render(<VerificationQueue pendingProjects={pendingProjects}
+        loadingQueue={false} loadingReview={false} onReview={vi.fn()} />));
+    expect(container.querySelector('[aria-label="Review service attention"]')).toBeNull();
+    const showMore = [...container.querySelectorAll('button')].find(button => button.textContent?.includes('Show more'))!;
+    await act(async () => showMore.click());
+    const operations = container.querySelector('[aria-label="Review service attention"]')!;
+    expect(operations.textContent).toContain('Provider');
+    expect(operations.textContent).toContain('Review held');
+    expect(operations.textContent).toContain('Security clearance withheld');
+    expect(operations.textContent).not.toContain('Risk 75');
+});

@@ -67,10 +67,36 @@ public final class LinuxDesktopBackend {
         return active;
     }
 
-    public static boolean beginMoveResize(int direction) {
-        if (!isWayland()) return false;
-        if (moveResize == null) moveResize = function("modtale_glass_begin_move_resize");
-        return moveResize != null && moveResize.invokeInt(new Object[]{direction}) != 0;
+    public static boolean beginMoveResize(int direction, double screenX, double screenY) {
+        if (!isLinux()) return false;
+        if (isWayland()) {
+            if (moveResize == null) moveResize = function("modtale_glass_begin_move_resize");
+            return moveResize != null && moveResize.invokeInt(new Object[]{direction}) != 0;
+        }
+        try {
+            Gdk gdk = Native.load("gdk-3", Gdk.class, LOCAL_SYMBOLS);
+            Pointer display = gdk.gdk_display_get_default();
+            if (display == null) return false;
+            Pointer seat = gdk.gdk_display_get_default_seat(display);
+            if (seat == null) return false;
+            Pointer device = gdk.gdk_seat_get_pointer(seat);
+            if (device == null) return false;
+            Pointer pointerWindow = gdk.gdk_device_get_window_at_position(device, null, null);
+            if (pointerWindow == null) return false;
+            Pointer window = gdk.gdk_window_get_toplevel(pointerWindow);
+            if (window == null) return false;
+            int x = (int) Math.round(screenX);
+            int y = (int) Math.round(screenY);
+            if (direction == 8) gdk.gdk_window_begin_move_drag(window, 1, x, y, 0);
+            else gdk.gdk_window_begin_resize_drag(window, switch (direction) {
+                case 0 -> 0; case 1 -> 1; case 2 -> 2; case 3 -> 4;
+                case 4 -> 7; case 5 -> 6; case 6 -> 5; case 7 -> 3;
+                default -> throw new IllegalArgumentException("Invalid resize direction: " + direction);
+            }, 1, x, y, 0);
+            return true;
+        } catch (RuntimeException | LinkageError unavailable) {
+            return false;
+        }
     }
 
     private static Function function(String name) {
@@ -92,5 +118,11 @@ public final class LinuxDesktopBackend {
         int gdk_display_get_n_monitors(Pointer display);
         Pointer gdk_display_get_monitor(Pointer display, int index);
         int gdk_monitor_get_refresh_rate(Pointer monitor);
+        Pointer gdk_display_get_default_seat(Pointer display);
+        Pointer gdk_seat_get_pointer(Pointer seat);
+        Pointer gdk_device_get_window_at_position(Pointer device, Pointer winX, Pointer winY);
+        Pointer gdk_window_get_toplevel(Pointer window);
+        void gdk_window_begin_move_drag(Pointer window, int button, int rootX, int rootY, int timestamp);
+        void gdk_window_begin_resize_drag(Pointer window, int edge, int button, int rootX, int rootY, int timestamp);
     }
 }

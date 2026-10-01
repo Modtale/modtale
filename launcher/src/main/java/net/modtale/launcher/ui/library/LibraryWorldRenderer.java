@@ -1,5 +1,7 @@
 package net.modtale.launcher.ui.library;
 
+import net.modtale.launcher.ui.common.LauncherTooltips;
+
 import static net.modtale.launcher.ui.common.LauncherUi.emptyState;
 import static net.modtale.launcher.ui.common.LauncherUi.primaryButton;
 import static net.modtale.launcher.ui.common.LauncherUi.secondaryButton;
@@ -204,6 +206,7 @@ final class LibraryWorldRenderer {
         settings.setPrefHeight(40);
         settings.setMaxHeight(40);
         settings.setAccessibleText("World settings");
+        LauncherTooltips.install(settings, "Manage this world’s settings");
         settings.setOnAction(event -> editWorldSettings.accept(model.world()));
         actions.getChildren().addAll(tools, settings, pack);
         actions.setMinWidth(Region.USE_PREF_SIZE);

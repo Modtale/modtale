@@ -3,6 +3,7 @@ package net.modtale.service.project.lifecycle;
 import java.util.ArrayList;
 import java.util.List;
 import net.modtale.config.properties.AppLimitProperties;
+import net.modtale.exception.VersionStateConflictException;
 import net.modtale.model.project.Project;
 import net.modtale.model.project.ProjectClassification;
 import net.modtale.model.project.ProjectStatus;
@@ -345,6 +346,25 @@ class LifecycleServiceTest {
         verify(projectRepository, never()).save(any());
         verify(projectNotificationService, never()).notifyNewProject(any());
         verify(webhookService, never()).triggerWebhook(any());
+    }
+
+    @Test
+    void boundPublicationWaitsForScanningVersion() {
+        User admin = user("user-1", "ItsNeil17", User.AccountType.USER, true);
+        Project project = editableProject("project-1", ProjectClassification.DATA, ProjectStatus.PENDING);
+        ProjectVersion scanning = version("1.0.0");
+        scanning.setReviewStatus(ProjectVersion.ReviewStatus.PENDING);
+        scanning.setScanResult(new ScanResult(ScanStatus.SCANNING, 0, List.of()));
+        project.setVersions(new ArrayList<>(List.of(scanning)));
+        when(projectService.getRawProjectById("project-1")).thenReturn(project);
+        when(accessControlService.canApproveProjectReviews(admin)).thenReturn(true);
+
+        assertThrows(VersionStateConflictException.class,
+                () -> lifecycleService.publishProject("project-1", admin, "review-token", scanning.getId()));
+        assertEquals(ProjectStatus.PENDING, project.getStatus());
+        verify(reviewPersistence, never()).apply(any(), any());
+        verify(projectRepository, never()).save(any(Project.class));
+        verify(projectNotificationService, never()).notifyNewProject(any());
     }
 
     @Test
