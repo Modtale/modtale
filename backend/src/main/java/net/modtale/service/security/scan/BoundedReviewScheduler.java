@@ -17,10 +17,13 @@ public class BoundedReviewScheduler<C,K> implements SmartLifecycle,AutoCloseable
     private final Step<C> step;
     private final String threadName;
     private final Settings settings;
+    private final java.util.function.LongSupplier ticker;
     private final Object lifecycle=new Object(),queueLock=new Object();
     private final CountDownLatch stopping=new CountDownLatch(1);
     private final ArrayDeque<C> queue=new ArrayDeque<>();
     private final Set<C> inFlight=new HashSet<>();
+    private final Map<C,Long> retryAfter=new HashMap<>();
+    private Long overflowRetryAfter;
     private K cursor;
     private final AtomicInteger active=new AtomicInteger(),buffered=new AtomicInteger();
     private final AtomicLong pages=new AtomicLong(),processed=new AtomicLong(),failures=new AtomicLong();
@@ -30,7 +33,11 @@ public class BoundedReviewScheduler<C,K> implements SmartLifecycle,AutoCloseable
     private volatile String state="NEW",lastOutcome="NONE";
     private volatile ExecutorService executor;
     public BoundedReviewScheduler(String threadName,Discovery<C,K> discovery,Step<C> step,Settings settings) {
+        this(threadName,discovery,step,settings,System::nanoTime);
+    }
+    BoundedReviewScheduler(String threadName,Discovery<C,K> discovery,Step<C> step,Settings settings,java.util.function.LongSupplier ticker) {
         this.threadName=Objects.requireNonNull(threadName);this.discovery=Objects.requireNonNull(discovery);this.step=Objects.requireNonNull(step);this.settings=Objects.requireNonNull(settings);
+        this.ticker=Objects.requireNonNull(ticker);
     }
     @Override public void start() {
         synchronized(lifecycle) {
@@ -42,31 +49,40 @@ public class BoundedReviewScheduler<C,K> implements SmartLifecycle,AutoCloseable
     private C next() {
         synchronized(queueLock) {
             if(stopping.getCount()==0)return null;
+            long now=ticker.getAsLong();
+            retryAfter.entrySet().removeIf(entry->now-entry.getValue()>=0);
+            if(overflowRetryAfter!=null){if(now-overflowRetryAfter<0)return null;overflowRetryAfter=null;}
             if(queue.isEmpty()) {
                 var page=discovery.page(cursor,settings.pageSize());
                 if(stopping.getCount()==0)return null;
                 if(page.candidates().size()>settings.pageSize())throw new IllegalStateException("Oversized discovery page");
                 queue.addAll(page.candidates());cursor=page.next();pages.incrementAndGet();buffered.set(queue.size());
             }
-            while(!queue.isEmpty()) {var candidate=queue.removeFirst();buffered.set(queue.size());if(inFlight.add(candidate))return candidate;}
+            while(!queue.isEmpty()) {var candidate=queue.removeFirst();buffered.set(queue.size());if(!retryAfter.containsKey(candidate) && inFlight.add(candidate))return candidate;}
             return null;
         }
+    }
+    private void defer(C candidate) {
+        long deadline=ticker.getAsLong()+TimeUnit.MILLISECONDS.toNanos(Math.max(5000,settings.pollMillis()));
+        // Bound retained candidate identities. Saturation backs off discovery rather than forgetting a cooldown.
+        if(retryAfter.size()<settings.pageSize()+settings.workers() || retryAfter.containsKey(candidate))retryAfter.put(candidate,deadline);
+        else overflowRetryAfter=deadline;
     }
     private void loop() {
         threads.add(Thread.currentThread());
         try {
             while(stopping.getCount()!=0) {
-                long pause=settings.pollMillis();C candidate=null;
+                long pause=settings.pollMillis();C candidate=null;boolean retry=false;
                 try {
                     candidate=next();
                     if(candidate!=null) {
                         active.incrementAndGet();var outcome=step.advance(candidate,
                                 ()->stopping.getCount()!=0 && !Thread.currentThread().isInterrupted());
                         lastOutcome=outcome;processed.incrementAndGet();
-                        if(Set.of("RETRY","UNKNOWN").contains(outcome)){failures.incrementAndGet();pause=Math.max(5000,pause);}
+                        if(Set.of("RETRY","UNKNOWN").contains(outcome)){failures.incrementAndGet();retry=true;}
                     }
-                } catch(RuntimeException failure) {if(stopping.getCount()==0)break;failures.incrementAndGet();lastOutcome="POLL_ERROR";pause=Math.max(5000,pause);}
-                finally {if(candidate!=null){active.decrementAndGet();synchronized(queueLock){inFlight.remove(candidate);}}}
+                } catch(RuntimeException failure) {if(stopping.getCount()==0)break;failures.incrementAndGet();lastOutcome="POLL_ERROR";if(candidate==null)pause=Math.max(5000,pause);else retry=true;}
+                finally {if(candidate!=null){synchronized(queueLock){if(retry)defer(candidate);inFlight.remove(candidate);}active.decrementAndGet();}}
                 if(stopping.await(pause,TimeUnit.MILLISECONDS))break;
             }
         } catch(InterruptedException interrupted) {Thread.currentThread().interrupt();if(stopping.getCount()!=0){failures.incrementAndGet();lastOutcome="LOOP_INTERRUPTED";requestStop();}}

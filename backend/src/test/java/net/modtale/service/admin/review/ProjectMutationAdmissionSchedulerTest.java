@@ -23,6 +23,17 @@ class ProjectMutationAdmissionSchedulerTest {
         when(automatic.advance(eq(candidate),any())).thenAnswer(call->{handled.countDown();return new ProjectMutationAutomaticAdmission.Result("ADMITTED","decision");});
         try(var scheduler=scheduler(1000)){scheduler.start();assertTrue(handled.await(3,TimeUnit.SECONDS));until(()->scheduler.status().processed()==1);assertEquals(1,scheduler.unavailableCandidates());verify(discovery).page(cursor,4);assertEquals("ADMITTED",scheduler.status().lastOutcome());}
     }
+    @Test void busyCandidateDoesNotDelayAnotherProjectAdmission()throws Exception {
+        var busy=candidate();var healthy=new ProjectMutationDiscovery.Candidate("other",0,"v",UUID.randomUUID().toString(),UUID.randomUUID().toString(),1);
+        var handled=new CountDownLatch(1);
+        when(discovery.page(any(),anyInt())).thenReturn(new ProjectMutationDiscovery.Page(List.of(busy,healthy),null,2,0),new ProjectMutationDiscovery.Page(List.of(),null,0,0));
+        when(automatic.advance(eq(busy),any())).thenThrow(new IllegalStateException("Review repair is busy"));
+        when(automatic.advance(eq(healthy),any())).thenAnswer(call->{handled.countDown();return new ProjectMutationAutomaticAdmission.Result("ADMITTED","decision");});
+        try(var scheduler=scheduler(1000)) {
+            scheduler.start();assertTrue(handled.await(2,TimeUnit.SECONDS));until(()->scheduler.status().processed()==1);
+            assertEquals(1,scheduler.status().failures());assertEquals("ADMITTED",scheduler.status().lastOutcome());
+        }
+    }
     @Test void stopWaitsForActualAdmissionReturnBeforeCallback()throws Exception {
         var candidate=candidate();var entered=new CountDownLatch(1);var release=new CountDownLatch(1);var done=new CountDownLatch(1);var guard=new AtomicReference<BooleanSupplier>();
         when(discovery.page(any(),anyInt())).thenReturn(new ProjectMutationDiscovery.Page(List.of(candidate),null,1,0));
