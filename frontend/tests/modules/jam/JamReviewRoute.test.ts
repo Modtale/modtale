@@ -25,4 +25,14 @@ describe('read-only synthetic branch review', () => {
         vi.stubEnv('LOG_ENVIRONMENT', 'branch-preview');
         expect((await GET({ params: { view: '../../private' } } as any)).status).toBe(404);
     });
+    it('renders the organizer permissions panel in the populated settings fixture', async () => {
+        vi.stubEnv('LOG_ENVIRONMENT', 'branch-preview');
+        const response = await GET({ params: { view: 'organizers' } } as any);
+        const html = await response.text();
+        expect(response.status).toBe(200);
+        expect(html).toContain('Organizer role name');
+        expect(html).toContain('Role permissions');
+        expect(html).toContain('Event editor');
+        expect(html).toContain('Judging lead');
+    });
 });
