@@ -80,6 +80,7 @@ class VersionDownloadOrchestrationServiceTest {
         user.setId("user-1");
         Project project = project("project-1", "Sky Tools", ProjectClassification.PLUGIN);
         ProjectVersion version = version("version-1", "1.0.0", "files/mod.jar");
+        project.setVersions(List.of(version));
 
         when(projectService.getProjectById("project-1", user)).thenReturn(project);
         when(projectVersionAccessService.requireByVersionNumber(org.mockito.Mockito.eq(project), org.mockito.Mockito.eq("1.0.0"), org.mockito.Mockito.eq("1.21.0"), org.mockito.Mockito.any()))
@@ -111,6 +112,7 @@ class VersionDownloadOrchestrationServiceTest {
         user.setId("user-1");
         Project pack = project("pack-1", "Sky Pack", ProjectClassification.MODPACK);
         ProjectVersion version = version("version-1", "1.0.0", "modpacks/pack.zip");
+        pack.setVersions(List.of(version));
         version.setDependencies(List.of(ProjectDependency.curseForge(
                 "1450386", "Simple Compost", "1.0.0",
                 "https://www.curseforge.com/hytale/mods/simple-compost",
@@ -142,6 +144,7 @@ class VersionDownloadOrchestrationServiceTest {
         user.setId("user-1");
         Project pack = project("pack-1", "Sky Pack", ProjectClassification.PLUGIN);
         ProjectVersion version = version("version-1", "1.0.0", "modpacks/pack.zip");
+        pack.setVersions(List.of(version));
         version.setDependencies(List.of(ProjectDependency.curseForge(
                 "1450386", "Simple Compost", "1.0.0",
                 "https://www.curseforge.com/hytale/mods/simple-compost",
@@ -193,6 +196,7 @@ class VersionDownloadOrchestrationServiceTest {
         User user = new User();
         Project pack = project("pack-1", "Sky Pack", ProjectClassification.MODPACK);
         ProjectVersion version = version("version-1", "1.0.0", "modpacks/pack.zip");
+        pack.setVersions(List.of(version));
         version.setDependencies(List.of(ProjectDependency.curseForge(
                 "1450386", "Simple Compost", "1.0.0",
                 "https://www.curseforge.com/hytale/mods/simple-compost",
@@ -225,6 +229,7 @@ class VersionDownloadOrchestrationServiceTest {
         User user = new User();
         Project project = project("project-1", "Sky Tools", ProjectClassification.PLUGIN);
         ProjectVersion version = version("version-1", "1.0.0", "files/123456789012345678901234567890123456-sky-tools.jar");
+        project.setVersions(List.of(version));
         DownloadTokenService.DownloadToken token = token("project-1", "1.0.0", "1.21.0", null);
 
         when(downloadTokenService.validateAndConsume("token")).thenReturn(token);
@@ -256,6 +261,7 @@ class VersionDownloadOrchestrationServiceTest {
         User user = new User();
         Project project = project("project-1", "Sky Tools", ProjectClassification.PLUGIN);
         ProjectVersion version = version("version-1", "1.0.0", "files/mod.jar");
+        project.setVersions(List.of(version));
         version.setHash(sha256(new byte[]{1, 2, 3}));
         when(downloadTokenService.validateAndConsume("token")).thenReturn(token("project-1", "1.0.0", null, null));
         when(projectService.getRawProjectById("project-1")).thenReturn(project);
@@ -275,6 +281,7 @@ class VersionDownloadOrchestrationServiceTest {
         User user = new User();
         Project pack = project("pack-1", "Sky Pack!", ProjectClassification.MODPACK);
         ProjectVersion version = version("version-1", "1.0.0", "modpacks/pack.zip");
+        pack.setVersions(List.of(version));
         version.setDependencies(List.of(new ProjectDependency("dep-1", "Dependency", "2.0.0")));
         Project dependencyProject = project("dep-1", "Dependency", ProjectClassification.PLUGIN);
 
@@ -302,6 +309,7 @@ class VersionDownloadOrchestrationServiceTest {
         User user = new User();
         Project project = project("project-1", "Sky Tools", ProjectClassification.PLUGIN);
         ProjectVersion version = version("version-1", "1.0.0", "files/mod.jar");
+        project.setVersions(List.of(version));
         version.setDependencies(List.of(
                 new ProjectDependency("dep-1", "Dependency One", "1.0.0"),
                 new ProjectDependency("dep-2", "Dependency Two", "1.0.0"),
@@ -366,6 +374,7 @@ class VersionDownloadOrchestrationServiceTest {
     void withdrawnVersionCannotIssueOrRedeemAnExistingDownloadToken() throws Exception {
         Project project = project("project-1", "Sky Tools", ProjectClassification.PLUGIN);
         ProjectVersion version = version("version-1", "1.0.0", "files/mod.jar");
+        project.setVersions(List.of(version));
         version.setReviewStatus(ProjectVersion.ReviewStatus.PENDING);
         when(projectService.getProjectById("project-1", null)).thenReturn(project);
         when(projectService.getRawProjectById("project-1")).thenReturn(project);

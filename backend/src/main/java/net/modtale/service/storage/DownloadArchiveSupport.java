@@ -4,6 +4,7 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import net.modtale.model.project.Project;
 import net.modtale.model.project.ProjectDependency;
+import net.modtale.model.project.ProjectStatus;
 import net.modtale.model.project.ProjectVersion;
 import net.modtale.service.project.query.ProjectService;
 import net.modtale.service.security.access.AccessControlService;
@@ -27,7 +28,8 @@ final class DownloadArchiveSupport {
         }
 
         Project project = projectService.getRawProjectById(dependency.getProjectId());
-        if (project == null || !accessControlService.isPubliclyReadable(project)) {
+        if (project == null || project.getDeletedAt() != null || project.getStatus() == ProjectStatus.DELETED
+                || !accessControlService.isPubliclyReadable(project)) {
             return null;
         }
 

@@ -63,6 +63,7 @@ final class ModpackArchiveService {
         byte[] zipBytes = buildArchive(pack, version);
         requireUnchangedDependencies(version, dependencyBindings);
         cacheArchive(pack, version, zipBytes, projectToken, versionToken);
+        requireUnchangedDependencies(version, dependencyBindings);
         return zipBytes;
     }
 
@@ -215,11 +216,15 @@ final class ModpackArchiveService {
                     + dependencyLabel(dependency) + " at version " + dependency.getVersionNumber() + ".");
         }
 
+        String reviewBinding = VersionReviewSnapshot.token(resolved.version());
         byte[] bytes;
         try {
             bytes = archiveSupport.downloadApproved(resolved.version());
         } catch (StorageDownloadException ex) {
             throw new IOException("Cannot download bundled Modtale dependency " + dependencyLabel(dependency) + ".", ex);
+        }
+        if (!reviewBinding.equals(VersionReviewSnapshot.token(resolved.version()))) {
+            throw new IOException("A bundled Modtale dependency changed while the modpack was being prepared.");
         }
         if (bytes == null || bytes.length == 0) {
             throw new IOException("Bundled Modtale dependency " + dependencyLabel(dependency) + " is empty.");
@@ -227,7 +232,7 @@ final class ModpackArchiveService {
 
         String filename = archiveSupport.extractOriginalFilename(resolved.version().getFileUrl());
         String path = uniqueArchiveEntryName(archiveKeys, sanitizeArchiveFilename(filename));
-        return PreparedDependency.bundled(dependency, path, bytes, VersionReviewSnapshot.token(resolved.version()));
+        return PreparedDependency.bundled(dependency, path, bytes, reviewBinding);
     }
 
     private PreparedDependency prepareExternalDependency(ProjectDependency dependency) {

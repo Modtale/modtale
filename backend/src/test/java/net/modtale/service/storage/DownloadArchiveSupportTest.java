@@ -3,15 +3,19 @@ package net.modtale.service.storage;
 import java.nio.charset.StandardCharsets;
 import java.io.IOException;
 import java.security.MessageDigest;
+import java.time.LocalDateTime;
 import java.util.HexFormat;
 import java.util.List;
 import net.modtale.model.project.Project;
 import net.modtale.model.project.ProjectDependency;
+import net.modtale.model.project.ProjectStatus;
 import net.modtale.model.project.ProjectVersion;
 import net.modtale.service.project.query.ProjectService;
 import net.modtale.service.security.access.AccessControlService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.web.multipart.MultipartFile;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
@@ -66,6 +70,18 @@ class DownloadArchiveSupportTest {
     void privateDependencyCannotBePackagedFromARawProject() {
         Project project = project("project-1", version("1.0.0", "files/private.jar"));
         when(projectService.getRawProjectById("project-1")).thenReturn(project);
+
+        assertNull(service.resolveDependency(new ProjectDependency("project-1", "Project", "1.0.0")));
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void deletedDependencyCannotBePackagedEvenWhenReadPolicyAllowsIt(boolean deletedStatus) {
+        Project project = project("project-1", version("1.0.0", "files/deleted.jar"));
+        project.setStatus(deletedStatus ? ProjectStatus.DELETED : ProjectStatus.PUBLISHED);
+        if (!deletedStatus) project.setDeletedAt(LocalDateTime.of(2026, 10, 1, 0, 0));
+        when(projectService.getRawProjectById("project-1")).thenReturn(project);
+        when(accessControlService.isPubliclyReadable(project)).thenReturn(true);
 
         assertNull(service.resolveDependency(new ProjectDependency("project-1", "Project", "1.0.0")));
     }

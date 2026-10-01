@@ -13,6 +13,7 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
 import net.modtale.exception.StorageDownloadException;
+import net.modtale.exception.StorageUploadException;
 import net.modtale.model.project.Project;
 import net.modtale.model.project.ProjectClassification;
 import net.modtale.model.project.ProjectDependency;
@@ -22,6 +23,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.web.multipart.MultipartFile;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
@@ -226,6 +228,59 @@ class ModpackArchiveServiceTest {
         verify(archiveSupport).download("modpacks/cached.zip");
         verify(archiveSupport, never()).upload(any(), any());
         verify(reviewPersistence, never()).cacheModpackArchive(any(), any(), any(), any(), any());
+    }
+
+    @ParameterizedTest
+    @CsvSource({"true,false", "false,false", "true,true", "false,true"})
+    void dependencyChangingDuringCacheUploadCannotBeDelivered(boolean withdrawn, boolean uploadFails) throws Exception {
+        Project pack = pack();
+        ProjectVersion version = version("1.0.0", null);
+        ProjectDependency dependency = new ProjectDependency("plugin", "Plugin", "2.0.0");
+        version.setDependencies(List.of(dependency));
+        var approved = new DownloadArchiveSupport.ResolvedDependency(
+                dependencyProject("plugin", ProjectClassification.PLUGIN), version("2.0.0", "plugin-old.jar"));
+        var replacement = new DownloadArchiveSupport.ResolvedDependency(
+                dependencyProject("plugin", ProjectClassification.PLUGIN), version("2.0.0", "plugin-new.jar"));
+        when(archiveSupport.resolveDependency(dependency)).thenReturn(approved);
+        when(archiveSupport.download("plugin-old.jar")).thenReturn(bytes("old-approved-bytes"));
+        when(archiveSupport.extractOriginalFilename("plugin-old.jar")).thenReturn("plugin.jar");
+        when(archiveSupport.newZipMultipartFile(any(), any())).thenReturn(mock(MultipartFile.class));
+        when(archiveSupport.upload(any(), eq("modpacks"))).thenAnswer(invocation -> {
+            when(archiveSupport.resolveDependency(dependency)).thenReturn(withdrawn ? null : replacement);
+            if (uploadFails) throw new StorageUploadException("Upload failed", new IOException("unavailable"));
+            return "modpacks/generated.zip";
+        });
+
+        assertThrows(IOException.class, () -> service.generateModpackZip(pack, version));
+        verify(archiveSupport).upload(any(), eq("modpacks"));
+        verify(archiveSupport, never()).download("plugin-new.jar");
+        if (uploadFails) verify(reviewPersistence, never()).cacheModpackArchive(any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void localDependencyMutationCannotDeliverWhenRepositoryBindingIsUnchanged() throws Exception {
+        Project pack = pack();
+        ProjectVersion version = version("1.0.0", null);
+        ProjectDependency dependency = new ProjectDependency("plugin", "Plugin", "2.0.0");
+        version.setDependencies(List.of(dependency));
+        ProjectVersion persisted = version("2.0.0", "plugin.jar");
+        ProjectVersion prepared = version("2.0.0", "plugin.jar");
+        persisted.setHash(sha256(bytes("approved")));
+        prepared.setHash(persisted.getHash());
+        var authoritative = new DownloadArchiveSupport.ResolvedDependency(
+                dependencyProject("plugin", ProjectClassification.PLUGIN), persisted);
+        var local = new DownloadArchiveSupport.ResolvedDependency(
+                dependencyProject("plugin", ProjectClassification.PLUGIN), prepared);
+        when(archiveSupport.resolveDependency(dependency)).thenReturn(authoritative, local, authoritative);
+        when(archiveSupport.download("plugin.jar")).thenAnswer(invocation -> {
+            prepared.setHash(sha256(bytes("replacement")));
+            return bytes("replacement");
+        });
+        when(archiveSupport.extractOriginalFilename("plugin.jar")).thenReturn("plugin.jar");
+        when(archiveSupport.newZipMultipartFile(any(), any())).thenReturn(mock(MultipartFile.class));
+
+        assertThrows(IOException.class, () -> service.generateModpackZip(pack, version));
+        verify(archiveSupport, never()).upload(any(), any());
     }
 
     @Test

@@ -183,6 +183,7 @@ class VersionControllerTest {
         User currentUser = user("user-1");
         Project project = project("project-1", "Sky Tools", ProjectClassification.MODPACK);
         ProjectVersion version = version("version-1", "1.0.0");
+        project.setVersions(List.of(version));
         version.setDependencies(List.of(new ProjectDependency("dep-1", "Dependency One", "2.0.0")));
 
         when(downloadTokenService.validateAndConsume("token")).thenReturn(
@@ -216,6 +217,7 @@ class VersionControllerTest {
     void downloadWithTokenStripsGeneratedPrefixFromStoredFilenames() throws Exception {
         Project project = project("project-1", "Sky Tools", ProjectClassification.DATA);
         ProjectVersion version = version("version-1", "1.0.0");
+        project.setVersions(List.of(version));
         version.setFileUrl("https://cdn.modtale.net/files/123456789012345678901234567890123456-actual.jar");
         version.setHash(sha256(new byte[]{1, 2, 3, 4}));
 
@@ -250,6 +252,7 @@ class VersionControllerTest {
     void authorizedDownloadsVerifyBytesBeforeDelivery() throws Exception {
         Project project = project("project-1", "Sky Tools", ProjectClassification.DATA);
         ProjectVersion version = version("version-1", "1.0.0");
+        project.setVersions(List.of(version));
         version.setFileUrl("https://cdn.modtale.net/files/123456789012345678901234567890123456-actual.jar");
         version.setHash(sha256(new byte[]{1, 2, 3}));
 
@@ -280,6 +283,7 @@ class VersionControllerTest {
         User currentUser = user("user-1");
         Project project = project("project-1", "Sky Tools", ProjectClassification.DATA);
         ProjectVersion version = version("version-1", "1.0.0");
+        project.setVersions(List.of(version));
         version.setDependencies(List.of(
                 new ProjectDependency("dep-a", "Dependency A", "1.0.0"),
                 new ProjectDependency("dep-b", "Dependency B", "2.0.0"),
@@ -321,6 +325,7 @@ class VersionControllerTest {
         User currentUser = user("author-1");
         Project project = project("project-1", "Sky Tools", ProjectClassification.DATA);
         ProjectVersion version = version("version-1", "1.0.0");
+        project.setVersions(List.of(version));
         version.setFileUrl("https://cdn.modtale.net/files/actual.jar");
         version.setHash(sha256(new byte[]{1, 2, 3}));
 
