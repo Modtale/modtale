@@ -68,6 +68,83 @@ class CreatorPayoutServiceTest {
         verify(gateway, never()).createTransfer(anyString(), anyLong(), anyString(), anyString(), anyMap(), anyBoolean(), anyString());
         verify(wallets).completeTransfers(request.getId());
     }
+    @Test void confirmationBeforeAuthorizationDoesNotBlockTheNextOrganizationRecipient() {
+        addRemainingRecipient();
+        when(wallets.authorizeRecipientTransfer(request.getId(), 0)).thenAnswer(call -> {
+            request.getRecipients().getFirst().setTransferId("tr_competing");
+            return false;
+        });
+        when(gateway.createTransfer(eq("acct_remaining"), eq(500L), eq("usd"), anyString(), anyMap(), eq(false), anyString()))
+                .thenReturn(new StripeGatewayService.StripeResult(true, "tr_remaining", null, null, transferResponse(1, "tr_remaining")));
+        service.dispatch(request.getId());
+        verify(wallets, never()).requireReview(anyString(), anyString());
+        verify(wallets).authorizeRecipientTransfer(request.getId(), 1);
+        verify(gateway).createTransfer(eq("acct_remaining"), eq(500L), eq("usd"), anyString(), anyMap(), eq(false),
+                eq("modtale-payout:" + request.getId() + ":1"));
+        verify(gateway, never()).createTransfer(eq("acct_recipient"), anyLong(), anyString(), anyString(), anyMap(), anyBoolean(), anyString());
+        verify(wallets).recordTransfer(eq(request.getId()), eq(1), eq("tr_remaining"), anyString(), anyString());
+    }
+    @Test void confirmationAfterAuthorizationStillAllowsTheRemainingOrganizationRecipient() {
+        addRemainingRecipient();
+        when(wallets.authorizeRecipientTransfer(request.getId(), 0)).thenAnswer(call -> {
+            request.getRecipients().getFirst().setTransferId("tr_competing");
+            return true;
+        });
+        when(gateway.createTransfer(eq("acct_remaining"), eq(500L), eq("usd"), anyString(), anyMap(), eq(false), anyString()))
+                .thenReturn(new StripeGatewayService.StripeResult(true, "tr_remaining", null, null, transferResponse(1, "tr_remaining")));
+        service.dispatch(request.getId());
+        verify(wallets).authorizeRecipientTransfer(request.getId(), 1);
+        verify(gateway, never()).createTransfer(eq("acct_recipient"), anyLong(), anyString(), anyString(), anyMap(), anyBoolean(), anyString());
+        verify(wallets).recordTransfer(eq(request.getId()), eq(1), eq("tr_remaining"), anyString(), anyString());
+    }
+    @Test void confirmedRecipientDoesNotBypassTheRemainingRecipientsRiskAuthorization() {
+        addRemainingRecipient();
+        when(wallets.authorizeRecipientTransfer(request.getId(), 0)).thenAnswer(call -> {
+            request.getRecipients().getFirst().setTransferId("tr_competing");
+            return false;
+        });
+        when(wallets.authorizeRecipientTransfer(request.getId(), 1)).thenReturn(false);
+        service.dispatch(request.getId());
+        verify(wallets).authorizeRecipientTransfer(request.getId(), 1);
+        verify(wallets).requireRecipientReview(eq(request.getId()), eq(1), anyString());
+        verify(gateway, never()).createTransfer(anyString(), anyLong(), anyString(), anyString(), anyMap(), anyBoolean(), anyString());
+        verify(wallets, never()).completeTransfers(anyString());
+    }
+    @Test void confirmationAfterAuthorizationDoesNotResendTheRecipient() {
+        when(gateway.createTransfer(anyString(), anyLong(), anyString(), anyString(), anyMap(), anyBoolean(), anyString()))
+                .thenReturn(new StripeGatewayService.StripeResult(false, null, null, "fixture", Map.of()));
+        when(wallets.authorizeRecipientTransfer(request.getId(), 0)).thenAnswer(call -> {
+            request.getRecipients().getFirst().setTransferId("tr_competing");
+            request.setStatus(CreatorPayoutRequest.Status.TRANSFERRED);
+            return true;
+        });
+        service.dispatch(request.getId());
+        verify(gateway, never()).createTransfer(anyString(), anyLong(), anyString(), anyString(), anyMap(), anyBoolean(), anyString());
+        verify(wallets, never()).requireReview(anyString(), anyString());
+    }
+    @Test void reviewAfterAuthorizationStopsTheOutboundCall() {
+        when(gateway.createTransfer(anyString(), anyLong(), anyString(), anyString(), anyMap(), anyBoolean(), anyString()))
+                .thenReturn(new StripeGatewayService.StripeResult(false, null, null, "fixture", Map.of()));
+        when(wallets.authorizeRecipientTransfer(request.getId(), 0)).thenAnswer(call -> {
+            request.setStatus(CreatorPayoutRequest.Status.REQUIRES_REVIEW);
+            return true;
+        });
+        service.dispatch(request.getId());
+        verify(gateway, never()).createTransfer(anyString(), anyLong(), anyString(), anyString(), anyMap(), anyBoolean(), anyString());
+    }
+    private void addRemainingRecipient() {
+        var remaining = new CreatorPayoutRequest.Recipient(); remaining.setAccountId("acct_remaining");
+        remaining.setAmountCents(500); remaining.setCorrelationId("nonce_remaining"); remaining.setAuthorizedAt(Instant.now());
+        request.setRecipients(List.of(request.getRecipients().getFirst(), remaining));
+    }
+    private Map<String, Object> transferResponse(int index, String id) {
+        var recipient = request.getRecipients().get(index); var transfer = new java.util.HashMap<String, Object>();
+        transfer.put("id", id); transfer.put("object", "transfer"); transfer.put("livemode", false);
+        transfer.put("destination", recipient.getAccountId()); transfer.put("amount", recipient.getAmountCents()); transfer.put("currency", request.getCurrency());
+        transfer.put("transfer_group", request.getTransferGroup()); transfer.put("metadata", CreatorPayoutService.transferMetadata(request, index));
+        transfer.put("created", Instant.now().getEpochSecond()); transfer.put("reversed", false); transfer.put("amount_reversed", 0);
+        return transfer;
+    }
     @Test void staleIdempotencyWindowRequiresReviewWithoutRetry() {
         request.setFirstAttemptAt(Instant.now().minusSeconds(24 * 3600));
         service.dispatch(request.getId());
@@ -96,7 +173,7 @@ class CreatorPayoutServiceTest {
     @Test void failedTransactionalAuthorizationStopsTheOutboundCall() {
         when(wallets.authorizeRecipientTransfer(anyString(), anyInt())).thenReturn(false);
         service.dispatch(request.getId());
-        verify(wallets).requireReview(eq(request.getId()), anyString());
+        verify(wallets).requireRecipientReview(eq(request.getId()), eq(0), anyString());
         verify(gateway, never()).createTransfer(anyString(), anyLong(), anyString(), anyString(), anyMap(), anyBoolean(), anyString());
     }
 

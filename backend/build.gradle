@@ -66,7 +66,7 @@ tasks.named('test') {
 }
 
 tasks.register('financeFrontendIntegrationTest', Test) {
-    description = 'Runs the real frontend finance client against an isolated loopback servlet fixture.'
+    description = 'Runs JSDOM and Chromium finance clients against an isolated loopback servlet fixture.'
     group = 'verification'
     testClassesDirs = sourceSets.test.output.classesDirs
     classpath = sourceSets.test.runtimeClasspath

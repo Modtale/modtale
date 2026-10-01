@@ -150,7 +150,7 @@ jobs:
         run: ./gradlew test
 
   finance-frontend-integration:
-    name: Finance Frontend Session Tests
+    name: Finance Frontend Session and Browser Tests
     needs: detect-changes
     if: needs.detect-changes.outputs.backend == 'true' || needs.detect-changes.outputs.frontend == 'true'
     runs-on: ubuntu-latest
@@ -169,6 +169,11 @@ jobs:
       - name: Install frontend dependencies
         working-directory: frontend
         run: npm ci
+      - name: Install isolated Chromium test browser
+        working-directory: frontend
+        env:
+          PLAYWRIGHT_BROWSERS_PATH: "0"
+        run: npx playwright install --with-deps chromium
       - name: Set up Java
         uses: actions/setup-java@v4
         with:
@@ -188,6 +193,8 @@ jobs:
             backend/build/reports/tests/financeFrontendIntegrationTest
             backend/build/test-results/financeFrontendIntegrationTest
             backend/build/test-results/finance-frontend-ui.xml
+            backend/build/test-results/finance-browser-ui.xml
+            backend/build/finance-browser-artifacts
           if-no-files-found: error
 
   finance-transactions:

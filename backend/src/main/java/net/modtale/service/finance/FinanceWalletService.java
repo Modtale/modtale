@@ -408,6 +408,15 @@ public class FinanceWalletService {
                 new Update().set("status", CreatorPayoutRequest.Status.REQUIRES_REVIEW).set("reviewReason", reason), CreatorPayoutRequest.class);
     }
 
+    /** A stale dispatch failure must not pause recipients already confirmed by another worker. */
+    public void requireRecipientReview(String id, int recipientIndex, String reason) {
+        if (recipientIndex < 0) throw new IllegalArgumentException("Payout recipient not found.");
+        String recipientPath = "recipients." + recipientIndex;
+        mongo.updateFirst(Query.query(Criteria.where("_id").is(id).and("status").is(CreatorPayoutRequest.Status.PROCESSING)
+                        .and(recipientPath).exists(true).and(recipientPath + ".transferId").is(null)),
+                new Update().set("status", CreatorPayoutRequest.Status.REQUIRES_REVIEW).set("reviewReason", reason), CreatorPayoutRequest.class);
+    }
+
     public CreatorPayoutRequest completeTransfers(String id) {
         CreatorPayoutRequest request = getRequest(id);
         if (request == null) throw new IllegalArgumentException("Payout not found.");

@@ -106,11 +106,14 @@ public class CreatorPayoutService {
         for (int i = 0; i < request.getRecipients().size(); i++) {
             var recipient = request.getRecipients().get(i);
             if (recipient.getTransferId() != null) continue;
-            if (!wallets.authorizeRecipientTransfer(requestId, i)) {
-                wallets.requireReview(requestId, "Transfer authorization is paused for balance or risk reconciliation."); return;
-            }
+            boolean authorized = wallets.authorizeRecipientTransfer(requestId, i);
+            if (!authorized) wallets.requireRecipientReview(requestId, i, "Transfer authorization is paused for balance or risk reconciliation.");
             request = wallets.getRequest(requestId);
+            if (request == null || request.getStatus() != CreatorPayoutRequest.Status.PROCESSING) return;
             recipient = request.getRecipients().get(i);
+            // Another dispatcher may have confirmed this recipient since our snapshot or authorization.
+            if (recipient.getTransferId() != null) continue;
+            if (!authorized) return;
             var result = gateway.createTransfer(recipient.getAccountId(), recipient.getAmountCents(), request.getCurrency(),
                     "Modtale creator earnings", transferMetadata(request, i), false,
                     "modtale-payout:" + request.getId() + ":" + i);

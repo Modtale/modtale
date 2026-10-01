@@ -94,6 +94,60 @@ class PayoutReconciliationIntegrationTest extends FinancePipelineFixture {
         assertTrue(wallets.getWallet("creator", "usd", true).isPayoutHold());
         assertEquals(-1000, ledger.findAll().stream().filter(e -> e.getType() == FinanceLedgerEntry.LedgerType.PAYOUT).mapToLong(FinanceLedgerEntry::getCreatorCents).sum());
     }
+    @Test void confirmationBetweenSnapshotAndAuthorizationDoesNotStrandRemainingOrganizationRecipient() throws Exception {
+        assertCompetingConfirmationDoesNotStrandRemainingRecipient(true);
+    }
+    @Test void confirmationBetweenAuthorizationAndProviderRequestDoesNotResendOrStrandRemainingOrganizationRecipient() throws Exception {
+        assertCompetingConfirmationDoesNotStrandRemainingRecipient(false);
+    }
+    private void assertCompetingConfirmationDoesNotStrandRemainingRecipient(boolean beforeAuthorization) throws Exception {
+        settleOneTime(); var request = reserve(500, 500); payouts();
+        var dispatchWallets = spy(wallets);
+        var service = new CreatorPayoutService(dispatchWallets, gateway, mock(UserRepository.class), mock(RevenueOpsSupport.class));
+        doAnswer(call -> {
+            // A competing dispatcher confirms the first recipient while this worker has a stale snapshot.
+            if (beforeAuthorization) assertTrue(wallets.authorizeRecipientTransfer(request.getId(), 0));
+            else assertTrue((boolean) call.callRealMethod());
+            wallets.recordTransfer(request.getId(), 0, "tr_competing", "provider-response", "Verified fixture transfer");
+            return beforeAuthorization ? call.callRealMethod() : true;
+        }).when(dispatchWallets).authorizeRecipientTransfer(request.getId(), 0);
+        when(gateway.createTransfer(anyString(), anyLong(), anyString(), anyString(), anyMap(), eq(false), anyString()))
+                .thenAnswer(call -> new StripeGatewayService.StripeResult(true, "tr_remaining", null, null,
+                        transfer(wallets.getRequest(request.getId()), 1, "tr_remaining")));
+        service.dispatch(request.getId());
+        var completed = wallets.getRequest(request.getId());
+        assertEquals(CreatorPayoutRequest.Status.TRANSFERRED, completed.getStatus());
+        assertNull(completed.getReviewReason());
+        assertEquals("tr_competing", completed.getRecipients().getFirst().getTransferId());
+        assertEquals("tr_remaining", completed.getRecipients().get(1).getTransferId());
+        verify(gateway, times(1)).createTransfer(eq("acct_recipient1"), eq(500L), eq("usd"), anyString(), anyMap(), eq(false),
+                eq("modtale-payout:" + request.getId() + ":1"));
+        verify(gateway, never()).createTransfer(eq("acct_recipient0"), anyLong(), anyString(), anyString(), anyMap(), anyBoolean(), anyString());
+        assertEquals(0, wallets.getWallet("creator", "usd", true).getReservedCents());
+        assertEquals(7445, available());
+        assertEquals(2, mongo.getCollection("finance_transfer_receipts").countDocuments());
+        assertEquals(-1000, ledger.findAll().stream().filter(e -> e.getType() == FinanceLedgerEntry.LedgerType.PAYOUT).mapToLong(FinanceLedgerEntry::getCreatorCents).sum());
+    }
+    @Test void recipientReviewCannotPauseAConfirmedRecipientAndRemainingRiskStillFailsClosed() throws Exception {
+        settleOneTime(); var request = reserve(500, 500); payouts(); authorize(request, 0);
+        wallets.recordTransfer(request.getId(), 0, "tr_confirmed", "provider-response", "Verified fixture transfer");
+        assertFalse(wallets.authorizeRecipientTransfer(request.getId(), 0));
+        wallets.requireRecipientReview(request.getId(), 0, "Stale authorization failure");
+        var partial = wallets.getRequest(request.getId());
+        assertEquals(CreatorPayoutRequest.Status.PROCESSING, partial.getStatus()); assertNull(partial.getReviewReason());
+        wallets.holdForRisk("creator", "usd", true, "dp_remaining");
+        assertFalse(wallets.authorizeRecipientTransfer(request.getId(), 1));
+        wallets.requireRecipientReview(request.getId(), 1, "Remaining recipient risk");
+        var paused = wallets.getRequest(request.getId());
+        assertEquals(CreatorPayoutRequest.Status.REQUIRES_REVIEW, paused.getStatus());
+        assertEquals("Remaining recipient risk", paused.getReviewReason());
+        assertEquals("tr_confirmed", paused.getRecipients().getFirst().getTransferId());
+        assertNull(paused.getRecipients().get(1).getTransferId());
+        assertEquals(500, wallets.getWallet("creator", "usd", true).getReservedCents());
+        assertEquals(List.of("dp_remaining"), wallets.getWallet("creator", "usd", true).getOpenRiskIds());
+        assertEquals(1, mongo.getCollection("finance_transfer_receipts").countDocuments());
+        verify(gateway, never()).createTransfer(anyString(), anyLong(), anyString(), anyString(), anyMap(), anyBoolean(), anyString());
+    }
     @Test void simultaneousAttemptsCannotClaimOneProviderTransferForTwoReservations() throws Exception {
         settleOneTime(); var one = reserve(1000); var two = reserve(1000); authorize(one, 0); authorize(two, 0);
         try (var executor = Executors.newFixedThreadPool(2)) {

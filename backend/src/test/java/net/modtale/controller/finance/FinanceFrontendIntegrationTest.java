@@ -29,6 +29,7 @@ import org.apache.tomcat.util.descriptor.web.FilterMap;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.context.annotation.*;
+import org.springframework.core.env.MapPropertySource;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.web.context.support.AnnotationConfigWebApplicationContext;
@@ -59,6 +60,14 @@ class FinanceFrontendIntegrationTest {
     }
 
     @Test void realFrontendUsesSessionCookiesCsrfAndAuthoritativeSupportTerms() throws Exception {
+        runFrontend(false);
+    }
+
+    @Test void realChromiumUsesSessionCookiesCsrfAndAuthoritativeSupportTerms() throws Exception {
+        runFrontend(true);
+    }
+
+    private void runFrontend(boolean browser) throws Exception {
         Path frontend = Path.of("../frontend").toAbsolutePath().normalize();
         assertTrue(Files.isRegularFile(frontend.resolve("node_modules/vitest/vitest.mjs")), "Install frontend dependencies before this integration task");
         var tomcat = new Tomcat();
@@ -68,6 +77,8 @@ class FinanceFrontendIntegrationTest {
         var servlet = tomcat.addContext("", temporary.toString());
         servlet.setParentClassLoader(getClass().getClassLoader());
         var application = new AnnotationConfigWebApplicationContext();
+        if (browser) application.getEnvironment().getPropertySources().addFirst(new MapPropertySource("browser-fixture",
+                Map.of("modtale.fixture.frontend-origin", "http://127.0.0.1:3000")));
         application.setServletContext(servlet.getServletContext());
         application.register(Config.class); application.refresh();
         Map<String, DonationIntent> intents = configureFixtures(application);
@@ -80,10 +91,12 @@ class FinanceFrontendIntegrationTest {
         try {
             tomcat.start();
             Path output = temporary.resolve("frontend-output.txt");
-            Path report = Path.of("build/test-results/finance-frontend-ui.xml").toAbsolutePath();
+            Path report = Path.of(browser ? "build/test-results/finance-browser-ui.xml" : "build/test-results/finance-frontend-ui.xml").toAbsolutePath();
             Files.createDirectories(report.getParent());
-            var process = new ProcessBuilder("node", "node_modules/vitest/vitest.mjs", "run", "--config", "vitest.finance-integration.config.ts",
-                    "--reporter=default", "--reporter=junit", "--outputFile.junit=" + report)
+            List<String> command = browser ? List.of("node", "scripts/run-finance-browser-tests.mjs")
+                    : List.of("node", "node_modules/vitest/vitest.mjs", "run", "--config", "vitest.finance-integration.config.ts",
+                    "--reporter=default", "--reporter=junit", "--outputFile.junit=" + report);
+            var process = new ProcessBuilder(command)
                     .directory(frontend.toFile()).redirectErrorStream(true).redirectOutput(output.toFile());
             // This subprocess only needs local Node and the disposable server. Do not inherit provider/cloud credentials.
             String path = process.environment().get("PATH");
@@ -92,8 +105,14 @@ class FinanceFrontendIntegrationTest {
             process.environment().put("HOME", temporary.toString());
             process.environment().put("CI", "true");
             process.environment().put("MODTALE_FINANCE_TEST_ORIGIN", "http://127.0.0.1:" + tomcat.getConnector().getLocalPort());
+            if (browser) {
+                process.environment().put("PLAYWRIGHT_JUNIT_OUTPUT_FILE", report.toString());
+                process.environment().put("PLAYWRIGHT_BROWSERS_PATH", "0");
+                String executable = System.getenv("MODTALE_FINANCE_CHROMIUM_PATH");
+                if (executable != null && !executable.isBlank()) process.environment().put("MODTALE_FINANCE_CHROMIUM_PATH", executable);
+            }
             child = process.start();
-            assertTrue(child.waitFor(120, TimeUnit.SECONDS), "Frontend integration timed out");
+            assertTrue(child.waitFor(browser ? 180 : 120, TimeUnit.SECONDS), "Frontend integration timed out");
             String result = Files.readString(output); System.out.println(result);
             assertEquals(0, child.exitValue(), "Frontend integration failed:\n" + result);
             assertEquals(3, intents.size(), "Rejected, repeated, and stale requests must not create extra intents");
