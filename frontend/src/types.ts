@@ -408,6 +408,26 @@ export interface ModjamCategory {
     maxScore: number;
 }
 
+export interface ModjamRestrictions {
+    requireNewProject?: boolean;
+    requireSourceRepo?: boolean;
+    requireOsiLicense?: boolean;
+    minContributors?: number;
+    maxContributors?: number;
+    requireUniqueSubmission?: boolean;
+    requireNewbie?: boolean;
+    requirePriorJams?: boolean;
+    requireNoPriorProjects?: boolean;
+    requirePriorProjects?: boolean;
+    allowedLicenses?: string[];
+    allowedClassifications?: string[];
+    allowedGameVersions?: string[];
+    minimumGameVersion?: string;
+    maximumGameVersion?: string;
+    requiredDependencyId?: string;
+    requiredClassUsage?: string;
+}
+
 export interface Modjam {
     id: string;
     slug: string;
@@ -417,6 +437,11 @@ export interface Modjam {
     bannerUrl?: string;
     hostId: string;
     hostName: string;
+    rules?: string;
+    customCss?: string;
+    restrictions?: ModjamRestrictions;
+    oneEntryPerPerson?: boolean;
+    hideSubmissions?: boolean;
     startDate: string;
     endDate: string;
     votingEndDate: string;

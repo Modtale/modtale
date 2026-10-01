@@ -4,7 +4,11 @@ import { Settings, Plus, Trash2, List, Trophy, FileText, Scale, Save, CheckCircl
 import { JamLayout } from '@/modules/jam/components/JamLayout';
 import { Spinner } from '@/components/ui/Spinner.tsx';
 import { MarkdownRenderer } from '@/components/ui/MarkdownRenderer';
-import { api, BACKEND_URL } from '@/utils/api';
+import { api, BACKEND_URL, extractApiErrorMessage } from '@/utils/api';
+import { OptimizedImage } from '@/components/ui/OptimizedImage';
+import { StatusModal } from '@/components/ui/StatusModal';
+import { normalizeJamSlug, validateJamSlug } from '@/modules/jam/utils/slug';
+import { getScopedJamCss } from '@/modules/jam/utils/customCss';
 import type { User } from '@/types';
 import { getClampedJamMilestoneDate, getJamMilestoneMinimum } from '@/modules/jam/utils/timeline';
 
@@ -256,12 +260,13 @@ const CustomDateTimePicker: React.FC<{ label: string, icon: any, value: string, 
 const MultiSelectDropdown: React.FC<{ options: {label: string, value: string}[], selected: string[], onChange: (val: string[]) => void, placeholder: string, direction?: 'up' | 'down' }> = ({ options, selected, onChange, placeholder, direction = 'down' }) => {
     const [isOpen, setIsOpen] = useState(false);
     const ref = useRef<HTMLDivElement>(null);
+    const menuRef = useRef<HTMLDivElement>(null);
     const buttonRef = useRef<HTMLButtonElement>(null);
     const [menuRect, setMenuRect] = useState<{ top: number; left: number; width: number } | null>(null);
 
     useEffect(() => {
         const handleClickOutside = (e: MouseEvent) => {
-            if (ref.current && !ref.current.contains(e.target as Node)) setIsOpen(false);
+            if (ref.current && !ref.current.contains(e.target as Node) && !menuRef.current?.contains(e.target as Node)) setIsOpen(false);
         };
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
@@ -291,6 +296,8 @@ const MultiSelectDropdown: React.FC<{ options: {label: string, value: string}[],
         <div className={`relative w-full ${isOpen ? 'z-[100]' : 'z-10'}`} ref={ref}>
             <button
                 ref={buttonRef}
+                aria-expanded={isOpen}
+                aria-label={placeholder}
                 type="button"
                 onClick={() => setIsOpen(!isOpen)}
                 className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-white/5 rounded-xl px-4 py-2 font-bold shadow-sm outline-none focus:ring-2 focus:ring-modtale-accent flex justify-between items-center text-sm transition-all"
@@ -299,7 +306,7 @@ const MultiSelectDropdown: React.FC<{ options: {label: string, value: string}[],
                 <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${isOpen && direction === 'down' ? 'rotate-180' : ''} ${!isOpen && direction === 'up' ? 'rotate-180' : ''}`} />
             </button>
             {isOpen && menuRect && createPortal(
-                <div
+                <div ref={menuRef}
                     className="bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/10 rounded-xl shadow-[0_10px_50px_rgba(0,0,0,0.25)] max-h-48 overflow-y-auto custom-scrollbar p-1"
                     style={{
                         position: 'fixed',
@@ -313,6 +320,7 @@ const MultiSelectDropdown: React.FC<{ options: {label: string, value: string}[],
                     {options.map((opt) => (
                         <button
                             key={opt.value}
+                            aria-pressed={selected.includes(opt.value)}
                             type="button"
                             onClick={() => {
                                 if (selected.includes(opt.value)) onChange(selected.filter(v => v !== opt.value));
@@ -378,8 +386,8 @@ const JamDependencySelector: React.FC<{ selectedId: string | undefined, onChange
     if (selectedId) {
         return (
             <div className="flex items-center justify-between bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl p-3 shadow-sm">
-                <div className="flex items-center gap-3">
-                    <img src={getIconUrl(selectedMeta?.icon)} className="w-8 h-8 rounded-lg bg-slate-200 dark:bg-slate-800 object-cover" alt="" onError={(e) => e.currentTarget.src='/assets/favicon.svg'} />
+                <div className="flex flex-wrap items-center gap-2">
+                    <OptimizedImage baseWidth={64} initialQuality="standard" src={getIconUrl(selectedMeta?.icon)} className="w-8 h-8 rounded-lg bg-slate-200 dark:bg-slate-800 object-cover" alt="" />
                     <div>
                         <div className="font-bold text-sm text-slate-900 dark:text-white">{selectedMeta?.title || selectedId}</div>
                         <div className="text-xs text-slate-500">by {selectedMeta?.author || '...'}</div>
@@ -403,7 +411,7 @@ const JamDependencySelector: React.FC<{ selectedId: string | undefined, onChange
                 >
                     {results.map(mod => (
                         <button key={mod.id} type="button" onClick={() => { onChange(mod.id); setSelectedMeta({ title: mod.title, author: mod.author, icon: mod.imageUrl }); setSearch(''); setResults([]); }} className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-slate-50 dark:hover:bg-white/5 rounded-lg transition-colors text-left group">
-                            <img src={getIconUrl(mod.imageUrl)} className="w-8 h-8 rounded bg-slate-200 dark:bg-slate-800 object-cover" alt="" onError={(e) => e.currentTarget.src='/assets/favicon.svg'} />
+                            <OptimizedImage baseWidth={64} initialQuality="standard" src={getIconUrl(mod.imageUrl)} className="w-8 h-8 rounded bg-slate-200 dark:bg-slate-800 object-cover" alt="" />
                             <div>
                                 <div className="font-bold text-sm text-slate-900 dark:text-white group-hover:text-modtale-accent transition-colors">{mod.title}</div>
                                 <div className="text-xs text-slate-500">by {mod.author}</div>
@@ -428,7 +436,17 @@ export const JamBuilder: React.FC<any> = ({
     const [rulesEditorMode, setRulesEditorMode] = useState<'generate' | 'write' | 'preview'>('generate');
     const [gameVersionOptions, setGameVersionOptions] = useState<{label: string, value: string}[]>([]);
 
-    const [slugError, setSlugError] = useState<string | null>(null);
+    const slugError = validateJamSlug(metaData.slug || '');
+    const [saveError, setSaveError] = useState<string | null>(null);
+    const [confirmBack, setConfirmBack] = useState(false);
+    const savePending = useRef(false);
+    const editRevision = useRef(0);
+    const savedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const [versionMode, setVersionMode] = useState<'any' | 'exact' | 'range'>(() => metaData.restrictions?.minimumGameVersion || metaData.restrictions?.maximumGameVersion ? 'range' : metaData.restrictions?.allowedGameVersions?.length ? 'exact' : 'any');
+    const scopedCss = getScopedJamCss(metaData.customCss);
+    const rangeMinimum = metaData.restrictions?.minimumGameVersion || '';
+    const rangeMaximum = metaData.restrictions?.maximumGameVersion || '';
+    const rangeError = versionMode === 'range' && (!rangeMinimum || !rangeMaximum || gameVersionOptions.findIndex(version => version.value === rangeMinimum) < 0 || gameVersionOptions.findIndex(version => version.value === rangeMaximum) < gameVersionOptions.findIndex(version => version.value === rangeMinimum)) ? 'Choose an inclusive range with the first version no later than the last.' : null;
 
     // User search states
     const [inviteUsername, setInviteUsername] = useState('');
@@ -441,11 +459,20 @@ export const JamBuilder: React.FC<any> = ({
     const [judgeProfiles, setJudgeProfiles] = useState<Record<string, User>>({});
 
     useEffect(() => {
-        api.get('/meta/game-versions').then(res => {
+        const controller = new AbortController();
+        api.get('/meta/game-versions', { signal: controller.signal }).then(res => {
             const versions = Array.isArray(res.data) ? res.data : (res.data.content || []);
             setGameVersionOptions(versions.map((v: string) => ({ label: v, value: v })));
         }).catch(() => {});
+        return () => controller.abort();
     }, []);
+
+    useEffect(() => () => {
+        if (searchTimeout.current) clearTimeout(searchTimeout.current);
+        if (savedTimer.current) clearTimeout(savedTimer.current);
+    }, []);
+    useEffect(() => () => { if (metaData.imageUrl?.startsWith('blob:')) URL.revokeObjectURL(metaData.imageUrl); }, [metaData.imageUrl]);
+    useEffect(() => () => { if (metaData.bannerUrl?.startsWith('blob:')) URL.revokeObjectURL(metaData.bannerUrl); }, [metaData.bannerUrl]);
 
     useEffect(() => {
         const handleClickOutside = (e: MouseEvent) => {
@@ -500,7 +527,8 @@ export const JamBuilder: React.FC<any> = ({
 
     const publishChecklist = [
         { label: 'Title (min 5 chars)', met: (metaData.title || '').trim().length >= 5 },
-        { label: 'Valid URL Slug', met: !!metaData.slug && !slugError },
+        { label: 'Valid URL Slug', met: !slugError },
+        { label: 'Valid game version restriction', met: !rangeError && (versionMode !== 'exact' || !!metaData.restrictions?.allowedGameVersions?.length) },
         { label: 'Description (min 10 chars)', met: (metaData.description || '').trim().length >= 10 },
         { label: 'Start Date set', met: !!metaData.startDate },
         { label: 'Timeline follows order', met: !!metaData.endDate && !!metaData.votingEndDate && new Date(metaData.votingEndDate) > new Date(metaData.endDate) && new Date(metaData.endDate) > new Date(metaData.startDate) },
@@ -513,25 +541,38 @@ export const JamBuilder: React.FC<any> = ({
     const isPublished = metaData.status && metaData.status !== 'DRAFT';
 
     const markDirty = () => {
+        editRevision.current += 1;
+        setSaveError(null);
         setIsDirty(true);
         setIsSaved(false);
     };
 
     const performSave = async () => {
+        if (savePending.current || isLoading) return;
+        if (slugError || rangeError) { setSaveError(slugError || rangeError); return; }
+        savePending.current = true;
+        const savingRevision = editRevision.current;
         try {
             const success = await handleSave();
-            if (success) {
+            if (!success) throw new Error('We could not save your changes. Please try again.');
+            if (savingRevision === editRevision.current) {
                 setIsDirty(false);
                 setIsSaved(true);
-                setTimeout(() => setIsSaved(false), 3000);
+                savedTimer.current = setTimeout(() => setIsSaved(false), 3000);
             }
-        } catch (e: any) {
-            let errorMsg = typeof e.response?.data === 'string'
-                ? e.response.data
-                : e.response?.data?.message || 'Failed to save jam.';
-            errorMsg = errorMsg.replace(/^\d{3} [A-Z_]+ "(.*)"$/, '$1');
-            alert(errorMsg);
+        } catch (failure) {
+            setSaveError(extractApiErrorMessage(failure, 'Failed to save jam.'));
+        } finally {
+            savePending.current = false;
         }
+    };
+
+    const performPublish = async () => {
+        if (savePending.current || isLoading || !isReadyToPublish) return;
+        savePending.current = true;
+        try { await onPublish(); }
+        catch (failure) { setSaveError(extractApiErrorMessage(failure, 'Failed to publish jam.')); }
+        finally { savePending.current = false; }
     };
 
     const updateField = (field: string, val: any) => {
@@ -539,19 +580,7 @@ export const JamBuilder: React.FC<any> = ({
         setMetaData((prev: any) => ({ ...prev, [field]: val }));
     };
 
-    const validateSlugFormat = (val: string) => {
-        if (!val) return "Slug is required.";
-        const slugRegex = /^[a-z0-9](?:[a-z0-9-]{1,48}[a-z0-9])?$/;
-        if (!slugRegex.test(val)) return "Must be 3-50 chars, lowercase alphanumeric, no start/end dash.";
-        return null;
-    };
-
-    const handleSlugChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        markDirty();
-        const val = e.target.value;
-        setMetaData((prev: any) => ({...prev, slug: val}));
-        setSlugError(validateSlugFormat(val));
-    };
+    const handleSlugChange = (e: React.ChangeEvent<HTMLInputElement>) => updateField('slug', normalizeJamSlug(e.target.value));
 
     const handleInputSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const val = e.target.value;
@@ -583,6 +612,7 @@ export const JamBuilder: React.FC<any> = ({
             setInviteStatus("Please save the jam draft first before inviting judges.");
             return;
         }
+        if (isInviting || !inviteUsername.trim()) return;
         setIsInviting(true);
         try {
             const res = await api.post(`/modjams/${metaData.id}/judges/invite`, { username: inviteUsername });
@@ -619,7 +649,7 @@ export const JamBuilder: React.FC<any> = ({
                 ? e.response.data
                 : e.response?.data?.message || 'Failed to remove judge.';
             errorMsg = errorMsg.replace(/^\d{3} [A-Z_]+ "(.*)"$/, '$1');
-            alert(errorMsg);
+            setSaveError(errorMsg);
         }
     };
 
@@ -644,6 +674,7 @@ export const JamBuilder: React.FC<any> = ({
         if (res?.allowedGameVersions && res.allowedGameVersions.length > 0) {
             text += `- **Game Version Lock:** Submissions must support the following game version(s): ${res.allowedGameVersions.join(', ')}.\n`;
         }
+        if (res?.minimumGameVersion || res?.maximumGameVersion) text += `- **Game Version Range:** Submissions must support a version from ${res.minimumGameVersion || 'the earliest version'} through ${res.maximumGameVersion || 'the latest version'} (inclusive).\n`;
         if (res?.requiredClassUsage) {
             text += `- **Required Implementation:** Submissions must explicitly utilize the \`${res.requiredClassUsage}\` class or package in their compiled code.\n`;
         }
@@ -693,7 +724,7 @@ export const JamBuilder: React.FC<any> = ({
     return (
         <JamLayout
             isEditing={true}
-            onBack={onBack}
+            onBack={() => { if (isLoading || savePending.current) return; if (isDirty) setConfirmBack(true); else onBack(); }}
             bannerUrl={metaData.bannerUrl}
             iconUrl={metaData.imageUrl}
             onBannerUpload={(f, p) => { markDirty(); setMetaData((prev: any) => ({ ...prev, bannerUrl: p, bannerFile: f })); }}
@@ -703,10 +734,13 @@ export const JamBuilder: React.FC<any> = ({
                     {isEditingTitle ? (
                         <div className="relative w-full max-w-full">
                             <input
+                                aria-label="Jam title"
+                                onKeyDown={event => { if (event.key === 'Enter') setIsEditingTitle(false); if (event.key === 'Escape') { updateField('title', titleBeforeEdit); setIsEditingTitle(false); } }}
+                                onBlur={() => setIsEditingTitle(false)}
                                 value={metaData.title}
                                 onChange={e => updateField('title', e.target.value)}
                                 placeholder="Enter Jam Title"
-                                className="text-4xl md:text-5xl font-black bg-transparent border-b border-slate-300 dark:border-white/20 outline-none w-full focus:border-modtale-accent pb-1 pr-10 placeholder:text-slate-400 dark:placeholder:text-slate-600 text-slate-900 dark:text-white"
+                                className="text-3xl md:text-4xl font-black bg-transparent border-b border-slate-300 dark:border-white/20 outline-none w-full focus:border-modtale-accent pb-1 pr-10 placeholder:text-slate-400 dark:placeholder:text-slate-600 text-slate-900 dark:text-white"
                                 autoFocus
                             />
                             <button
@@ -719,16 +753,16 @@ export const JamBuilder: React.FC<any> = ({
                             </button>
                         </div>
                     ) : (
-                        <div
-                            className="flex items-center gap-3 group rounded-2xl -ml-3 px-3 py-1.5 cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                        <button type="button" aria-label="Edit jam title"
+                            className="flex items-center gap-3 group text-left rounded-2xl -ml-3 px-3 py-1.5 cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
                             onClick={() => {
                                 setTitleBeforeEdit(metaData.title || '');
                                 setIsEditingTitle(true);
                             }}
                         >
-                            <h1 className="text-4xl md:text-5xl font-black text-slate-900 dark:text-white tracking-tighter break-words">{metaData.title || 'Enter Jam Title'}</h1>
+                            <h1 className="text-3xl md:text-4xl font-black text-slate-900 dark:text-white tracking-tighter break-words">{metaData.title || 'Enter Jam Title'}</h1>
                             <Edit3 className="w-5 h-5 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity" />
-                        </div>
+                        </button>
                     )}
                 </div>
             }
@@ -742,7 +776,8 @@ export const JamBuilder: React.FC<any> = ({
                     <button
                         type="button"
                         onClick={(e) => { e.preventDefault(); performSave(); }}
-                        disabled={isLoading || !isDirty}
+                        disabled={isLoading || !isDirty || !!slugError || !!rangeError}
+                        aria-label={isPublished ? 'Save changes' : 'Save draft'}
                         className={`h-10 px-6 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 border shadow-lg ${
                             isSaved ? 'bg-green-500/20 border-green-500/30 text-green-700 dark:text-green-400' :
                                 !isDirty ? 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-white/10 text-slate-500 cursor-not-allowed shadow-none' :
@@ -750,7 +785,7 @@ export const JamBuilder: React.FC<any> = ({
                         }`}
                     >
                         {isLoading ? <Spinner className="w-4 h-4" fullScreen={false} /> : isSaved ? <CheckCircle2 className="w-4 h-4" /> : <Save className="w-4 h-4" />}
-                        <span className="hidden sm:inline">{isLoading ? 'Saving...' : isSaved ? 'Saved!' : (isPublished ? 'Save Changes' : 'Save Draft')}</span>
+                        <span>{isLoading ? 'Saving…' : isSaved ? 'Saved!' : (isPublished ? 'Save Changes' : 'Save Draft')}</span>
                     </button>
 
                     {!isPublished && (
@@ -777,11 +812,11 @@ export const JamBuilder: React.FC<any> = ({
 
                             <button
                                 type="button"
-                                onClick={(e) => { e.preventDefault(); onPublish(); }}
+                                onClick={(e) => { e.preventDefault(); performPublish(); }}
                                 disabled={!isReadyToPublish || isLoading}
                                 className="h-10 px-6 bg-slate-900 dark:bg-white text-white dark:text-slate-900 hover:opacity-90 disabled:bg-slate-300 dark:disabled:bg-slate-800 disabled:text-slate-500 rounded-xl font-black text-sm transition-all flex items-center justify-center gap-2 shadow-lg enabled:active:scale-95"
                             >
-                                <span className="hidden sm:inline">Publish Jam</span>
+                                <span>Publish Jam</span>
                             </button>
                         </div>
                     )}
@@ -811,6 +846,9 @@ export const JamBuilder: React.FC<any> = ({
             }
             mainContent={
                 <div className="animate-in fade-in slide-in-from-bottom-2">
+                    {scopedCss && <style>{scopedCss}</style>}
+                    {saveError && <p role="alert" className="mb-5 rounded-xl border border-red-500/20 bg-red-500/10 p-4 text-sm text-red-600 dark:text-red-400">{saveError}</p>}
+                    {confirmBack && <StatusModal type="warning" title="Leave the builder?" message="Your unsaved changes will be discarded. The saved draft will still be available." actionLabel="Discard changes" secondaryLabel="Keep editing" onClose={() => setConfirmBack(false)} onAction={() => { setConfirmBack(false); onBack(); }} />}
                     {activeTab === 'details' && (
                         <div className="space-y-6">
                             <div className="flex items-center justify-between border-b border-slate-200/50 dark:border-white/5 pb-4">
@@ -827,12 +865,12 @@ export const JamBuilder: React.FC<any> = ({
                                     value={metaData.description}
                                     onChange={e => updateField('description', e.target.value)}
                                     placeholder="# Welcome to the Jam!&#10;&#10;Describe the theme, goals, and glory..."
-                                    className="w-full min-h-[500px] bg-white/60 dark:bg-slate-900/60 backdrop-blur-xl border border-white/40 dark:border-white/10 rounded-[2rem] p-6 md:p-8 text-slate-700 dark:text-slate-300 font-mono text-sm md:text-base resize-none focus:ring-2 focus:ring-modtale-accent shadow-sm outline-none transition-all custom-scrollbar"
+                                    className="w-full min-h-[280px] md:min-h-[400px] bg-white/60 dark:bg-slate-900/60 backdrop-blur-xl border border-white/40 dark:border-white/10 rounded-[2rem] p-6 md:p-8 text-slate-700 dark:text-slate-300 font-mono text-sm md:text-base resize-none focus:ring-2 focus:ring-modtale-accent shadow-sm outline-none transition-all custom-scrollbar"
                                 />
                             ) : (
-                                <div className="prose dark:prose-invert prose-lg max-w-none min-h-[500px] bg-white/60 dark:bg-slate-900/60 backdrop-blur-xl border border-white/40 dark:border-white/10 rounded-[2rem] p-6 md:p-8 shadow-sm">
+                                <div className="prose dark:prose-invert prose-lg max-w-none min-h-[280px] md:min-h-[400px] bg-white/60 dark:bg-slate-900/60 backdrop-blur-xl border border-white/40 dark:border-white/10 rounded-[2rem] p-6 md:p-8 shadow-sm">
                                     {metaData.description ? (
-                                        <MarkdownRenderer content={metaData.description} />
+                                        <div className="jam-custom-content"><MarkdownRenderer content={metaData.description} /></div>
                                     ) : <p className="text-slate-500 italic">No description provided.</p>}
                                 </div>
                             )}
@@ -1010,14 +1048,14 @@ export const JamBuilder: React.FC<any> = ({
                                     value={metaData.rules || ''}
                                     onChange={e => updateField('rules', e.target.value)}
                                     placeholder="### Jam Rules&#10;&#10;Users will have to agree to these before submitting..."
-                                    className="w-full min-h-[500px] bg-white/60 dark:bg-slate-900/60 backdrop-blur-xl border border-white/40 dark:border-white/10 rounded-[2rem] p-6 md:p-8 text-slate-700 dark:text-slate-300 font-mono text-sm md:text-base resize-none focus:ring-2 focus:ring-modtale-accent shadow-sm outline-none transition-all custom-scrollbar"
+                                    className="w-full min-h-[280px] md:min-h-[400px] bg-white/60 dark:bg-slate-900/60 backdrop-blur-xl border border-white/40 dark:border-white/10 rounded-[2rem] p-6 md:p-8 text-slate-700 dark:text-slate-300 font-mono text-sm md:text-base resize-none focus:ring-2 focus:ring-modtale-accent shadow-sm outline-none transition-all custom-scrollbar"
                                 />
                             )}
 
                             {rulesEditorMode === 'preview' && (
-                                <div className="prose dark:prose-invert prose-lg max-w-none min-h-[500px] bg-white/60 dark:bg-slate-900/60 backdrop-blur-xl border border-white/40 dark:border-white/10 rounded-[2rem] p-6 md:p-8 shadow-sm">
+                                <div className="prose dark:prose-invert prose-lg max-w-none min-h-[280px] md:min-h-[400px] bg-white/60 dark:bg-slate-900/60 backdrop-blur-xl border border-white/40 dark:border-white/10 rounded-[2rem] p-6 md:p-8 shadow-sm">
                                     {metaData.rules ? (
-                                        <MarkdownRenderer content={metaData.rules} />
+                                        <div className="jam-custom-content"><MarkdownRenderer content={metaData.rules} /></div>
                                     ) : <p className="text-slate-500 italic">No rules generated yet.</p>}
                                 </div>
                             )}
@@ -1210,7 +1248,7 @@ export const JamBuilder: React.FC<any> = ({
                                                         className="w-full text-left px-4 py-3 hover:bg-slate-50 dark:hover:bg-white/5 flex items-center gap-3 transition-colors border-b border-slate-100 dark:border-white/5 last:border-0"
                                                     >
                                                         <div className="w-6 h-6 rounded-full bg-slate-200 dark:bg-white/10 overflow-hidden shrink-0">
-                                                            <img src={user.avatarUrl} alt="" className="w-full h-full object-cover" />
+                                                            <OptimizedImage baseWidth={64} initialQuality="standard" src={user.avatarUrl} alt="" className="w-full h-full object-cover" />
                                                         </div>
                                                         <p className="text-sm font-bold text-slate-900 dark:text-white">{user.username}</p>
                                                     </button>
@@ -1253,7 +1291,7 @@ export const JamBuilder: React.FC<any> = ({
                                                     <div key={id} className="flex items-center justify-between p-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 rounded-xl shadow-sm">
                                                         <div className="flex items-center gap-3">
                                                             <div className="w-8 h-8 rounded-full bg-slate-200 dark:bg-white/10 overflow-hidden shrink-0 flex items-center justify-center border border-slate-200 dark:border-white/5">
-                                                                {profile?.avatarUrl ? <img src={profile.avatarUrl} className="w-full h-full object-cover" alt="" /> : <CheckCircle2 className="w-4 h-4 text-modtale-accent" />}
+                                                                {profile?.avatarUrl ? <OptimizedImage baseWidth={64} initialQuality="standard" src={profile.avatarUrl} className="w-full h-full object-cover" alt="" /> : <CheckCircle2 className="w-4 h-4 text-modtale-accent" />}
                                                             </div>
                                                             <div>
                                                                 <div className="font-bold text-slate-900 dark:text-white">{profile?.username || `ID: ${id.substring(0, 8)}`}</div>
@@ -1450,15 +1488,21 @@ export const JamBuilder: React.FC<any> = ({
                                     </div>
 
                                     <div className="bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-white/5 p-4 shadow-sm flex flex-col justify-center z-[100]">
-                                        <label className="text-sm font-bold text-slate-900 dark:text-white block mb-1">Game Version Lock</label>
-                                        <span className="text-xs text-slate-500 font-medium block mb-2">Select allowed game versions</span>
-                                        <MultiSelectDropdown
-                                            options={gameVersionOptions}
-                                            selected={metaData.restrictions?.allowedGameVersions || []}
-                                            onChange={val => updateField('restrictions', {...metaData.restrictions, allowedGameVersions: val})}
-                                            placeholder="Any Version"
-                                            direction="down"
-                                        />
+                                        <label htmlFor="jam-version-mode" className="text-sm font-bold text-slate-900 dark:text-white block mb-1">Game versions</label>
+                                        <p className="text-xs text-slate-500 mb-3">Restrict the game versions supported by submitted releases.</p>
+                                        <select id="jam-version-mode" value={versionMode} onChange={event => {
+                                            const mode = event.target.value as 'any' | 'exact' | 'range';
+                                            setVersionMode(mode);
+                                            updateField('restrictions', { ...metaData.restrictions, allowedGameVersions: [], minimumGameVersion: undefined, maximumGameVersion: undefined });
+                                        }} className="w-full rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-900 p-3 text-sm font-bold mb-3">
+                                            <option value="any">Any game version</option><option value="exact">Specific versions</option><option value="range">Inclusive version range</option>
+                                        </select>
+                                        {versionMode === 'exact' && <MultiSelectDropdown options={gameVersionOptions} selected={metaData.restrictions?.allowedGameVersions || []} onChange={val => updateField('restrictions', {...metaData.restrictions, allowedGameVersions: val})} placeholder="Select game versions" />}
+                                        {versionMode === 'range' && <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                            <label className="text-xs font-bold text-slate-500">First version<select aria-label="First game version" value={rangeMinimum} onChange={event => updateField('restrictions', {...metaData.restrictions, minimumGameVersion: event.target.value})} className="mt-1 w-full rounded-lg border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-900 p-2 text-sm"><option value="">Choose a version</option>{gameVersionOptions.map(version => <option key={version.value} value={version.value}>{version.label}</option>)}</select></label>
+                                            <label className="text-xs font-bold text-slate-500">Last version<select aria-label="Last game version" value={rangeMaximum} onChange={event => updateField('restrictions', {...metaData.restrictions, maximumGameVersion: event.target.value})} className="mt-1 w-full rounded-lg border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-900 p-2 text-sm"><option value="">Choose a version</option>{gameVersionOptions.map(version => <option key={version.value} value={version.value}>{version.label}</option>)}</select></label>
+                                        </div>}
+                                        {rangeError && <p role="alert" className="mt-2 text-xs text-red-600 dark:text-red-400">{rangeError}</p>}
                                     </div>
 
                                     <div className="bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-white/5 p-4 shadow-sm flex flex-col justify-center z-[100]">
@@ -1500,11 +1544,19 @@ export const JamBuilder: React.FC<any> = ({
                                         <div><h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2"><Link2 className="w-4 h-4 text-slate-500" /> Jam Slug</h3><p className="text-xs text-slate-500">Customize the URL.</p></div>
                                         <div className={`flex flex-col sm:flex-row items-stretch w-full bg-white dark:bg-black/20 border rounded-xl overflow-hidden focus-within:ring-2 focus-within:ring-modtale-accent transition-all ${slugError ? 'border-red-500' : 'border-slate-200 dark:border-white/10'}`}>
                                             <div className="px-4 py-2.5 sm:py-3 bg-slate-50 dark:bg-white/5 border-b sm:border-b-0 sm:border-r border-slate-200 dark:border-white/10 text-slate-500 text-xs sm:text-sm font-mono whitespace-nowrap select-none">modtale.net/jam/</div>
-                                            <input value={metaData.slug || ''} onChange={handleSlugChange} className={`min-w-0 flex-1 bg-transparent border-none px-4 py-3 text-sm font-mono text-slate-900 dark:text-white focus:outline-none placeholder:text-slate-400 ${slugError ? 'text-red-500' : ''}`} placeholder="jam-slug" />
+                                            <input aria-label="Jam URL" aria-invalid={!!slugError} value={metaData.slug || ''} onChange={handleSlugChange} className={`min-w-0 flex-1 bg-transparent border-none px-4 py-3 text-sm font-mono text-slate-900 dark:text-white focus:outline-none placeholder:text-slate-400 ${slugError ? 'text-red-500' : ''}`} placeholder="jam-slug" />
                                         </div>
                                         {slugError && <p className="text-[10px] text-red-500 font-bold">{slugError}</p>}
                                     </div>
                                 </div>
+
+                                <section className="space-y-3 pb-6 border-b border-slate-200 dark:border-white/10">
+                                    <label htmlFor="jam-custom-css" className="block text-sm font-bold text-slate-900 dark:text-white">Custom content styles</label>
+                                    <p id="jam-custom-css-help" className="text-xs text-slate-500">Style the description and rules using h1, h2, h3, p, a, blockquote, ul, ol, li, code, pre, table, th, td, hr, strong and em. Only safe typography, color and spacing are supported. Network URLs, imports and page layout controls are blocked.</p>
+                                    <textarea id="jam-custom-css" aria-describedby="jam-custom-css-help" value={metaData.customCss || ''} maxLength={10000} onChange={event => updateField('customCss', event.target.value)} placeholder="h2 { color: #3b82f6; }" className="w-full min-h-36 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-900 p-4 font-mono text-sm outline-none focus:ring-2 focus:ring-modtale-accent" />
+                                    {metaData.customCss?.trim() && !scopedCss && <p role="alert" className="text-xs text-amber-700 dark:text-amber-300">These styles could not be safely previewed. Check the allowed selectors and properties before saving.</p>}
+                                    <div className="rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900 p-4"><p className="mb-3 text-xs font-bold uppercase text-slate-400">Content preview</p><div className="jam-custom-content"><MarkdownRenderer content={metaData.description || '## Your jam\n\nThis is how your description and rules will look.'} /></div></div>
+                                </section>
 
                                 <label className="flex items-center justify-between p-4 bg-white dark:bg-slate-800/50 rounded-2xl cursor-pointer hover:border-modtale-accent border border-slate-200 dark:border-white/5 transition-all shadow-sm">
                                     <div className="flex flex-col">

@@ -11,6 +11,8 @@ import net.modtale.repository.jam.ModjamSubmissionRepository;
 import net.modtale.repository.project.ProjectRepository;
 import net.modtale.repository.user.UserRepository;
 import net.modtale.service.storage.StorageService;
+import net.modtale.service.jam.ModjamCustomizationService;
+import net.modtale.service.project.lifecycle.LifecycleService;
 import net.modtale.service.user.account.AccountService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -52,6 +54,8 @@ public class ModjamService {
     @Autowired private StorageService storageService;
     @Autowired private MongoTemplate mongoTemplate;
     @Autowired private AccountService accountService;
+    @Autowired private ModjamCustomizationService customizationService;
+    @Autowired private LifecycleService lifecycleService;
 
     @Value("${app.r2.public-domain:#{null}}")
     private String publicDomain;
@@ -164,6 +168,17 @@ public class ModjamService {
         }
     }
 
+    private static String effectivePhase(Modjam jam, Instant now) {
+        if ("DRAFT".equals(jam.getStatus()) || "COMPLETED".equals(jam.getStatus())) {
+            return jam.getStatus();
+        }
+        if (jam.getStartDate() != null && now.isBefore(jam.getStartDate())) return "UPCOMING";
+        if (jam.getEndDate() != null && now.isBefore(jam.getEndDate())) return "ACTIVE";
+        if (jam.getVotingEndDate() != null && now.isBefore(jam.getVotingEndDate())) return "VOTING";
+        if (jam.getEndDate() != null || jam.getVotingEndDate() != null) return "AWAITING_WINNERS";
+        return jam.getStatus() == null ? "" : jam.getStatus();
+    }
+
     private void enrichSubmissions(String jamId, List<ModjamSubmission> subs, Map<String, Project> projectMap) {
         if (subs == null || subs.isEmpty()) return;
 
@@ -242,6 +257,11 @@ public class ModjamService {
         jam.setId(null);
         jam.setHostId(hostId);
         jam.setHostName(hostName);
+        customizationService.validate(jam);
+        // Incoming document fields do not confer membership or management authority.
+        jam.setParticipantIds(new ArrayList<>());
+        jam.setJudgeIds(new ArrayList<>());
+        jam.setPendingJudgeInvites(new ArrayList<>());
 
         if (jam.getSlug() == null || jam.getSlug().trim().isEmpty()) {
             throw new IllegalArgumentException("A custom URL slug is required.");
@@ -255,7 +275,7 @@ public class ModjamService {
         }
         jam.setSlug(newSlug);
 
-        if (jam.getStartDate() != null && jam.getStartDate().isAfter(Instant.now())) {
+        if (!"DRAFT".equals(jam.getStatus()) && jam.getStartDate() != null && jam.getStartDate().isAfter(Instant.now())) {
             jam.setStatus("UPCOMING");
         } else if (!"DRAFT".equals(jam.getStatus())) {
             jam.setStatus("ACTIVE");
@@ -284,6 +304,10 @@ public class ModjamService {
         Modjam jam = modjamRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Jam not found"));
         requireHost(jam, userId);
+        customizationService.validate(updatedJam);
+        if ("COMPLETED".equals(updatedJam.getStatus()) != "COMPLETED".equals(jam.getStatus())) {
+            throw new IllegalArgumentException("Announce winners to complete a jam; completed jams cannot be reopened.");
+        }
 
         if (updatedJam.getSlug() == null || updatedJam.getSlug().trim().isEmpty()) {
             throw new IllegalArgumentException("A custom URL slug is required.");
@@ -304,6 +328,7 @@ public class ModjamService {
         jam.setTitle(updatedJam.getTitle());
         jam.setDescription(updatedJam.getDescription());
         jam.setRules(updatedJam.getRules());
+        jam.setCustomCss(updatedJam.getCustomCss());
         jam.setStartDate(updatedJam.getStartDate());
         jam.setEndDate(updatedJam.getEndDate());
         jam.setVotingEndDate(updatedJam.getVotingEndDate());
@@ -535,6 +560,9 @@ public class ModjamService {
     public Modjam participate(String jamId, String userId) {
         Modjam jam = modjamRepository.findById(jamId)
                 .orElseThrow(() -> new IllegalArgumentException("Jam not found"));
+        if (!List.of("UPCOMING", "ACTIVE").contains(effectivePhase(jam, Instant.now()))) {
+            throw new IllegalArgumentException("Participation is closed for this jam.");
+        }
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
@@ -545,8 +573,8 @@ public class ModjamService {
                 Optional<Modjam> optOtherJam = modjamRepository.findById(joinedId);
                 if (optOtherJam.isPresent()) {
                     Modjam otherJam = optOtherJam.get();
-                    boolean otherIsActive = "ACTIVE".equals(otherJam.getStatus()) || "UPCOMING".equals(otherJam.getStatus());
-                    boolean thisIsActive = "ACTIVE".equals(jam.getStatus()) || "UPCOMING".equals(jam.getStatus());
+                    boolean otherIsActive = List.of("ACTIVE", "UPCOMING").contains(effectivePhase(otherJam, Instant.now()));
+                    boolean thisIsActive = List.of("ACTIVE", "UPCOMING").contains(effectivePhase(jam, Instant.now()));
 
                     if (otherIsActive && thisIsActive) {
                         boolean otherRequiresUnique = otherJam.getRestrictions() != null && otherJam.getRestrictions().isRequireUniqueSubmission();
@@ -612,8 +640,16 @@ public class ModjamService {
         Modjam jam = modjamRepository.findById(jamId)
                 .orElseThrow(() -> new IllegalArgumentException("Jam not found"));
 
-        if (!"ACTIVE".equals(jam.getStatus())) {
+        if (!"ACTIVE".equals(effectivePhase(jam, Instant.now()))) {
             throw new IllegalArgumentException("Submissions are closed.");
+        }
+
+        if (jam.getParticipantIds() == null || !jam.getParticipantIds().contains(userId)) {
+            throw new IllegalArgumentException("Join this jam before submitting a project.");
+        }
+
+        if (projectId == null || projectId.isBlank()) {
+            throw new IllegalArgumentException("Select a project to submit.");
         }
 
         Project project = projectRepository.findById(projectId)
@@ -639,16 +675,6 @@ public class ModjamService {
 
         if (existing.stream().anyMatch(s -> s.getProjectId().equals(projectId))) {
             throw new IllegalArgumentException("Already submitted.");
-        }
-
-        if (project.getStatus() == ProjectStatus.DRAFT) {
-            try {
-                project.setStatus(ProjectStatus.PENDING);
-                projectRepository.save(project);
-                project = projectRepository.findById(projectId).orElseThrow(() -> new IllegalArgumentException("Project not found"));
-            } catch (Exception e) {
-                throw new IllegalArgumentException(e.getMessage());
-            }
         }
 
         Modjam.Restrictions res = jam.getRestrictions();
@@ -707,25 +733,7 @@ public class ModjamService {
                 }
             }
 
-            if (res.getAllowedGameVersions() != null && !res.getAllowedGameVersions().isEmpty()) {
-                boolean hasValidVersion = false;
-                if (project.getVersions() != null) {
-                    for (ProjectVersion pv : project.getVersions()) {
-                        if (pv.getGameVersions() != null) {
-                            for (String gv : pv.getGameVersions()) {
-                                if (res.getAllowedGameVersions().contains(gv)) {
-                                    hasValidVersion = true;
-                                    break;
-                                }
-                            }
-                        }
-                        if (hasValidVersion) break;
-                    }
-                }
-                if (!hasValidVersion) {
-                    throw new IllegalArgumentException("Project does not support any of the required game versions.");
-                }
-            }
+            customizationService.validateProjectVersions(res, project);
 
             if (res.getRequiredDependencyId() != null && !res.getRequiredDependencyId().trim().isEmpty()) {
                 String requiredDependencyId = res.getRequiredDependencyId().trim();
@@ -811,6 +819,16 @@ public class ModjamService {
                     }
                 }
             }
+        }
+
+        // Jam eligibility is read-only. Only a fully eligible draft enters the
+        // canonical review workflow, including verification, validation and scans.
+        if (project.getStatus() == ProjectStatus.DRAFT) {
+            User user = userRepository.findById(userId)
+                    .orElseThrow(() -> new IllegalArgumentException("User not found"));
+            lifecycleService.submitProject(projectId, user);
+            project = projectRepository.findById(projectId)
+                    .orElseThrow(() -> new IllegalArgumentException("Project not found"));
         }
 
         ModjamSubmission sub = new ModjamSubmission();
@@ -915,23 +933,50 @@ public class ModjamService {
 
     public Modjam finalizeJam(String jamId, String userId, List<Map<String, String>> winnersData) {
         Modjam jam = modjamRepository.findById(jamId).orElseThrow(() -> new IllegalArgumentException("Jam not found"));
-        if (!jam.getHostId().equals(userId)) throw new SecurityException("Only the host can finalize the jam");
-
-        calculateScores(jamId);
+        requireHost(jam, userId);
+        String phase = effectivePhase(jam, Instant.now());
+        if (!"AWAITING_WINNERS".equals(phase) && !"COMPLETED".equals(phase)) {
+            throw new IllegalArgumentException("Wait for voting to close before finalizing this jam.");
+        }
 
         List<ModjamSubmission> allSubs = submissionRepository.findByJamId(jamId);
-        for (ModjamSubmission sub : allSubs) {
-            Optional<Map<String, String>> matchingWinner = winnersData.stream()
-                    .filter(w -> w.get("submissionId").equals(sub.getId()))
-                    .findFirst();
-
-            if (matchingWinner.isPresent()) {
-                sub.setWinner(true);
-                sub.setAwardTitle(matchingWinner.get().get("awardTitle"));
-            } else {
-                sub.setWinner(false);
-                sub.setAwardTitle(null);
+        if (allSubs == null) allSubs = new ArrayList<>();
+        Set<String> submissionIds = allSubs.stream().map(ModjamSubmission::getId).collect(Collectors.toSet());
+        if (winnersData == null) {
+            throw new IllegalArgumentException("Provide the winners for this jam.");
+        }
+        Map<String, String> awards = new LinkedHashMap<>();
+        for (Map<String, String> winner : winnersData) {
+            if (winner == null || winner.get("submissionId") == null
+                    || !submissionIds.contains(winner.get("submissionId"))) {
+                throw new IllegalArgumentException("Every winner must be a submission in this jam.");
             }
+            String submissionId = winner.get("submissionId");
+            String awardTitle = winner.get("awardTitle");
+            if (awardTitle == null || awardTitle.isBlank() || awardTitle.length() > 200) {
+                throw new IllegalArgumentException("Award titles must contain 1-200 characters.");
+            }
+            if (awards.putIfAbsent(submissionId, awardTitle.trim()) != null) {
+                throw new IllegalArgumentException("A submission can only be selected once.");
+            }
+        }
+
+        if ("COMPLETED".equals(jam.getStatus())) {
+            boolean identical = allSubs.stream().allMatch(sub ->
+                    sub.isWinner() == awards.containsKey(sub.getId())
+                            && Objects.equals(sub.getAwardTitle(), awards.get(sub.getId())));
+            if (!identical) {
+                throw new IllegalArgumentException("This jam has already been finalized.");
+            }
+            return enrichAndReturn(jam);
+        }
+
+        calculateScores(jamId);
+        allSubs = submissionRepository.findByJamId(jamId);
+        if (allSubs == null) allSubs = new ArrayList<>();
+        for (ModjamSubmission sub : allSubs) {
+            sub.setWinner(awards.containsKey(sub.getId()));
+            sub.setAwardTitle(awards.get(sub.getId()));
             submissionRepository.save(sub);
         }
 

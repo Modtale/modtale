@@ -18,6 +18,7 @@ public class Modjam {
     private String title;
     private String description;
     private String rules;
+    private String customCss;
 
     private String imageUrl;
     private String bannerUrl;
@@ -77,6 +78,8 @@ public class Modjam {
         private List<String> allowedLicenses = new ArrayList<>();
         private List<String> allowedClassifications = new ArrayList<>();
         private List<String> allowedGameVersions = new ArrayList<>();
+        private String minimumGameVersion;
+        private String maximumGameVersion;
         private String requiredDependencyId;
         private String requiredClassUsage;
 
@@ -106,6 +109,10 @@ public class Modjam {
         public void setAllowedClassifications(List<String> allowedClassifications) { this.allowedClassifications = allowedClassifications; }
         public List<String> getAllowedGameVersions() { return allowedGameVersions; }
         public void setAllowedGameVersions(List<String> allowedGameVersions) { this.allowedGameVersions = allowedGameVersions; }
+        public String getMinimumGameVersion() { return minimumGameVersion; }
+        public void setMinimumGameVersion(String value) { minimumGameVersion = value; }
+        public String getMaximumGameVersion() { return maximumGameVersion; }
+        public void setMaximumGameVersion(String value) { maximumGameVersion = value; }
         public String getRequiredDependencyId() { return requiredDependencyId; }
         public void setRequiredDependencyId(String requiredDependencyId) { this.requiredDependencyId = requiredDependencyId; }
         public String getRequiredClassUsage() { return requiredClassUsage; }
@@ -134,6 +141,8 @@ public class Modjam {
     public void setDescription(String description) { this.description = description; }
     public String getRules() { return rules; }
     public void setRules(String rules) { this.rules = rules; }
+    public String getCustomCss() { return customCss; }
+    public void setCustomCss(String value) { customCss = value; }
     public String getImageUrl() { return imageUrl; }
     public void setImageUrl(String imageUrl) { this.imageUrl = imageUrl; }
     public String getBannerUrl() { return bannerUrl; }

@@ -3,10 +3,13 @@ package net.modtale.controller;
 import net.modtale.model.jam.Modjam;
 import net.modtale.model.jam.ModjamSubmission;
 import net.modtale.model.user.User;
+import net.modtale.exception.ApiKeyOperationForbiddenException;
 import net.modtale.service.ModjamService;
+import net.modtale.service.security.access.AccessControlService;
 import net.modtale.service.user.account.AccountService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
@@ -20,6 +23,14 @@ public class ModjamController {
 
     @Autowired private ModjamService modjamService;
     @Autowired private AccountService accountService;
+    @Autowired private AccessControlService accessControlService;
+
+    private User getBrowserUser() {
+        if (accessControlService.isApiKey(SecurityContextHolder.getContext().getAuthentication())) {
+            throw new ApiKeyOperationForbiddenException("API keys cannot be used to manage or participate in modjams.");
+        }
+        return accountService.getCurrentUser();
+    }
 
     @GetMapping
     public ResponseEntity<List<Modjam>> getAllJams() {
@@ -28,7 +39,7 @@ public class ModjamController {
 
     @GetMapping("/user/me")
     public ResponseEntity<List<Modjam>> getMyJams() {
-        User user = accountService.getCurrentUser();
+        User user = getBrowserUser();
         if (user == null) return ResponseEntity.status(401).build();
         return ResponseEntity.ok(modjamService.getUserHostedJams(user.getId()));
     }
@@ -40,21 +51,21 @@ public class ModjamController {
 
     @PostMapping
     public ResponseEntity<Modjam> createJam(@RequestBody Modjam jam) {
-        User user = accountService.getCurrentUser();
+        User user = getBrowserUser();
         if (user == null) return ResponseEntity.status(401).build();
         return ResponseEntity.ok(modjamService.createJam(jam, user.getId(), user.getUsername()));
     }
 
     @PutMapping("/{id}")
     public ResponseEntity<Modjam> updateJam(@PathVariable String id, @RequestBody Modjam jam) {
-        User user = accountService.getCurrentUser();
+        User user = getBrowserUser();
         if (user == null) return ResponseEntity.status(401).build();
         return ResponseEntity.ok(modjamService.updateJam(id, jam, user.getId()));
     }
 
     @PutMapping("/{id}/icon")
     public ResponseEntity<?> updateIcon(@PathVariable String id, @RequestParam("file") MultipartFile file) {
-        User user = accountService.getCurrentUser();
+        User user = getBrowserUser();
         if (user == null) return ResponseEntity.status(401).build();
         try {
             modjamService.updateIcon(id, file, user.getId());
@@ -68,7 +79,7 @@ public class ModjamController {
 
     @PutMapping("/{id}/banner")
     public ResponseEntity<?> updateBanner(@PathVariable String id, @RequestParam("file") MultipartFile file) {
-        User user = accountService.getCurrentUser();
+        User user = getBrowserUser();
         if (user == null) return ResponseEntity.status(401).build();
         try {
             modjamService.updateBanner(id, file, user.getId());
@@ -82,7 +93,7 @@ public class ModjamController {
 
     @DeleteMapping("/{id}")
     public ResponseEntity<?> deleteJam(@PathVariable String id) {
-        User user = accountService.getCurrentUser();
+        User user = getBrowserUser();
         if (user == null) return ResponseEntity.status(401).build();
         try {
             modjamService.deleteJam(id, user.getId());
@@ -101,28 +112,28 @@ public class ModjamController {
 
     @PostMapping("/{jamId}/participate")
     public ResponseEntity<Modjam> participate(@PathVariable String jamId) {
-        User user = accountService.getCurrentUser();
+        User user = getBrowserUser();
         if (user == null) return ResponseEntity.status(401).build();
         return ResponseEntity.ok(modjamService.participate(jamId, user.getId()));
     }
 
     @PostMapping("/{jamId}/leave")
     public ResponseEntity<Modjam> leaveJam(@PathVariable String jamId) {
-        User user = accountService.getCurrentUser();
+        User user = getBrowserUser();
         if (user == null) return ResponseEntity.status(401).build();
         return ResponseEntity.ok(modjamService.leaveJam(jamId, user.getId()));
     }
 
     @PostMapping("/{jamId}/submit")
     public ResponseEntity<ModjamSubmission> submitProject(@PathVariable String jamId, @RequestBody Map<String, String> body) {
-        User user = accountService.getCurrentUser();
+        User user = getBrowserUser();
         if (user == null) return ResponseEntity.status(401).build();
         return ResponseEntity.ok(modjamService.submitProject(jamId, body.get("projectId"), user.getId()));
     }
 
     @PostMapping("/{jamId}/vote")
     public ResponseEntity<ModjamSubmission> vote(@PathVariable String jamId, @RequestBody Map<String, Object> body) {
-        User user = accountService.getCurrentUser();
+        User user = getBrowserUser();
         if (user == null) return ResponseEntity.status(401).build();
 
         String submissionId = (String) body.get("submissionId");
@@ -134,7 +145,7 @@ public class ModjamController {
 
     @PostMapping("/{jamId}/finalize")
     public ResponseEntity<Modjam> finalizeJam(@PathVariable String jamId, @RequestBody List<Map<String, String>> winners) {
-        User user = accountService.getCurrentUser();
+        User user = getBrowserUser();
         if (user == null) return ResponseEntity.status(401).build();
         return ResponseEntity.ok(modjamService.finalizeJam(jamId, user.getId(), winners));
     }
@@ -142,28 +153,28 @@ public class ModjamController {
     // Judging Endpoints
     @PostMapping("/{jamId}/judges/invite")
     public ResponseEntity<Modjam> inviteJudge(@PathVariable String jamId, @RequestBody Map<String, String> body) {
-        User user = accountService.getCurrentUser();
+        User user = getBrowserUser();
         if (user == null) return ResponseEntity.status(401).build();
         return ResponseEntity.ok(modjamService.inviteJudge(jamId, body.get("username"), user.getId()));
     }
 
     @PostMapping("/{jamId}/judges/accept")
     public ResponseEntity<Modjam> acceptJudge(@PathVariable String jamId) {
-        User user = accountService.getCurrentUser();
+        User user = getBrowserUser();
         if (user == null) return ResponseEntity.status(401).build();
         return ResponseEntity.ok(modjamService.acceptJudgeInvite(jamId, user.getId(), user.getUsername()));
     }
 
     @PostMapping("/{jamId}/judges/decline")
     public ResponseEntity<Modjam> declineJudge(@PathVariable String jamId) {
-        User user = accountService.getCurrentUser();
+        User user = getBrowserUser();
         if (user == null) return ResponseEntity.status(401).build();
         return ResponseEntity.ok(modjamService.declineJudgeInvite(jamId, user.getUsername()));
     }
 
     @DeleteMapping("/{jamId}/judges/{username}")
     public ResponseEntity<Modjam> removeJudge(@PathVariable String jamId, @PathVariable String username) {
-        User user = accountService.getCurrentUser();
+        User user = getBrowserUser();
         if (user == null) return ResponseEntity.status(401).build();
         return ResponseEntity.ok(modjamService.removeJudge(jamId, username, user.getId()));
     }
