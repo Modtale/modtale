@@ -1,7 +1,7 @@
 import { test, expect, type BrowserContext, type Page } from '@playwright/test';
 
 const backend = process.env.MODTALE_FINANCE_TEST_ORIGIN!;
-const frontend = 'http://127.0.0.1:3000';
+const frontend = 'http://localhost:3000';
 const checkout = `${backend}/api/v1/finance/projects/project/donations/checkout-url`;
 const external: string[] = [];
 

@@ -120,14 +120,12 @@ class FinanceHttpSecurityTest {
                 StripeGatewayService gateway, RecurringSupportService recurring, PaymentAdjustmentService adjustments) {
             return new StripeWebhookController(donations, receipts, gateway, recurring, adjustments, SECRET);
         }
-        @Bean SecurityFilterChain security(HttpSecurity http, ApiKeyService keys, AccountService accounts,
-                org.springframework.core.env.Environment environment) throws Exception {
+        @Bean SecurityFilterChain security(HttpSecurity http, ApiKeyService keys, AccountService accounts) throws Exception {
             var config = new SecurityConfig(new ApiKeyAuthFilter(keys, (req, res, handler, failure) -> {
                 res.setStatus(401); return new org.springframework.web.servlet.ModelAndView();
             }), new RateLimitFilter(keys), mock(OAuth2LoginService.class), mock(OidcLoginService.class),
                     mock(OAuth2AuthorizedClientRepository.class), mock(LocalUserDetailsService.class), mock(PasswordEncoder.class),
-                    accounts, mock(AuthenticationService.class), mock(LauncherAuthService.class),
-                    new AppFrontendProperties(environment.getProperty("modtale.fixture.frontend-origin", "http://localhost:3000")));
+                    accounts, mock(AuthenticationService.class), mock(LauncherAuthService.class), new AppFrontendProperties("http://localhost:3000"));
             return config.securityFilterChain(http, mock(OAuth2AuthorizationRequestResolver.class));
         }
     }

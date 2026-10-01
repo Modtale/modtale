@@ -1,6 +1,12 @@
 import { defineConfig } from '@playwright/test';
 
-if (!process.env.MODTALE_FINANCE_TEST_ORIGIN) throw new Error('Run backend financeFrontendIntegrationTest');
+const raw = process.env.MODTALE_FINANCE_TEST_ORIGIN;
+if (!raw) throw new Error('Run backend financeFrontendIntegrationTest');
+const origin = new URL(raw);
+if (origin.protocol !== 'http:' || origin.hostname !== 'localhost' || !origin.port || origin.pathname !== '/'
+    || origin.username || origin.password || origin.search || origin.hash) {
+    throw new Error('Finance browser tests require an exact loopback HTTP origin');
+}
 
 export default defineConfig({
     testDir: './integration/browser',
@@ -11,7 +17,7 @@ export default defineConfig({
     reporter: [['list'], ['junit']],
     outputDir: '../backend/build/finance-browser-artifacts',
     use: {
-        baseURL: 'http://127.0.0.1:3000',
+        baseURL: 'http://localhost:3000',
         browserName: 'chromium',
         launchOptions: { executablePath: process.env.MODTALE_FINANCE_CHROMIUM_PATH },
         serviceWorkers: 'block',

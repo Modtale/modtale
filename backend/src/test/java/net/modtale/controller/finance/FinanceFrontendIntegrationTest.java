@@ -29,7 +29,6 @@ import org.apache.tomcat.util.descriptor.web.FilterMap;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.context.annotation.*;
-import org.springframework.core.env.MapPropertySource;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.web.context.support.AnnotationConfigWebApplicationContext;
@@ -77,8 +76,6 @@ class FinanceFrontendIntegrationTest {
         var servlet = tomcat.addContext("", temporary.toString());
         servlet.setParentClassLoader(getClass().getClassLoader());
         var application = new AnnotationConfigWebApplicationContext();
-        if (browser) application.getEnvironment().getPropertySources().addFirst(new MapPropertySource("browser-fixture",
-                Map.of("modtale.fixture.frontend-origin", "http://127.0.0.1:3000")));
         application.setServletContext(servlet.getServletContext());
         application.register(Config.class); application.refresh();
         Map<String, DonationIntent> intents = configureFixtures(application);
@@ -104,7 +101,7 @@ class FinanceFrontendIntegrationTest {
             process.environment().put("PATH", path == null ? "/usr/bin:/bin" : path);
             process.environment().put("HOME", temporary.toString());
             process.environment().put("CI", "true");
-            process.environment().put("MODTALE_FINANCE_TEST_ORIGIN", "http://127.0.0.1:" + tomcat.getConnector().getLocalPort());
+            process.environment().put("MODTALE_FINANCE_TEST_ORIGIN", (browser ? "http://localhost:" : "http://127.0.0.1:") + tomcat.getConnector().getLocalPort());
             if (browser) {
                 process.environment().put("PLAYWRIGHT_JUNIT_OUTPUT_FILE", report.toString());
                 process.environment().put("PLAYWRIGHT_BROWSERS_PATH", "0");

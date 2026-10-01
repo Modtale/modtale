@@ -5,7 +5,7 @@ import { createServer } from 'vite';
 const raw = process.env.MODTALE_FINANCE_TEST_ORIGIN;
 if (!raw) throw new Error('Run backend financeFrontendIntegrationTest to start the isolated servlet');
 const origin = new URL(raw);
-if (origin.protocol !== 'http:' || origin.hostname !== '127.0.0.1' || !origin.port || origin.pathname !== '/'
+if (origin.protocol !== 'http:' || origin.hostname !== 'localhost' || !origin.port || origin.pathname !== '/'
     || origin.username || origin.password || origin.search || origin.hash) {
     throw new Error('Finance browser tests require an exact loopback HTTP origin');
 }

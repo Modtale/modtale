@@ -39,7 +39,7 @@ function Fixture() {
         {subscriptions && <SupportSubscriptions />}
         {configuration && <DonationPromptModal show={show} suggestedAmountCents={configuration.suggestedDonationCents}
             recurringDefault={false} currency={configuration.currency} platformCutBps={configuration.donationPlatformCutBps}
-            allowRecurring={configuration.recurringEnabled} testMode={configuration.testMode} isProcessing={processing}
+            allowRecurring={user !== 'guest' && configuration.recurringEnabled} testMode={configuration.testMode} isProcessing={processing}
             errorMessage={outcome === 'TERMS_CHANGED' ? 'Support terms changed. Review the new share before retrying.' : undefined}
             onClose={dismiss} onSkip={dismiss} onDonate={async (amountCents, recurring, guestCheckout) => {
                 const current = generation.current; setProcessing(true);

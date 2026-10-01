@@ -131,6 +131,7 @@ class PayoutReconciliationIntegrationTest extends FinancePipelineFixture {
     @Test void recipientReviewCannotPauseAConfirmedRecipientAndRemainingRiskStillFailsClosed() throws Exception {
         settleOneTime(); var request = reserve(500, 500); payouts(); authorize(request, 0);
         wallets.recordTransfer(request.getId(), 0, "tr_confirmed", "provider-response", "Verified fixture transfer");
+        assertEquals("tr_confirmed", wallets.getRequest(request.getId()).getRecipients().getFirst().getTransferId());
         assertFalse(wallets.authorizeRecipientTransfer(request.getId(), 0));
         wallets.requireRecipientReview(request.getId(), 0, "Stale authorization failure");
         var partial = wallets.getRequest(request.getId());
@@ -147,6 +148,31 @@ class PayoutReconciliationIntegrationTest extends FinancePipelineFixture {
         assertEquals(List.of("dp_remaining"), wallets.getWallet("creator", "usd", true).getOpenRiskIds());
         assertEquals(1, mongo.getCollection("finance_transfer_receipts").countDocuments());
         verify(gateway, never()).createTransfer(anyString(), anyLong(), anyString(), anyString(), anyMap(), anyBoolean(), anyString());
+    }
+    @Test void confirmationDuringRecipientReviewRetriesWithoutPausingRemainingRecipients() throws Exception {
+        settleOneTime(); var request = reserve(500, 500); authorize(request, 0);
+        var reviewMongo = spy(mongo);
+        var reviewWallets = new FinanceWalletService(reviewMongo, mongo.getMongoDatabaseFactory());
+        var firstRead = new java.util.concurrent.atomic.AtomicBoolean(true);
+        try (var executor = Executors.newSingleThreadExecutor()) {
+            doAnswer(call -> {
+                var snapshot = call.callRealMethod();
+                if (firstRead.compareAndSet(true, false)) {
+                    // Confirm in another transaction after review read its old request snapshot.
+                    executor.submit(() -> wallets.recordTransfer(request.getId(), 0, "tr_competing", "provider-response", "Verified fixture transfer"))
+                            .get(20, TimeUnit.SECONDS);
+                }
+                return snapshot;
+            }).when(reviewMongo).findById(request.getId(), CreatorPayoutRequest.class);
+            reviewWallets.requireRecipientReview(request.getId(), 0, "Stale review attempt");
+        }
+        verify(reviewMongo, atLeast(2)).findById(request.getId(), CreatorPayoutRequest.class);
+        var partial = wallets.getRequest(request.getId());
+        assertEquals(CreatorPayoutRequest.Status.PROCESSING, partial.getStatus()); assertNull(partial.getReviewReason());
+        assertEquals("tr_competing", partial.getRecipients().getFirst().getTransferId());
+        assertNull(partial.getRecipients().get(1).getTransferId());
+        assertEquals(500, wallets.getWallet("creator", "usd", true).getReservedCents());
+        assertEquals(1, mongo.getCollection("finance_transfer_receipts").countDocuments());
     }
     @Test void simultaneousAttemptsCannotClaimOneProviderTransferForTwoReservations() throws Exception {
         settleOneTime(); var one = reserve(1000); var two = reserve(1000); authorize(one, 0); authorize(two, 0);

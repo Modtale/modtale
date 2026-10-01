@@ -411,10 +411,16 @@ public class FinanceWalletService {
     /** A stale dispatch failure must not pause recipients already confirmed by another worker. */
     public void requireRecipientReview(String id, int recipientIndex, String reason) {
         if (recipientIndex < 0) throw new IllegalArgumentException("Payout recipient not found.");
-        String recipientPath = "recipients." + recipientIndex;
-        mongo.updateFirst(Query.query(Criteria.where("_id").is(id).and("status").is(CreatorPayoutRequest.Status.PROCESSING)
-                        .and(recipientPath).exists(true).and(recipientPath + ".transferId").is(null)),
-                new Update().set("status", CreatorPayoutRequest.Status.REQUIRES_REVIEW).set("reviewReason", reason), CreatorPayoutRequest.class);
+        transact(() -> {
+            CreatorPayoutRequest request = mongo.findById(id, CreatorPayoutRequest.class);
+            if (request == null || request.getStatus() != CreatorPayoutRequest.Status.PROCESSING
+                    || recipientIndex >= request.getRecipients().size() || request.getRecipients().get(recipientIndex).getTransferId() != null) return null;
+            // Indexed null predicates do not reliably select one array element. Read the exact
+            // recipient, then write this same document so concurrent confirmations force a retry.
+            mongo.updateFirst(Query.query(Criteria.where("_id").is(id).and("status").is(CreatorPayoutRequest.Status.PROCESSING)),
+                    new Update().set("status", CreatorPayoutRequest.Status.REQUIRES_REVIEW).set("reviewReason", reason), CreatorPayoutRequest.class);
+            return null;
+        });
     }
 
     public CreatorPayoutRequest completeTransfers(String id) {
