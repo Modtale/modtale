@@ -1,5 +1,7 @@
 package net.modtale.controller;
 
+import jakarta.validation.Valid;
+import net.modtale.model.dto.request.jam.VoteRequest;
 import net.modtale.model.jam.Modjam;
 import net.modtale.model.jam.ModjamSubmission;
 import net.modtale.model.user.User;
@@ -121,15 +123,11 @@ public class ModjamController {
     }
 
     @PostMapping("/{jamId}/vote")
-    public ResponseEntity<ModjamSubmission> vote(@PathVariable String jamId, @RequestBody Map<String, Object> body) {
+    public ResponseEntity<ModjamSubmission> vote(@PathVariable String jamId, @Valid @RequestBody VoteRequest body) {
         User user = accountService.getCurrentUser();
         if (user == null) return ResponseEntity.status(401).build();
 
-        String submissionId = (String) body.get("submissionId");
-        String categoryId = (String) body.get("categoryId");
-        int score = (Integer) body.get("score");
-
-        return ResponseEntity.ok(modjamService.vote(jamId, submissionId, categoryId, score, user.getId()));
+        return ResponseEntity.ok(modjamService.vote(jamId, body.submissionId(), body.categoryId(), body.score().intValueExact(), user.getId()));
     }
 
     @PostMapping("/{jamId}/finalize")
