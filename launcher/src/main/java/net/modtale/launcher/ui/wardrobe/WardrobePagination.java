@@ -1,5 +1,7 @@
 package net.modtale.launcher.ui.wardrobe;
 
+import net.modtale.launcher.ui.common.LauncherTooltips;
+
 import javafx.css.PseudoClass;
 import javafx.geometry.Pos;
 import javafx.scene.control.Button;
@@ -57,6 +59,7 @@ final class WardrobePagination extends FlowPane {
             Button button = new Button(Integer.toString(target)); button.getStyleClass().add("pagination-button");
             button.setMinSize(36, 36); button.setPrefSize(36, 36); button.setMaxSize(36, 36);
             button.setAccessibleText("Page " + target); button.pseudoClassStateChanged(SELECTED, target == page);
+            LauncherTooltips.install(button, "Go to page " + target);
             button.setOnAction(e -> goToPage(destination)); pageButtons.getChildren().add(button); last = target;
         }
     }

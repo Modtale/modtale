@@ -3,6 +3,7 @@ package net.modtale.launcher.ui.wardrobe;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.*;
+import java.nio.file.Files;
 import java.util.concurrent.*;
 import java.util.function.Supplier;
 import javafx.application.Platform;
@@ -17,6 +18,8 @@ import javafx.scene.image.ImageView;
 import javafx.scene.layout.*;
 import net.modtale.launcher.hytale.HytaleAuthSession;
 import net.modtale.launcher.settings.LauncherSettings;
+import net.modtale.launcher.logging.LauncherLog;
+import net.modtale.launcher.logging.LauncherLogger;
 import net.modtale.launcher.ui.common.LauncherIcons;
 import net.modtale.launcher.ui.common.LauncherView;
 import net.modtale.launcher.ui.common.StatusModal;
@@ -26,7 +29,8 @@ import static net.modtale.launcher.ui.common.LauncherUi.*;
 
 /** Native wardrobe. Network work never blocks the application thread. */
 public final class LauncherWardrobeController implements AutoCloseable {
-    private enum Tab { CUSTOMIZE, POPULAR, SAVED }
+    private static final LauncherLogger LOG = LauncherLog.getLogger(LauncherWardrobeController.class);
+    public enum Tab { CUSTOMIZE, POPULAR, SAVED }
     private static final ObjectMapper JSON = new ObjectMapper();
     private static final PseudoClass SELECTED = PseudoClass.getPseudoClass("selected");
     private final PopularSkinClient popular;
@@ -44,6 +48,9 @@ public final class LauncherWardrobeController implements AutoCloseable {
     private final CosmeticEditorController editor;
     private final java.util.function.Function<WardrobeItem, String> thumbnailResolver;
     private final VBox root = new VBox(22);
+    private final HBox tabBar = new HBox(6);
+    private Runnable openSettings = () -> {};
+    private boolean unavailable;
     private final VBox catalog = new VBox(16);
     private final VBox inspector = new VBox(14);
     private final HBox columns = new HBox(24);
@@ -79,18 +86,37 @@ public final class LauncherWardrobeController implements AutoCloseable {
         this.api = api; this.store = store; this.settings = settings; this.feedback = feedback;
         this.executor = executor; this.preview = preview; this.thumbnailResolver = thumbnailResolver;
         this.editor = new CosmeticEditorController(api, store, settings, feedback, executor);
+        this.editor.onCatalogFailure(error -> {
+            LOG.warn("Could not load Hytale wardrobe assets", error);
+            showUnavailable(true);
+        });
         build();
     }
 
     public Node view() { return root; }
+    public void setOpenSettingsAction(Runnable action) { openSettings = Objects.requireNonNull(action); }
+    public void showTab(Tab value) {
+        if (unavailable || tab == value) return;
+        tabs.get(value).setSelected(true);
+        selectTab(value);
+    }
     CosmeticEditorController editorForTesting() { return editor; }
 
     public void open() {
+        if (!Files.isRegularFile(LocalSkinLibrary.assets(settings.get()))) {
+            showUnavailable(false);
+            return;
+        }
+        restoreWorkspace();
         refresh();
         editor.loadCurrentOnOpen();
     }
 
     public void refresh() {
+        if (unavailable) {
+            if (Files.isRegularFile(LocalSkinLibrary.assets(settings.get()))) open();
+            return;
+        }
         updateSelectionActions();
         if (tab == Tab.CUSTOMIZE) { editor.refresh(); return; }
         if (selected != null && selected.kind() == WardrobeItem.Kind.CAPE && !previewProfile.equals(activeProfile())) select(selected);
@@ -102,7 +128,7 @@ public final class LauncherWardrobeController implements AutoCloseable {
         root.setUserData(LauncherView.WARDROBE);
         root.getStyleClass().add("wardrobe-page");
         root.setMinWidth(0);
-        HBox tabBar = new HBox(6); tabBar.getStyleClass().add("wardrobe-tabs");
+        tabBar.getStyleClass().add("wardrobe-tabs");
         ToggleGroup group = new ToggleGroup();
         String[] names = {"Customize", "Popular skins", "Saved looks"};
         LauncherIcons.Glyph[] icons = {LauncherIcons.Glyph.PALETTE, LauncherIcons.Glyph.GRID,
@@ -164,6 +190,28 @@ public final class LauncherWardrobeController implements AutoCloseable {
             inspector.setPrefWidth(width < 1050 ? 300 : 350);
         });
         updateSelectionActions();
+    }
+
+    private void showUnavailable(boolean unreadable) {
+        unavailable = true;
+        Label title = label("Wardrobe needs Hytale game files", "wardrobe-unavailable-title");
+        Label detail = label(unreadable
+                ? "The Hytale game assets could not be opened. Check that Hytale is installed, or choose its game folder in Settings."
+                : "Install Hytale to use Wardrobe. If it is already installed, choose the folder containing Assets.zip in Settings.",
+                "wardrobe-unavailable-detail");
+        detail.setWrapText(true);
+        Button settingsButton = primaryButton("Open Settings");
+        settingsButton.setOnAction(event -> openSettings.run());
+        VBox panel = new VBox(18, LauncherIcons.icon(LauncherIcons.Glyph.PALETTE, 36), title, detail, settingsButton);
+        panel.getStyleClass().add("wardrobe-unavailable");
+        panel.setAlignment(Pos.CENTER);
+        root.getChildren().setAll(panel);
+    }
+
+    private void restoreWorkspace() {
+        if (!unavailable) return;
+        unavailable = false;
+        root.getChildren().setAll(tabBar, tab == Tab.CUSTOMIZE ? editor.view() : columns);
     }
 
     private void selectTab(Tab value) {
@@ -460,6 +508,6 @@ public final class LauncherWardrobeController implements AutoCloseable {
     private static String message(Throwable e) { while (e.getCause() != null && e instanceof CompletionException) e = e.getCause(); return e.getMessage() == null ? "Please try again." : e.getMessage(); }
     private static Label label(String text, String style) { Label l = new Label(text); l.getStyleClass().add(style); return l; }
     private static void hideWhenEmpty(Label label) { label.visibleProperty().bind(label.textProperty().isNotEmpty()); label.managedProperty().bind(label.visibleProperty()); }
-    private static Button iconButton(String title, LauncherIcons.Glyph glyph, Runnable action) { Button b = secondaryButton(title); b.setGraphic(LauncherIcons.icon(glyph, 15)); b.setOnAction(e -> action.run()); return b; }
+    private static Button iconButton(String title, LauncherIcons.Glyph glyph, Runnable action) { Button b = secondaryButton(title); b.setGraphic(LauncherIcons.icon(glyph, 15)); b.setOnAction(e -> action.run()); b.setTooltip(new Tooltip(title)); return b; }
     @Override public void close() { disposed = true; request++; resizeReload.stop(); localThumbnails.close(); preview.dispose(); editor.close(); }
 }

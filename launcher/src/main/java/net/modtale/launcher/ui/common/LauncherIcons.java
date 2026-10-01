@@ -30,6 +30,7 @@ public final class LauncherIcons {
         CHEVRON_RIGHT("m9 18 6-6-6-6"),
         CHEVRON_UP("m18 15-6-6-6 6"),
         CIRCLE("M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20Z"),
+        LOCK("M5 10h14v11H5Z M8 10V6a4 4 0 0 1 8 0v4 M12 14v3"),
         CLOCK("M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20Z M12 6v6l4 2"),
         CODE("m16 18 6-6-6-6 M8 6l-6 6 6 6"),
         COPY("M8 8h11a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H10a2 2 0 0 1-2-2Z M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"),

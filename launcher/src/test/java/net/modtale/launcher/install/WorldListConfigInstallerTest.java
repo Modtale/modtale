@@ -56,11 +56,14 @@ class WorldListConfigInstallerTest {
     @Test void rechecksDestinationsAfterPromptBeforeReplacing() throws Exception {
         existing("Alpha/config.json");
         Path outside = Files.writeString(root.resolve("outside.json"), "untouched");
+        Path probe = root.resolve("symlink-probe");
+        net.modtale.launcher.TestSymlinks.createSymbolicLink(probe, outside);
+        Files.delete(probe);
         assertThrows(IOException.class, () -> WorldListConfigInstaller.install(
                 List.of(config("Alpha/config.json", "alpha")), "WORLD", root, WorldListConfig.MAX_TOTAL_BYTES, conflicts -> {
                     try {
                         Files.delete(root.resolve("Alpha/config.json"));
-                        Files.createSymbolicLink(root.resolve("Alpha/config.json"), outside);
+                        net.modtale.launcher.TestSymlinks.createSymbolicLink(root.resolve("Alpha/config.json"), outside);
                     } catch (IOException ex) { throw new RuntimeException(ex); }
                     return true;
                 }));

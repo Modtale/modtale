@@ -574,7 +574,7 @@ public final class LauncherLibraryController {
     private void renderWorldRows() {
         projectList.getChildren().clear();
         if (worlds.isEmpty()) {
-            projectList.getChildren().add(emptyState("No worlds found", "Create a Hytale world, then refresh."));
+            projectList.getChildren().add(emptyState("No worlds found", "Create one in Hytale."));
             return;
         }
         worlds.forEach(world -> projectList.getChildren().add(worldListRenderer.worldRow(

@@ -18,7 +18,6 @@ import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.ButtonBase;
-import javafx.scene.control.CheckBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.image.ImageView;
@@ -61,6 +60,51 @@ class CosmeticEditorUiTest {
         fx(() -> { Platform.setImplicitExit(false); LauncherFonts.load(); return null; });
     }
 
+    @Test void capturesUnownedCosmetics() throws Exception {
+        Path assets = assets();
+        var catalog = new CosmeticCatalogClient(assets);
+        Path output = expand(System.getenv("MODTALE_COSMETIC_EDITOR_SCREENSHOTS"));
+        Files.createDirectories(output);
+        var settings = new LauncherSettings(); settings.setHytaleGamePath(assets.getParent().toString());
+        var session = new net.modtale.launcher.hytale.HytaleAuthSession();
+        session.setUuid("00000000-0000-4000-8000-000000000001"); session.setUsername("Preview");
+        settings.setHytaleAuthSession(session);
+        var rights = new java.util.HashMap<String, java.util.Set<String>>();
+        for (var category : catalog.categories()) {
+            var ids = new java.util.HashSet<String>();
+            var options = catalog.browseAssets(category.key(), "", 1, 100).options();
+            for (int i = 0; i < options.size(); i++) if (i < 4) ids.add(options.get(i).assetId());
+            rights.put(category.key(), ids);
+        }
+        var gateway = new WardrobeApiClient(new HytaleAuthService(null, null)) {
+            @Override public java.util.Map<String, java.util.Set<String>> unlockedCosmetics(LauncherSettings value) { return rights; }
+        };
+        try (var executor = Executors.newFixedThreadPool(4)) {
+            Harness harness = fx(() -> {
+                var feedback = new LauncherFeedback(executor, new Label(), new StackPane(), new Label(), new Label(), () -> "Ownership preview");
+                var controller = new CosmeticEditorController(gateway, new WardrobeStore(directory), () -> settings, feedback, executor);
+                var scroll = new ScrollPane(controller.view()); scroll.setFitToWidth(true);
+                scroll.setStyle("-fx-background: #0B1120; -fx-background-color: #0B1120; -fx-padding: 24;");
+                var root = new StackPane(scroll); root.getStyleClass().add("app-root");
+                var scene = new Scene(root, 1000, 900);
+                scene.getStylesheets().add(getClass().getResource("/net/modtale/launcher/ui/nativefx/launcher.css").toExternalForm());
+                var stage = new Stage(StageStyle.UNDECORATED); stage.setScene(scene); stage.show(); controller.refresh();
+                return new Harness(controller, stage, scroll);
+            });
+            try {
+                verifyCompactControls(harness);
+                await("unowned badges", () -> harness.root().lookup(".cosmetic-ownership-badge") != null);
+                fx(() -> { cards(harness).stream().filter(card -> card.getAccessibleText().contains("Not owned")).findFirst().orElseThrow().fire(); return null; });
+                assertTrue(fx(() -> nodes(harness.root(), Label.class).stream().noneMatch(label -> label.getText().equals("Not owned · Preview only") || label.getText().equals("Contains locked items"))));
+                assertTrue(fx(() -> button(harness.root(), "Apply").isDisabled()));
+                awaitPreview(harness);
+                capture(harness, output, "ownership", 1000, 900);
+            } finally {
+                fx(() -> { harness.controller().close(); harness.stage().close(); return null; });
+            }
+        }
+    }
+
     @Test void editsRealInstalledCosmeticsAndCapturesLocalComposition() throws Exception {
         Path assets = assets();
         assertTrue(Files.isRegularFile(assets), "Set WARDROBE_ASSETS_ZIP to the installed Assets.zip");
@@ -92,13 +136,13 @@ class CosmeticEditorUiTest {
                 return new Harness(controller, stage, scroll);
             });
             try {
-                showAllCosmetics(harness);
-                await("catalog/default draft", () -> harness.controller().draftSnapshot() != null && cards(harness).size() > 0);
+                verifyCompactControls(harness);
+                await("catalog/default draft", () -> !harness.controller().draftSnapshot().isEmpty() && cards(harness).size() > 0);
                 JsonNode baseline = fx(() -> harness.controller().draftSnapshot());
                 assertEquals(catalog.defaultSkin(), baseline);
                 awaitPreview(harness);
                 assertTrue(fx(() -> button(harness.root(), "Apply").isDisabled()));
-                assertFalse(fx(() -> button(harness.root(), "Save").isDisabled()));
+                assertFalse(fx(() -> button(harness.root(), "Save As").isDisabled()));
 
                 verifyPagination(harness, catalog);
                 CosmeticOption hair = selectFirst(harness, catalog, "haircut");
@@ -181,18 +225,15 @@ class CosmeticEditorUiTest {
         openCategory(harness, catalog, "haircut");
     }
 
-    private static void showAllCosmetics(Harness harness) throws Exception {
+    private static void verifyCompactControls(Harness harness) throws Exception {
         fx(() -> {
-            CheckBox owned = (CheckBox) button(harness.root(), "Owned only");
-            assertTrue(owned.isSelected(), "Owned only defaults on");
+            assertTrue(nodes(harness.root(), javafx.scene.control.CheckBox.class).isEmpty());
             for (String action : List.of("Undo", "Redo")) {
                 Button control = (Button) button(harness.root(), action);
                 assertEquals("", control.getText());
                 assertNotNull(control.getGraphic());
                 assertEquals(action, control.getTooltip().getText());
-                assertSame(control.getParent(), owned.getParent());
             }
-            owned.fire(); // This unlinked harness explicitly browses the complete installed catalog.
             return null;
         });
     }
@@ -209,7 +250,7 @@ class CosmeticEditorUiTest {
         });
         try {
             var hero = new Harness(wardrobe.editorForTesting(), standalone.stage(), standalone.scroll());
-            showAllCosmetics(hero);
+            verifyCompactControls(hero);
             await("integrated catalog", () -> hero.controller().draftSnapshot().hasNonNull("bodyCharacteristic") && !cards(hero).isEmpty());
             var payload = new com.fasterxml.jackson.databind.ObjectMapper().createObjectNode().set("skin", composition);
             fx(() -> { hero.controller().edit(new WardrobeItem(UUID.randomUUID(), WardrobeItem.Kind.SKIN,
@@ -245,7 +286,7 @@ class CosmeticEditorUiTest {
             capture(hero, output, "customize-cape", 1440, 1000);
             capture(hero, output, "customize-cape", 1000, 900);
             assertEquals(composition, fx(() -> hero.controller().draftSnapshot()));
-            FutureTask<Void> saveDialog = new FutureTask<>(() -> { button(hero.root(), "Save").fire(); return null; });
+            FutureTask<Void> saveDialog = new FutureTask<>(() -> { button(hero.root(), "Save As").fire(); return null; });
             Platform.runLater(saveDialog);
             await("save modal", () -> hero.stage().getScene().lookup(".status-modal-primary") != null);
             try {
@@ -270,11 +311,12 @@ class CosmeticEditorUiTest {
     private static void openCategory(Harness harness, CosmeticCatalogClient catalog, String category) throws Exception {
         String label = catalog.categories().stream().filter(value -> value.key().equals(category)).findFirst().orElseThrow().label();
         var before = fx(() -> harness.controller().draftSnapshot());
-        click(harness, CosmeticFraming.forCategory(category).group());
         fx(() -> {
-            var choice = nodes(harness.root(), Button.class).stream().filter(button -> button.getStyleClass().contains("cosmetic-category")
-                    && button.getText().equals(label)).findFirst().orElseThrow();
-            assertTrue(choice.getParent().isVisible(), "Group must reveal the selected submenu");
+            var group = (WardrobeCategoryNavigation.Section) harness.root().lookup("#wardrobe-group-"
+                    + CosmeticFraming.forCategory(category).group().toLowerCase(java.util.Locale.ROOT));
+            group.setExpanded(true);
+            var choice = (Button) harness.root().lookup("#wardrobe-category-" + category);
+            assertEquals(label, choice.getAccessibleText());
             choice.fire(); return null;
         });
         assertEquals(before, fx(() -> harness.controller().draftSnapshot()), "Navigation must preserve the outfit");

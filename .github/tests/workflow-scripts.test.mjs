@@ -86,7 +86,7 @@ test('launcher channel and version follow the source branch', () => {
       GITHUB_REF_NAME: branch, GITHUB_RUN_NUMBER: '42', GITHUB_RUN_ATTEMPT: '2', INPUT_VERSION: '',
     });
     assert.match(output, new RegExp(`^channel=${channel}$`, 'm'));
-    assert.match(output, new RegExp(`^tag=launcher-${channel === 'develop' ? 'develop-' : ''}v0\\.2\\.42${channel === 'develop' ? '-develop.42.2' : ''}$`, 'm'));
+    assert.match(output, new RegExp(`^tag=launcher-${channel === 'develop' ? 'develop-' : ''}v0\\.3\\.42${channel === 'develop' ? '-develop.42.2' : ''}$`, 'm'));
   }
 });
 

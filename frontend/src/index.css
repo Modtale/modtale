@@ -95,7 +95,7 @@
         }
     }
 
-    @container (min-width: 46rem) {
+    @container (min-width: 52rem) {
         .browse-project-grid {
             grid-template-columns: repeat(3, minmax(0, 1fr));
         }

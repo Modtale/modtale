@@ -228,7 +228,7 @@ export const PostDownloadModal: React.FC<PostDownloadModalProps> = ({
                                         ? 'Enable the asset pack in the target world, load the prefab from the Prefab List, then use the Paste Tool to place it.'
                                         : isWorld
                                             ? 'Launch Hytale and select the world from the Singleplayer menu.'
-                                            : `Restart your Hytale Launcher to load the new project${isBundle ? 's' : ''}.`}
+                                            : `Restart Hytale to load the new project${isBundle ? 's' : ''}.`}
                                 </div>
                             </div>
                         </div>

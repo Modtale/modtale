@@ -99,6 +99,7 @@ public final class LauncherUi {
         caption.setWrapText(true);
         caption.setMinWidth(0);
         caption.setLabelFor(checkBox);
+        caption.tooltipProperty().bind(checkBox.tooltipProperty());
         caption.setOnMouseClicked(event -> {
             checkBox.requestFocus();
             checkBox.fire();

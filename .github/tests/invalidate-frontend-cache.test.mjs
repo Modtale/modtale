@@ -11,7 +11,8 @@ test('purges only environment HTML after origin readiness, then warms real publi
   }});
   assert.equal(calls[0][0], env.FRONTEND_ORIGIN_URL);
   assert.deepEqual(JSON.parse(calls[1][1].body), { tags: ['modtale-html-modtale.net'] });
-  assert.deepEqual(calls.slice(2).map(c => c[0]), ['https://modtale.net/', 'https://modtale.net/launcher']);
+  assert.deepEqual(JSON.parse(calls[2][1].body), { files: ['https://modtale.net/', 'https://modtale.net/launcher'] });
+  assert.deepEqual(calls.slice(3).map(c => c[0]), ['https://modtale.net/', 'https://modtale.net/launcher']);
 });
 test('never purges when origin is stale', async () => {
   let purged = false;

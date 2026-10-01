@@ -1,5 +1,7 @@
 package net.modtale.launcher.ui.browse.controls;
 
+import net.modtale.launcher.ui.common.LauncherTooltips;
+
 import static net.modtale.launcher.ui.common.LauncherUi.dangerButton;
 import static net.modtale.launcher.ui.common.LauncherUi.pseudo;
 import static net.modtale.launcher.ui.common.LauncherUi.styleInput;
@@ -162,6 +164,7 @@ public final class ProjectBrowseFilterOptions {
         preReleaseToggle.getStyleClass().add("pre-release-toggle");
         preReleaseToggle.setGraphic(LauncherIcons.icon(LauncherIcons.Glyph.CHECK, 11));
         preReleaseToggle.setOnAction(event -> togglePreReleases());
+        LauncherTooltips.install(preReleaseToggle, "Include pre-release project versions");
         openSourceButton.getStyleClass().add("filter-toggle-button");
         openSourceButton.setMaxWidth(Double.MAX_VALUE);
         HBox openSourceContent = openSourceButtonContent();
@@ -169,6 +172,7 @@ public final class ProjectBrowseFilterOptions {
         openSourceButton.setGraphic(openSourceContent);
         openSourceButton.setContentDisplay(ContentDisplay.GRAPHIC_ONLY);
         openSourceButton.setAccessibleText("Open source license filter");
+        LauncherTooltips.install(openSourceButton, "Show only projects with an open-source license");
         openSourceButton.setOnAction(event -> toggleOpenSource());
         updatedAfterPicker.setOnAction(event -> {
             if (updatedAfterPicker.getValue() != null) {
@@ -177,6 +181,8 @@ public final class ProjectBrowseFilterOptions {
             changedAndSearch();
         });
         customMinFavoritesField.setPromptText("Custom min favorites...");
+        LauncherTooltips.install(customMinFavoritesField, "Minimum number of favorites a project must have");
+        LauncherTooltips.install(updatedAfterPicker, "Show projects updated after this date");
         customMinFavoritesField.textProperty().addListener((observable, oldValue, newValue) -> changedAndSearch());
         customMinDownloadsField.setPromptText("Custom min downloads...");
         customMinDownloadsField.textProperty().addListener((observable, oldValue, newValue) -> changedAndSearch());

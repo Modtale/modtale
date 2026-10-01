@@ -115,7 +115,6 @@ final class WardrobeCategoryNavigation extends VBox implements AutoCloseable {
             heading.setAccessibleText(label + " categories");
             heading.setAccessibleHelp("Collapsed. Activate to expand.");
             heading.setTooltip(new Tooltip("Expand " + label));
-            heading.setTooltip(new Tooltip("Expand " + label));
             heading.setOnAction(e -> setExpanded(!expanded));
             contentHeight = tiles.getPrefHeight();
             body = new StackPane(tiles); body.setAlignment(Pos.TOP_CENTER);

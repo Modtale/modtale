@@ -69,12 +69,12 @@ export const ExternalLinkProvider: React.FC<{ children: React.ReactNode }> = ({ 
                     return;
                 }
 
-                // Trust only installer assets from official launcher releases, never GitHub broadly.
-                const isLauncherInstaller = url.origin === 'https://github.com'
+                // Trust downloads from official launcher releases, never GitHub broadly.
+                const isLauncherReleaseAsset = url.origin === 'https://github.com'
                     && !url.username && !url.password && !url.search && !url.hash
-                    && /^\/Modtale\/modtale\/releases\/download\/launcher-(?:(?:stable|develop)-)?v[0-9][A-Za-z0-9.-]*\/[A-Za-z0-9._-]+\.(?:exe|msi|dmg|pkg|AppImage)$/.test(url.pathname);
+                    && /^\/Modtale\/modtale\/releases\/download\/launcher-(?:(?:stable|develop)-)?v[0-9][A-Za-z0-9.-]*\/(?:[A-Za-z0-9._-]+\.(?:exe|msi|dmg|pkg|AppImage|deb|rpm|flatpak|zip|pkg\.tar\.zst)|SHA256SUMS)$/.test(url.pathname);
 
-                if (isLauncherInstaller) return;
+                if (isLauncherReleaseAsset) return;
 
                 const trustedUrls = [
                     'https://discord.gg/pcfadvyqve',

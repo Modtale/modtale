@@ -1,11 +1,10 @@
 package net.modtale.launcher.ui.shell;
 
+import net.modtale.launcher.ui.common.LauncherTooltips;
+
 import java.util.List;
-import java.util.Objects;
 import javafx.geometry.Pos;
 import javafx.scene.control.Button;
-import javafx.scene.image.Image;
-import javafx.scene.image.ImageView;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
@@ -32,10 +31,7 @@ public final class LauncherNavbar {
     }
 
     public static Button brand(Runnable action) {
-        ImageView logo = new ImageView(new Image(Objects.requireNonNull(LauncherNavbar.class
-                .getResource("/net/modtale/launcher/ui/nativefx/assets/logo_light.png")).toExternalForm()));
-        logo.setFitHeight(36);
-        logo.setPreserveRatio(true);
+        javafx.scene.Node logo = LauncherVectorLogo.create(36);
         Button brand = new Button(null, logo);
         brand.getStyleClass().add("brand");
         brand.setMinWidth(142);
@@ -50,6 +46,7 @@ public final class LauncherNavbar {
     public static Button navigation(String key, LauncherIcons.Glyph icon, Runnable action) {
         Button button = new Button();
         LauncherI18n.get().bind(button, key);
+        LauncherTooltips.install(button, button.textProperty());
         button.getStyleClass().add("nav-btn");
         button.setFont(Font.font("Inter", FontWeight.BOLD, 14));
         button.setGraphic(LauncherIcons.icon(icon, 16));
