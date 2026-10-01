@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { GET } from '@/pages/__modjam_ui_review/[view]';
+import { GET } from '@/pages/jam-ui-review/[view]';
 
 afterEach(() => vi.unstubAllEnvs());
 describe('read-only synthetic branch review', () => {
