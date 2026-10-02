@@ -7,6 +7,11 @@ plugins {
 group = 'net.modtale'
 version = '0.0.1-SNAPSHOT'
 
+// Keep the embedded Tomcat family aligned while Boot 4.1.1 manages 11.0.24.
+// 11.0.26 includes the security fixes in 11.0.25 and the latest 11.0.x fixes:
+// https://tomcat.apache.org/security-11.html
+ext['tomcat.version'] = '11.0.26'
+
 java {
     toolchain {
         languageVersion = JavaLanguageVersion.of(26)
