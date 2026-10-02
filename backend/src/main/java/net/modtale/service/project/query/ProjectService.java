@@ -28,6 +28,10 @@ public class ProjectService {
         projectCacheService.evictProjectCache(project);
     }
 
+    public void evictProjectEngagementCache(Project project) {
+        projectCacheService.evictProjectEngagementCache(project);
+    }
+
     public void evictProjectDetailsCaches(Collection<Project> projects, Collection<String> fallbackProjectIds) {
         projectCacheService.evictProjectDetailsCaches(projects, fallbackProjectIds);
     }

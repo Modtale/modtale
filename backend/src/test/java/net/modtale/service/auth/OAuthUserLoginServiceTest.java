@@ -50,7 +50,8 @@ class OAuthUserLoginServiceTest {
                 trackingService,
                 reservedAccountGuardService,
                 providerProfileService,
-                connectedAccountMutationService
+                connectedAccountMutationService,
+                mock(net.modtale.service.system.PublicCreatorCacheService.class)
         );
     }
 

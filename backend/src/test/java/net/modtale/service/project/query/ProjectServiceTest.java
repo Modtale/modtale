@@ -44,7 +44,7 @@ class ProjectServiceTest {
         mongoTemplate = mock(MongoTemplate.class);
         accessControlService = mock(AccessControlService.class);
         ProjectRouteService projectRouteService = new ProjectRouteService();
-        ProjectCacheService projectCacheService = new ProjectCacheService(new ConcurrentMapCacheManager("projectDetails"), projectRouteService);
+        ProjectCacheService projectCacheService = new ProjectCacheService(new ConcurrentMapCacheManager("projectDetails"), projectRouteService, mock(net.modtale.service.system.PublicContentCacheInvalidator.class));
         ProjectViewService projectViewService = new ProjectViewService(projectRepository, userRepository, mongoTemplate, accessControlService, projectRouteService);
 
         service = new ProjectService(

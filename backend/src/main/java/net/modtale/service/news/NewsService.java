@@ -4,6 +4,7 @@ import java.time.Instant;
 import java.util.*;
 import net.modtale.model.news.*;
 import net.modtale.repository.news.NewsRepository;
+import net.modtale.service.system.PublicContentCacheInvalidator;
 import org.owasp.html.HtmlPolicyBuilder;
 import org.owasp.html.PolicyFactory;
 import org.springframework.dao.OptimisticLockingFailureException;
@@ -14,7 +15,11 @@ import org.springframework.web.server.ResponseStatusException;
 @Service
 public class NewsService {
     private final NewsRepository repository;
-    public NewsService(NewsRepository repository) { this.repository = repository; }
+    private final PublicContentCacheInvalidator publicContentCacheInvalidator;
+    public NewsService(NewsRepository repository, PublicContentCacheInvalidator publicContentCacheInvalidator) {
+        this.repository = repository;
+        this.publicContentCacheInvalidator = publicContentCacheInvalidator;
+    }
     private static final PolicyFactory HTML = new HtmlPolicyBuilder()
         .allowElements("p", "br", "h1", "h2", "h3", "h4", "h5", "h6", "strong", "b", "em", "i", "u", "s", "del", "sub", "sup", "mark", "span", "div", "section", "blockquote", "ul", "ol", "li", "hr", "pre", "code", "table", "thead", "tbody", "tr", "td", "th", "a", "img", "video")
         .allowAttributes("href").onElements("a")
@@ -60,10 +65,15 @@ public class NewsService {
         post.published = post.draft;
         if (post.publishedAt == null) post.publishedAt = Instant.now().toString();
         post.updatedAt = Instant.now().toString();
-        return persist(post);
+        NewsArticle saved = persist(post);
+        publicContentCacheInvalidator.contentChanged();
+        return saved;
     }
     public NewsArticle unpublish(String slug, Long version) {
-        NewsArticle post = get(slug); revision(post, version); post.published = null; return persist(post);
+        NewsArticle post = get(slug); revision(post, version); post.published = null;
+        NewsArticle saved = persist(post);
+        publicContentCacheInvalidator.contentChanged();
+        return saved;
     }
     public record PublicPost(String slug, String title, String description, String excerpt, String author, List<String> tags, String heroImage, String heroAlt, String socialImage, String socialImageAlt, String body, String publishedAt, String updatedAt, String readingTime) {}
     public PublicPost publicPost(NewsArticle post) {

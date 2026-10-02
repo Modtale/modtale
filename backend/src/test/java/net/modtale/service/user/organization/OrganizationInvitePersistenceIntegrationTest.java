@@ -90,7 +90,8 @@ class OrganizationInvitePersistenceIntegrationTest {
     @Test void failedInviteCreationDoesNotNotifyOrSaveTheWholeAccount(){
         var repository=mock(UserRepository.class); var notifications=mock(NotificationService.class); var access=mock(AccessControlService.class);
         var spyWrites=spy(writes); doReturn(false).when(spyWrites).create(any(),any());
-        var service=new OrganizationInviteService(repository,new OrganizationAccessService(repository,access),notifications,spyWrites);
+        var service=new OrganizationInviteService(repository,new OrganizationAccessService(repository,access),notifications,spyWrites,
+                mock(net.modtale.service.system.PublicCreatorCacheService.class));
         var requester=new User();requester.setId("owner");var target=new User();target.setId("recipient");
         when(repository.findById("recipient")).thenReturn(Optional.of(target));
         when(access.hasOrgPermission(any(),eq("owner"),eq(ApiKey.ApiPermission.ORG_MEMBER_INVITE))).thenReturn(true);

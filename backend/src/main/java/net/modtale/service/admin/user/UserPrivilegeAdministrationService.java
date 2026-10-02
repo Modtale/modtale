@@ -9,6 +9,7 @@ import net.modtale.model.user.AdminPermission;
 import net.modtale.model.user.User;
 import net.modtale.repository.user.UserRepository;
 import net.modtale.service.admin.audit.AdminAuditLogger;
+import net.modtale.service.system.PublicCreatorCacheService;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
@@ -18,6 +19,8 @@ import org.springframework.stereotype.Service;
 @Service
 public class UserPrivilegeAdministrationService {
 
+    private final PublicCreatorCacheService publicCreatorCacheService;
+
     private final UserRepository userRepository;
     private final MongoTemplate mongoTemplate;
     private final AdminAuditLogger adminAuditLogger;
@@ -25,8 +28,10 @@ public class UserPrivilegeAdministrationService {
     public UserPrivilegeAdministrationService(
             UserRepository userRepository,
             MongoTemplate mongoTemplate,
-            AdminAuditLogger adminAuditLogger
+            AdminAuditLogger adminAuditLogger,
+            PublicCreatorCacheService publicCreatorCacheService
     ) {
+        this.publicCreatorCacheService = publicCreatorCacheService;
         this.userRepository = userRepository;
         this.mongoTemplate = mongoTemplate;
         this.adminAuditLogger = adminAuditLogger;
@@ -36,6 +41,7 @@ public class UserPrivilegeAdministrationService {
         User user = requireUser(userId);
         user.setTier(tierEnum);
         userRepository.save(user);
+        publicCreatorCacheService.creatorChanged();
         mongoTemplate.updateMulti(
                 new Query(Criteria.where("userId").is(user.getId())),
                 new Update().set("tier", tierEnum),

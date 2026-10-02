@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { projectClient } from '../api/projectClient';
+import { isWikiMetadata, isWikiPage } from '@/utils/wikiPayload';
 
 type WikiCacheEntry = {
     modData?: any;
@@ -66,10 +67,6 @@ const getWikiBootstrap = (projectId: string) => {
     return sameWikiProject(bootstrap?.projectId, projectId) ? bootstrap : null;
 };
 
-const hasOwn = (value: object | null | undefined, key: string) => (
-    Boolean(value && Object.prototype.hasOwnProperty.call(value, key))
-);
-
 const seedWikiCacheFromBootstrap = (projectId: string) => {
     const entry = getWikiCacheEntry(projectId);
     if (entry.bootstrapSeeded) return entry;
@@ -78,12 +75,12 @@ const seedWikiCacheFromBootstrap = (projectId: string) => {
     const bootstrap = getWikiBootstrap(projectId);
     if (!bootstrap) return entry;
 
-    if (hasOwn(bootstrap, 'metadataData') && bootstrap.metadataData) {
+    if (isWikiMetadata(bootstrap.metadataData)) {
         entry.modData = bootstrap.metadataData;
     }
 
     for (const [slug, page] of Object.entries(bootstrap.pages || {})) {
-        if (hasOwn(page, 'data') && page.data) {
+        if (isWikiPage(page?.data)) {
             entry.pages.set(slug, page.data);
         }
     }
@@ -93,30 +90,32 @@ const seedWikiCacheFromBootstrap = (projectId: string) => {
 
 const getBootstrappedWikiData = (projectId: string) => {
     const bootstrap = getWikiBootstrap(projectId);
-    if (hasOwn(bootstrap, 'metadataData')) {
-        return bootstrap?.metadataData ? Promise.resolve(bootstrap.metadataData) : null;
+    if (isWikiMetadata(bootstrap?.metadataData)) {
+        return Promise.resolve(bootstrap!.metadataData);
     }
 
     const metadata = bootstrap?.metadata;
     if (!metadata) return null;
 
-    return metadata.then((data) => (
-        data ?? projectClient.getWikiData(projectId)
-    ));
+    return metadata.then(
+        data => isWikiMetadata(data) ? data : projectClient.getWikiData(projectId),
+        () => projectClient.getWikiData(projectId)
+    );
 };
 
 const getBootstrappedWikiPage = (projectId: string, slug: string) => {
     const pageRecord = getWikiBootstrap(projectId)?.pages?.[slug];
-    if (hasOwn(pageRecord, 'data')) {
-        return pageRecord?.data ? Promise.resolve(pageRecord.data) : null;
+    if (isWikiPage(pageRecord?.data)) {
+        return Promise.resolve(pageRecord!.data);
     }
 
     const page = pageRecord?.promise;
     if (!page) return null;
 
-    return page.then((data) => (
-        data ?? projectClient.getWikiPage(projectId, slug)
-    ));
+    return page.then(
+        data => isWikiPage(data) ? data : projectClient.getWikiPage(projectId, slug),
+        () => projectClient.getWikiPage(projectId, slug)
+    );
 };
 
 const collectWikiSlugList = (modData: any, pageSlug?: string) => {
@@ -171,6 +170,7 @@ const fetchWikiDataCached = (projectId: string) => {
 
     entry.modPromise = (getBootstrappedWikiData(projectId) ?? projectClient.getWikiData(projectId))
         .then((data) => {
+            if (!isWikiMetadata(data)) throw new Error('Invalid wiki metadata response');
             entry.modData = data;
             return data;
         })
@@ -193,6 +193,7 @@ const fetchWikiPageCached = (projectId: string, slug: string) => {
 
     const request = (getBootstrappedWikiPage(projectId, slug) ?? projectClient.getWikiPage(projectId, slug))
         .then((content) => {
+            if (!isWikiPage(content)) throw new Error('Invalid wiki page response');
             entry.pages.set(slug, content);
             return content;
         })

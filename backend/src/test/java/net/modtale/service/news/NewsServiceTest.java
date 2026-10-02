@@ -10,8 +10,26 @@ import static org.mockito.Mockito.*;
 
 class NewsServiceTest {
     private NewsContent content(String body) { return new NewsContent("Title", "Summary", "Excerpt", "Team", List.of("Update"), "/assets/cover.png", "Cover", body); }
+    @Test void onlySuccessfulPublicationAndUnpublicationInvalidatePublicContent() {
+        var repo = mock(NewsRepository.class);
+        var invalidator = mock(net.modtale.service.system.PublicContentCacheInvalidator.class);
+        var service = new NewsService(repo, invalidator);
+        var post = new NewsArticle(); post.slug = "test"; post.version = 2L;
+        post.draft = content("<p>Draft</p>");
+        when(repo.findById("test")).thenReturn(Optional.of(post));
+        when(repo.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        service.save("test", 2L, content("<p>Edited draft</p>"));
+        verifyNoInteractions(invalidator);
+        service.publish("test", 2L);
+        verify(invalidator).contentChanged();
+        service.unpublish("test", 2L);
+        verify(invalidator, times(2)).contentChanged();
+        when(repo.save(any())).thenThrow(new org.springframework.dao.OptimisticLockingFailureException("conflict"));
+        assertThrows(ResponseStatusException.class, () -> service.publish("test", 2L));
+        verify(invalidator, times(2)).contentChanged();
+    }
     @Test void draftsStayPrivateUntilExplicitPublicationAndUnpublishKeepsDraft() {
-        var repo = mock(NewsRepository.class); var service = new NewsService(repo);
+        var repo = mock(NewsRepository.class); var service = new NewsService(repo, mock(net.modtale.service.system.PublicContentCacheInvalidator.class));
         var post = new NewsArticle(); post.slug="test"; post.version=2L; post.draft=content("<p>Old</p>"); post.published=post.draft; post.publishedAt="2026-09-01T00:00:00Z";
         when(repo.findById("test")).thenReturn(Optional.of(post)); when(repo.save(any())).thenAnswer(i -> i.getArgument(0));
         service.save("test", 2L, content("<p>New draft</p>"));
@@ -22,7 +40,7 @@ class NewsServiceTest {
         assertEquals(404, assertThrows(ResponseStatusException.class, () -> service.publicPost(post)).getStatusCode().value());
     }
     @Test void staleEditsCannotOverwriteCurrentDraftOrPublish() {
-        var repo=mock(NewsRepository.class); var service=new NewsService(repo); var post=new NewsArticle(); post.version=4L;
+        var repo=mock(NewsRepository.class); var service=new NewsService(repo, mock(net.modtale.service.system.PublicContentCacheInvalidator.class)); var post=new NewsArticle(); post.version=4L;
         when(repo.findById("test")).thenReturn(Optional.of(post));
         assertEquals(409, assertThrows(ResponseStatusException.class, () -> service.save("test", 3L, content("<p>Edit</p>"))).getStatusCode().value());
         assertEquals(409, assertThrows(ResponseStatusException.class, () -> service.publish("test", 3L)).getStatusCode().value());
@@ -34,7 +52,7 @@ class NewsServiceTest {
         assertTrue(html.contains("data-demo-clip=\"modpack-creation\"")); assertTrue(html.contains("<video")); assertTrue(html.contains("<u>")); assertTrue(html.contains("text-align:center")); assertTrue(html.contains("colspan=\"2\"")); assertTrue(html.contains("id=\"creators\""));
     }
     @Test void validatesSlugMediaAndPublicationReadiness() {
-        var repo=mock(NewsRepository.class); var service=new NewsService(repo); when(repo.findById(anyString())).thenReturn(Optional.empty());
+        var repo=mock(NewsRepository.class); var service=new NewsService(repo, mock(net.modtale.service.system.PublicContentCacheInvalidator.class)); when(repo.findById(anyString())).thenReturn(Optional.empty());
         assertThrows(ResponseStatusException.class, () -> service.save("bad/slug", null, content("<p>Text</p>")));
         var unsafe=new NewsContent("Title", "Summary", "", "Team", List.of(), "javascript:alert(1)", "Cover", "<p>Text</p>");
         assertThrows(ResponseStatusException.class, () -> service.save("safe", null, unsafe));

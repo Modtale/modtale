@@ -53,6 +53,13 @@ public class MetadataService {
                 "You do not have permission to edit this project's metadata.");
         projectMutationGuard.ensureEditable(existing);
 
+        // Preserve the old handle until the write succeeds, otherwise renamed URLs retain old data.
+        Project previousRoute = new Project();
+        previousRoute.setId(existing.getId());
+        previousRoute.setTitle(existing.getTitle());
+        previousRoute.setSlug(existing.getSlug());
+        previousRoute.setClassification(existing.getClassification());
+
         if (updated.getClassification() != null && updated.getClassification() != existing.getClassification()) {
             if (!MUTABLE_CLASSIFICATIONS.contains(existing.getClassification())) {
                 throw new InvalidProjectRequestException("This project type cannot be changed.");
@@ -108,7 +115,7 @@ public class MetadataService {
             throw new InvalidProjectRequestException("Use the project image upload endpoint to change its image.");
 
         projectRepository.save(existing);
-        projectService.evictProjectCache(existing);
+        projectService.evictProjectDetailsCaches(List.of(previousRoute, existing), List.of());
     }
 
     private void validateSingleGalleryCarouselMarker(String about) {

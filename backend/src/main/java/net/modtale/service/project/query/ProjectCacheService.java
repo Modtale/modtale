@@ -2,6 +2,7 @@ package net.modtale.service.project.query;
 
 import java.util.Collection;
 import net.modtale.model.project.Project;
+import net.modtale.service.system.PublicContentCacheInvalidator;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
 import org.springframework.stereotype.Service;
@@ -11,13 +12,23 @@ public class ProjectCacheService {
 
     private final CacheManager cacheManager;
     private final ProjectRouteService projectRouteService;
+    private final PublicContentCacheInvalidator publicContentCacheInvalidator;
 
-    public ProjectCacheService(CacheManager cacheManager, ProjectRouteService projectRouteService) {
+    public ProjectCacheService(CacheManager cacheManager, ProjectRouteService projectRouteService,
+            PublicContentCacheInvalidator publicContentCacheInvalidator) {
         this.cacheManager = cacheManager;
         this.projectRouteService = projectRouteService;
+        this.publicContentCacheInvalidator = publicContentCacheInvalidator;
     }
 
     public void evictProjectCache(Project project) {
+        evictProjectDetailsCache(project);
+        evictProjectSearchCache();
+        publicContentCacheInvalidator.contentChanged();
+    }
+
+    /** Votes are engagement counters; let bounded public TTLs refresh them without an edge-wide purge. */
+    public void evictProjectEngagementCache(Project project) {
         evictProjectDetailsCache(project);
         evictProjectSearchCache();
     }
@@ -153,6 +164,7 @@ public class ProjectCacheService {
             fallbackProjectIds.forEach(this::evictProjectDetailsCacheById);
         }
         evictProjectSearchCache();
+        publicContentCacheInvalidator.contentChanged();
     }
 
     public void evictProjectCounterCaches(Collection<Project> projects, Collection<String> fallbackProjectIds) {

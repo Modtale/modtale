@@ -28,10 +28,11 @@ class ProjectSocialServiceTest {
         when(projects.getRawProjectByRouteKey("slug")).thenReturn(project);
         when(repository.toggle("canonical", "user")).thenThrow(new IllegalStateException("transaction failed"));
         assertThrows(IllegalStateException.class, () -> service.toggleFavorite("slug", "user"));
-        verify(projects, never()).evictProjectCache(any(Project.class)); verify(users, never()).save(any(User.class));
+        verify(projects, never()).evictProjectCounterCaches(any(), any()); verify(users, never()).save(any(User.class));
         doReturn(1).when(repository).toggle("canonical", "user");
         service.toggleFavorite("slug", "user");
-        assertEquals(1, project.getFavoriteCount()); verify(projects).evictProjectCache(project);
+        assertEquals(1, project.getFavoriteCount()); verify(projects).evictProjectCounterCaches(List.of(project), List.of());
+        verify(projects, never()).evictProjectCache(any(Project.class));
     }
 
 }

@@ -52,6 +52,21 @@ describe('JamsList SSR bootstrap', () => {
         container.remove();
     });
 
+    it('retries the list request after incomplete SSR bootstrap', async () => {
+        vi.mocked(api.get).mockResolvedValue({ data: [jam] });
+        await act(async () => {
+            root.render(
+                <MemoryRouter initialEntries={['/jams']}>
+                    <SSRProvider initialPath="/jams" data={{ jamsDataReady: false, jamsData: [] }}>
+                        <JamsList currentUser={null} />
+                    </SSRProvider>
+                </MemoryRouter>
+            );
+        });
+        expect(api.get).toHaveBeenCalledWith('/modjams', { signal: expect.any(AbortSignal) });
+        expect(container.textContent).toContain('Server Rendered Jam');
+    });
+
     it('renders server-provided jams without repeating the list request', async () => {
         await act(async () => {
             root.render(

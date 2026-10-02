@@ -63,12 +63,14 @@ class AuthenticationServiceTest {
                 trackingService,
                 reservedAccountGuardService,
                 providerProfileService,
-                connectedAccountMutationService
+                connectedAccountMutationService,
+                mock(net.modtale.service.system.PublicCreatorCacheService.class)
         );
         OAuthAccountLinkingService oauthAccountLinkingService = new OAuthAccountLinkingService(
                 userRepository,
                 providerProfileService,
-                connectedAccountMutationService
+                connectedAccountMutationService,
+                mock(net.modtale.service.system.PublicCreatorCacheService.class)
         );
         authenticationService = new AuthenticationService(
                 userRepository,

@@ -10,6 +10,7 @@ import net.modtale.exception.OrganizationNotFoundException;
 import net.modtale.model.user.User;
 import net.modtale.repository.user.UserRepository;
 import net.modtale.service.user.connection.ConnectedAccountMutationService;
+import net.modtale.service.system.PublicCreatorCacheService;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.core.user.DefaultOAuth2User;
 import org.springframework.security.oauth2.core.user.OAuth2User;
@@ -18,6 +19,8 @@ import org.springframework.stereotype.Service;
 @Service
 public class OAuthAccountLinkingService {
 
+    private final PublicCreatorCacheService publicCreatorCacheService;
+
     private final UserRepository userRepository;
     private final OAuthProviderProfileService providerProfileService;
     private final ConnectedAccountMutationService connectedAccountMutationService;
@@ -25,8 +28,10 @@ public class OAuthAccountLinkingService {
     public OAuthAccountLinkingService(
             UserRepository userRepository,
             OAuthProviderProfileService providerProfileService,
-            ConnectedAccountMutationService connectedAccountMutationService
+            ConnectedAccountMutationService connectedAccountMutationService,
+            PublicCreatorCacheService publicCreatorCacheService
     ) {
+        this.publicCreatorCacheService = publicCreatorCacheService;
         this.userRepository = userRepository;
         this.providerProfileService = providerProfileService;
         this.connectedAccountMutationService = connectedAccountMutationService;
@@ -40,6 +45,8 @@ public class OAuthAccountLinkingService {
             throw new OAuthAccountCollisionException("That account is already linked to another Modtale user.");
         }
 
+        boolean publicConnectionChanged = PublicCreatorCacheService.publicConnectionWouldChange(
+                currentUser, profile.provider(), profile.providerId(), profile.username(), profile.profileUrl(), profile.visible());
         connectedAccountMutationService.linkProvider(
                 currentUser,
                 profile.provider(),
@@ -50,6 +57,7 @@ public class OAuthAccountLinkingService {
                 accessToken
         );
         userRepository.save(currentUser);
+        if (publicConnectionChanged) publicCreatorCacheService.creatorChanged();
 
         return buildLinkedPrincipal(currentUser);
     }
@@ -71,6 +79,8 @@ public class OAuthAccountLinkingService {
             throw new OAuthAccountCollisionException("That account is already linked to another user or organization.");
         }
 
+        boolean publicConnectionChanged = PublicCreatorCacheService.publicConnectionWouldChange(
+                org, profile.provider(), profile.providerId(), profile.username(), profile.profileUrl(), true);
         connectedAccountMutationService.linkProvider(
                 org,
                 profile.provider(),
@@ -81,6 +91,7 @@ public class OAuthAccountLinkingService {
                 accessToken
         );
         userRepository.save(org);
+        if (publicConnectionChanged) publicCreatorCacheService.creatorChanged();
 
         return buildLinkedPrincipal(org);
     }

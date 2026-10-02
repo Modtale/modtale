@@ -6,10 +6,13 @@ import net.modtale.model.user.OAuthProvider;
 import net.modtale.model.user.User;
 import net.modtale.repository.user.UserRepository;
 import net.modtale.service.user.connection.ConnectedAccountMutationService;
+import net.modtale.service.system.PublicCreatorCacheService;
 import org.springframework.stereotype.Service;
 
 @Service
 public class OrganizationConnectionService {
+
+    private final PublicCreatorCacheService publicCreatorCacheService;
 
     private final UserRepository userRepository;
     private final OrganizationAccessService organizationAccessService;
@@ -18,8 +21,10 @@ public class OrganizationConnectionService {
     public OrganizationConnectionService(
             UserRepository userRepository,
             OrganizationAccessService organizationAccessService,
-            ConnectedAccountMutationService connectedAccountMutationService
+            ConnectedAccountMutationService connectedAccountMutationService,
+            PublicCreatorCacheService publicCreatorCacheService
     ) {
+        this.publicCreatorCacheService = publicCreatorCacheService;
         this.userRepository = userRepository;
         this.organizationAccessService = organizationAccessService;
         this.connectedAccountMutationService = connectedAccountMutationService;
@@ -41,6 +46,7 @@ public class OrganizationConnectionService {
         OAuthProvider targetProvider = OAuthProvider.fromString(provider);
         if (connectedAccountMutationService.unlink(org, targetProvider)) {
             userRepository.save(org);
+            publicCreatorCacheService.creatorChanged();
         }
     }
 
@@ -53,6 +59,7 @@ public class OrganizationConnectionService {
         User org = requireConnectionManagedOrganization(orgId, requester);
         if (connectedAccountMutationService.toggleVisibility(org, targetProvider)) {
             userRepository.save(org);
+            publicCreatorCacheService.creatorChanged();
         }
     }
 }

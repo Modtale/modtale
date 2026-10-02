@@ -9,6 +9,7 @@ import { ROUTE_SEO } from '@/data/seo-constants';
 import type { Project, User } from '@/types';
 import { SiteRoutes } from '@/utils/routes';
 import { useSSRData } from '@/context/SSRContext';
+import { getHomeSectionReadiness, isPlatformStats, isProjectData } from '@/utils/publicSsr';
 import { ProjectCardSkeleton } from '@/modules/project/components/ProjectCard';
 
 import { MarqueeColumn } from '../components/HeroMarquee';
@@ -178,15 +179,11 @@ export const Home: React.FC<{
 }) => {
     const { initialData: ssrData } = useSSRData();
     const homeSeo = ROUTE_SEO['/'];
-    const initialMarqueeProjects = ssrData?.homeMarqueeProjects || [];
-    const initialTrendingProjects = ssrData?.homeTrendingProjects || ssrData?.homeProjects || [];
-    const initialNewestProjects = ssrData?.homeNewestProjects || [];
-    const hasHomeSSRData = Boolean(
-        ssrData?.homeDataReady
-        || initialMarqueeProjects.length
-        || initialTrendingProjects.length
-        || initialNewestProjects.length
-    );
+    const initialMarqueeProjects = Array.isArray(ssrData?.homeMarqueeProjects) ? ssrData.homeMarqueeProjects.filter(isProjectData) : [];
+    const initialTrendingProjects = Array.isArray(ssrData?.homeTrendingProjects) ? ssrData.homeTrendingProjects.filter(isProjectData)
+        : Array.isArray(ssrData?.homeProjects) ? ssrData.homeProjects.filter(isProjectData) : [];
+    const initialNewestProjects = Array.isArray(ssrData?.homeNewestProjects) ? ssrData.homeNewestProjects.filter(isProjectData) : [];
+    const sectionReady = getHomeSectionReadiness(ssrData);
     const initialProjectSeed = useMemo(
         () => dedupeProjects([...initialTrendingProjects, ...initialNewestProjects]),
         [initialNewestProjects, initialTrendingProjects]
@@ -195,11 +192,11 @@ export const Home: React.FC<{
         () => initialMarqueeProjects.length ? initialMarqueeProjects : initialProjectSeed.filter(isHeroMarqueeProject),
         [initialMarqueeProjects, initialProjectSeed]
     );
-    const shouldFetchFallbackProjects = !hasHomeSSRData && initialProjectSeed.length === 0;
-    const shouldFetchFallbackMarquee = !hasHomeSSRData && initialMarqueeSeed.length === 0;
-    const shouldRefreshTrendingProjects = !initialTrendingProjects.length && initialProjectSeed.length > 0;
+    const shouldFetchFallbackProjects = !sectionReady.trending && initialProjectSeed.length === 0;
+    const shouldFetchFallbackMarquee = !sectionReady.marquee && initialMarqueeSeed.length === 0;
+    const shouldRefreshTrendingProjects = !sectionReady.trending && initialProjectSeed.length > 0;
     const hasInitialHeroMarqueeProjects = initialMarqueeSeed.some(isHeroMarqueeProject);
-    const initialProjects = initialTrendingProjects.length ? initialTrendingProjects : initialProjectSeed;
+    const initialProjects = sectionReady.trending ? initialTrendingProjects : initialProjectSeed;
     const initialHeroProjectsLoading = shouldFetchFallbackMarquee;
     const initialShouldReserveDesktopHeroMarquee = initialHeroProjectsLoading || initialMarqueeSeed.some(isHeroMarqueeProject);
 
@@ -211,11 +208,12 @@ export const Home: React.FC<{
     });
     const [marqueeProjects, setMarqueeProjects] = useState<Project[]>(initialMarqueeSeed);
     const [projects, setProjects] = useState<Project[]>(initialProjects);
-    const [newestProjects, setNewestProjects] = useState<Project[]>(initialNewestProjects.length ? initialNewestProjects : initialProjectSeed);
+    const [newestProjects, setNewestProjects] = useState<Project[]>(sectionReady.newest ? initialNewestProjects : initialProjectSeed);
+    const [hasNewestProjectsResponse, setHasNewestProjectsResponse] = useState(sectionReady.newest);
     const [isHeroProjectsLoading, setIsHeroProjectsLoading] = useState(initialHeroProjectsLoading);
     const [isTrendingProjectsLoading, setIsTrendingProjectsLoading] = useState(shouldFetchFallbackProjects);
-    const [isNewestProjectsLoading, setIsNewestProjectsLoading] = useState(!initialNewestProjects.length && initialProjectSeed.length === 0);
-    const [stats, setStats] = useState(ssrData?.stats || { totalProjects: 0, totalDownloads: 0, totalUsers: 0 });
+    const [isNewestProjectsLoading, setIsNewestProjectsLoading] = useState(!sectionReady.newest && initialProjectSeed.length === 0);
+    const [stats, setStats] = useState(isPlatformStats(ssrData?.stats) ? ssrData.stats : { totalProjects: 0, totalDownloads: 0, totalUsers: 0 });
     const heroGridRef = useRef<HTMLDivElement>(null);
     const heroTextColumnRef = useRef<HTMLDivElement>(null);
     const heroMarqueeDesktopRef = useRef<HTMLDivElement>(null);
@@ -232,9 +230,9 @@ export const Home: React.FC<{
         handleResize();
         window.addEventListener('resize', handleResize, { passive: true });
 
-        const shouldFetchFallbackNewest = !hasHomeSSRData && !initialNewestProjects.length && initialProjectSeed.length === 0;
-        const shouldRefreshNewestProjects = !initialNewestProjects.length && initialProjectSeed.length > 0;
-        const shouldFetchFallbackStats = !hasHomeSSRData || !ssrData?.stats;
+        const shouldFetchFallbackNewest = !sectionReady.newest && initialProjectSeed.length === 0;
+        const shouldRefreshNewestProjects = !sectionReady.newest && initialProjectSeed.length > 0;
+        const shouldFetchFallbackStats = !sectionReady.stats;
         let isCancelled = false;
         const scheduledTasks: Array<() => void> = [];
 
@@ -340,7 +338,7 @@ export const Home: React.FC<{
             }, true);
         } else if (initialMarqueeProjects.length > 0) {
             scheduleBackgroundRequest(() => loadAdditionalMarqueeProjects(initialMarqueeSeed));
-        } else if (hasInitialHeroMarqueeProjects) {
+        } else if (!sectionReady.marquee && hasInitialHeroMarqueeProjects) {
             scheduleBackgroundRequest(async () => {
                 try {
                     const nextProjects = await fetchMarqueeProjects(0);
@@ -360,7 +358,7 @@ export const Home: React.FC<{
                         params: { size: 12, sort: 'trending' },
                         timeout: HOME_REQUEST_TIMEOUT_MS,
                     });
-                    if (!isCancelled && res.data?.content) setProjects(res.data.content);
+                    if (!isCancelled && Array.isArray(res.data?.content)) setProjects(res.data.content);
                 } catch {}
             }, setIsTrendingProjectsLoading, true);
         } else if (shouldRefreshTrendingProjects) {
@@ -370,7 +368,7 @@ export const Home: React.FC<{
                         params: { size: 12, sort: 'trending' },
                         timeout: HOME_REQUEST_TIMEOUT_MS,
                     });
-                    if (!isCancelled && res.data?.content?.length) setProjects(res.data.content);
+                    if (!isCancelled && Array.isArray(res.data?.content)) setProjects(res.data.content);
                 } catch {}
             });
         }
@@ -379,7 +377,10 @@ export const Home: React.FC<{
             void runProjectRequest(async () => {
                 try {
                     const res = await api.get('/projects', { params: { size: 12, sort: 'newest' }, timeout: HOME_REQUEST_TIMEOUT_MS });
-                    if (!isCancelled && res.data?.content) setNewestProjects(res.data.content);
+                    if (!isCancelled && Array.isArray(res.data?.content)) {
+                        setNewestProjects(res.data.content);
+                        setHasNewestProjectsResponse(true);
+                    }
                 } catch {}
             }, setIsNewestProjectsLoading, true);
         } else if (shouldRefreshNewestProjects) {
@@ -389,14 +390,17 @@ export const Home: React.FC<{
                         params: { size: 12, sort: 'newest' },
                         timeout: HOME_REQUEST_TIMEOUT_MS,
                     });
-                    if (!isCancelled && res.data?.content?.length) setNewestProjects(res.data.content);
+                    if (!isCancelled && Array.isArray(res.data?.content)) {
+                        setNewestProjects(res.data.content);
+                        setHasNewestProjectsResponse(true);
+                    }
                 } catch {}
             });
         }
 
         if (shouldFetchFallbackStats) {
             api.get('/analytics/platform/stats', { timeout: HOME_REQUEST_TIMEOUT_MS })
-                .then(res => setStats(res.data))
+                .then(res => { if (!isCancelled && isPlatformStats(res.data)) setStats(res.data); })
                 .catch(() => {});
         }
 
@@ -408,7 +412,10 @@ export const Home: React.FC<{
     }, [
         DESKTOP_BREAKPOINT,
         hasInitialHeroMarqueeProjects,
-        hasHomeSSRData,
+        sectionReady.marquee,
+        sectionReady.trending,
+        sectionReady.newest,
+        sectionReady.stats,
         initialMarqueeProjects.length,
         initialMarqueeSeed.length,
         initialNewestProjects.length,
@@ -559,14 +566,14 @@ export const Home: React.FC<{
         [projects]
     );
     const newestSpotlightProjects = useMemo(() => {
-        if (newestProjects.length > 0) {
+        if (newestProjects.length > 0 || hasNewestProjectsResponse) {
             return dedupeProjects(newestProjects).slice(0, 6);
         }
 
         return [...combinedProjectPool]
             .sort((a, b) => new Date(b.createdAt || b.updatedAt || 0).getTime() - new Date(a.createdAt || a.updatedAt || 0).getTime())
             .slice(0, 6);
-    }, [combinedProjectPool, newestProjects]);
+    }, [combinedProjectPool, newestProjects, hasNewestProjectsResponse]);
     const col1Projects = useMemo(() => heroMarqueeProjects.filter((_, i) => i % 2 === 0), [heroMarqueeProjects]);
     const col2Projects = useMemo(() => heroMarqueeProjects.filter((_, i) => i % 2 === 1), [heroMarqueeProjects]);
     const col1Duration = `${Math.max(35, col1Projects.length * 7)}s`;
