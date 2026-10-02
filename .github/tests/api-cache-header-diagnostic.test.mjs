@@ -38,13 +38,13 @@ test('only exact fixed dev/production choices are accepted and dev is the defaul
     assert.throws(() => input(value), /invalid_fixed_target/);
   }
   const cases = requestCases(input());
-  assert.equal(cases.length, MAX_REQUESTS);
+  assert.equal(cases.length, MAX_REQUESTS - 2);
   assert.equal(cases.filter(item => item.kind === 'public').length, 6);
   assert.equal(cases.filter(item => item.kind === 'credential').length, 4);
   assert.ok(cases.every(item => item.path.startsWith('/api/v1/') && !/[?#%]/.test(item.path)));
 });
 
-test('at most 23 fixed ordinary GETs, no redirects/cache busting or real auth; summaries retain no raw data', async () => {
+test('at most 25 bounded ordinary GETs, no redirects/cache busting or real auth; summaries retain no raw data', async () => {
   for (const target of ['dev', 'production']) {
     const calls = [];
     const report = await runApiHeaderDiagnostic({ ...input(target), origin: 'https://ignored-evil.test' }, {
@@ -76,7 +76,9 @@ test('at most 23 fixed ordinary GETs, no redirects/cache busting or real auth; s
     assert.equal(good.status, 'complete', good.errorCode);
     assert.equal(goodCalls.length, MAX_REQUESTS);
     assert.equal(good.requestCount, MAX_REQUESTS);
-    assert.equal(good.publicSuccessCount, 6);
+    assert.equal(good.publicSuccessCount, 8);
+    assert.equal(good.catalogSuccessCount, 6);
+    assert.equal(good.projectSuccessCount, 2);
     assert.equal(good.applicationErrorCount, 1);
     assert.equal(good.publicProjectFixturePath, '/mod/public-fixture');
     assert.equal(good.authenticatedCrossUserCoverage, false);
@@ -196,7 +198,7 @@ test('authoritative errors must be no-store, and the fixed missing fixture canno
   assert.equal(limited.status, 'limited');
   assert.equal(limited.errorCode, 'public_policy_not_fully_observed');
   assert.equal(limited.publicSuccessCount, 0);
-  assert.equal(limited.requestCount, MAX_REQUESTS);
+  assert.equal(limited.requestCount, MAX_REQUESTS - 2);
   const safe = await runApiHeaderDiagnostic(input(), { request: async (url, options) => fixture(url, options, { status: 500 }) });
   assert.equal(safe.status, 'failed');
   assert.equal(safe.errorCode, 'missing_fixture_not_authoritatively_missing');
@@ -297,4 +299,154 @@ test('native request deadline also aborts a response body that stalls after head
       { method: 'GET', signal: AbortSignal.timeout(200) }, http.request);
     await assert.rejects(new Response(response.body).text());
   } finally { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); }
+});
+
+
+function originOnlyFixture(url, options, overrides = {}) {
+  const response = fixture(url, options, overrides);
+  response.headers.delete('cf-cache-status');
+  response.headers.delete('cf-ray');
+  return response;
+}
+
+test('DNS-only staging validates origin policy without claiming edge verification', async () => {
+  const report = await runApiHeaderDiagnostic(input(), { request: async (url, options) => originOnlyFixture(url, options) });
+  assert.equal(report.status, 'complete', report.errorCode);
+  assert.equal(report.requestCount, MAX_REQUESTS);
+  assert.equal(report.publicSuccessCount, 8);
+  assert.equal(report.originPolicyVerified, true);
+  assert.equal(report.csrfBootstrapVerified, true);
+  assert.equal(report.verificationScope, 'origin_only');
+  assert.equal(report.edgeVerificationRequired, false);
+  assert.equal(report.edgeVerified, false);
+  assert.equal(report.confirmedPublicHit, false);
+  assert.ok(report.observations.every(item => item.cloudflareHeadersObserved === false));
+  assert.match(report.limitations[0], /does not verify Cloudflare edge caching/);
+});
+
+test('staging with Cloudflare headers still enforces edge validation and remains origin-scoped', async () => {
+  const observed = await runApiHeaderDiagnostic(input(), { request: async (url, options) => fixture(url, options) });
+  assert.equal(observed.status, 'complete');
+  assert.equal(observed.confirmedPublicHit, true);
+  assert.equal(observed.edgeVerified, false);
+  assert.equal(observed.verificationScope, 'origin_only');
+  const partial = await runApiHeaderDiagnostic(input(), { request: async (url, options) => {
+    const response = originOnlyFixture(url, options);
+    response.headers.set('cf-ray', 'unretained-fixture-ray');
+    return response;
+  } });
+  assert.equal(partial.errorCode, 'edge_cache_status_not_observed');
+  assert.ok(!JSON.stringify(partial).includes('unretained-fixture-ray'));
+  for (const headers of [
+    { 'cf-cache-status': 'HIT' }, { age: '1' },
+    { 'cf-cache-status': 'MISS' }, { 'cf-cache-status': '' }, { age: 'invalid' },
+  ]) {
+    const report = await runApiHeaderDiagnostic(input(), { request: async (url, options) => {
+      const response = originOnlyFixture(url, options);
+      if (options.headers?.Origin) for (const [name, value] of Object.entries(headers)) response.headers.set(name, value);
+      return response;
+    } });
+    assert.equal(report.status, 'failed');
+    assert.equal(report.edgeVerified, false);
+  }
+});
+
+test('origin-only staging still rejects missing no-store, missing cookies and bad bootstrap tokens', async () => {
+  for (const overrides of [
+    { headers: { 'cache-control': publicPolicy } },
+    { headers: { 'set-cookie': 'SESSION=not-an-xsrf-cookie' } },
+  ]) {
+    const report = await runApiHeaderDiagnostic(input(), { request: async (url, options) => originOnlyFixture(url, options,
+      options.headers?.Origin ? overrides : {}) });
+    assert.equal(report.status, 'failed');
+    assert.equal(report.originPolicyVerified, false);
+  }
+  const report = await runApiHeaderDiagnostic(input(), { request: async (url, options) => originOnlyFixture(url, options,
+    new URL(url).pathname === '/api/v1/auth/csrf' ? { body: { token: 'mismatch' } } : {}) });
+  assert.equal(report.errorCode, 'bootstrap_token_cookie_mismatch');
+  assert.equal(report.originPolicyVerified, false);
+});
+
+test('production cannot complete without a public HIT or silently become origin-only', async () => {
+  const missingHeaders = await runApiHeaderDiagnostic({ ...input('production'), requireEdge: false }, {
+    request: async (url, options) => originOnlyFixture(url, options),
+  });
+  assert.equal(missingHeaders.status, 'failed');
+  assert.equal(missingHeaders.errorCode, 'edge_cache_status_not_observed');
+  assert.equal(missingHeaders.edgeVerificationRequired, true);
+  for (const state of ['MISS', 'BYPASS', 'DYNAMIC', 'EXPIRED']) {
+    const noHit = await runApiHeaderDiagnostic(input('production'), { request: async (url, options) => fixture(url, options,
+      options.headers || new URL(url).pathname === MISSING_PATH ? {} : { headers: { 'cf-cache-status': state } }) });
+    assert.equal(noHit.status, 'limited');
+    assert.equal(noHit.errorCode, 'catalog_cache_hit_not_observed');
+    assert.equal(noHit.requestCount, MAX_REQUESTS);
+    assert.equal(noHit.originPolicyVerified, true);
+    assert.equal(noHit.edgeVerified, false);
+  }
+  const good = await runApiHeaderDiagnostic(input('production'), { request: async (url, options) => fixture(url, options) });
+  assert.equal(good.status, 'complete');
+  assert.equal(good.verificationScope, 'origin_and_cloudflare_edge');
+  assert.equal(good.edgeVerificationRequired, true);
+  assert.equal(good.originPolicyVerified, true);
+  assert.equal(good.edgeVerified, true);
+  assert.equal(good.confirmedPublicHit, true);
+  const missingBypass = await runApiHeaderDiagnostic(input('production'), { request: async (url, options) => {
+    const response = fixture(url, options);
+    if (options.headers?.Origin) response.headers.delete('cf-cache-status');
+    return response;
+  } });
+  assert.equal(missingBypass.errorCode, 'edge_bypass_not_observed');
+});
+
+
+test('both production cache-rule groups require a HIT from a bounded validated fixture', async () => {
+  const calls = [];
+  const good = await runApiHeaderDiagnostic(input('production'), { request: async (url, options) => {
+    calls.push(new URL(url));
+    return fixture(url, options);
+  } });
+  assert.equal(good.status, 'complete');
+  assert.equal(good.confirmedCatalogHit, true);
+  assert.equal(good.confirmedProjectHit, true);
+  assert.equal(good.projectFixtureAvailable, true);
+  assert.equal(good.catalogSuccessCount, 6);
+  assert.equal(good.projectSuccessCount, 2);
+  assert.equal(calls.length, MAX_REQUESTS);
+  assert.deepEqual(calls.slice(-2).map(url => url.pathname), ['/api/v1/projects/public-fixture', '/api/v1/projects/public-fixture']);
+  assert.ok(calls.every(url => url.origin === input('production').origin && !url.search && !url.hash));
+  const projectMiss = await runApiHeaderDiagnostic(input('production'), { request: async (url, options) => fixture(url, options,
+    new URL(url).pathname === '/api/v1/projects/public-fixture' ? { headers: { 'cf-cache-status': 'MISS' } } : {}) });
+  assert.equal(projectMiss.status, 'limited');
+  assert.equal(projectMiss.errorCode, 'project_cache_hit_not_observed');
+  assert.equal(projectMiss.confirmedCatalogHit, true);
+  assert.equal(projectMiss.confirmedProjectHit, false);
+  assert.equal(projectMiss.edgeVerified, false);
+});
+
+test('absent or unsafe public fixture limits coverage and never widens request scope', async () => {
+  for (const target of ['dev', 'production']) {
+    for (const body of [
+      { content: [] },
+      { content: [{ ...projects.content[0], slug: 'https://attacker.test' }] },
+      { content: [{ ...projects.content[0], status: 'DRAFT' }] },
+    ]) {
+      const calls = [];
+      const report = await runApiHeaderDiagnostic(input(target), { request: async (url, options) => {
+        calls.push(String(url));
+        return fixture(url, options, new URL(url).pathname === '/api/v1/projects' && !options.headers ? { body } : {});
+      } });
+      assert.equal(report.status, 'limited');
+      assert.equal(report.errorCode, 'public_project_fixture_not_observed');
+      assert.equal(report.requestCount, MAX_REQUESTS - 2);
+      assert.equal(report.projectFixtureAvailable, false);
+      assert.equal(report.projectSuccessCount, 0);
+      assert.equal(report.edgeVerified, false);
+      assert.ok(calls.every(url => !url.includes('attacker')));
+    }
+  }
+  const gone = await runApiHeaderDiagnostic(input('production'), { request: async (url, options) => fixture(url, options,
+    new URL(url).pathname === '/api/v1/projects/public-fixture' ? { status: 404 } : {}) });
+  assert.equal(gone.status, 'limited');
+  assert.equal(gone.errorCode, 'project_policy_not_fully_observed');
+  assert.equal(gone.edgeVerified, false);
 });
