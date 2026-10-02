@@ -1,0 +1,126 @@
+name: Warden Persisted State
+
+on:
+  push:
+    branches: [warden-v3]
+    paths:
+      - 'backend/**'
+      - '.github/workflows/warden-persisted.yml'
+      - '.github/scripts/warden-persisted-tests.py'
+      - '.github/tests/warden-persisted-tests.test.mjs'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: warden-persisted-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  persisted:
+    name: MongoDB ${{ matrix.version }} persisted review
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - version: '7.0.41'
+            image: 'mongo:7.0.41@sha256:afef081f9a06e810d1781214234b8c0dab77f9f694567bf24b193b78d445491e'
+          - version: '8.0.23'
+            image: 'mongo:8.0.23@sha256:9e53b28fb3904fa3c68e561902b64ac996a5c71fc56dda279f4964b7f937a749'
+    env:
+      WARDEN_REVIEW_DB_TEST: 'true'
+      WARDEN_REVIEW_DB_PORT: '27030'
+      WARDEN_REPAIR_TX_DB_TEST: 'true'
+      WARDEN_REPAIR_TX_DB_PORT: '27032'
+      MONGODB_URI: mongodb://127.0.0.1:27030/modtale-test
+      MONGODB_DATABASE_NAME: modtale-test
+      R2_BUCKET_NAME: modtale-test
+      R2_ARTIFACT_BUCKET_NAME: modtale-test-artifacts
+      R2_ACCESS_KEY: test-access-key
+      R2_SECRET_KEY: test-secret-key
+      R2_ENDPOINT: https://example.com
+      R2_PUBLIC_DOMAIN: https://cdn.example.com
+      FRONTEND_URL: http://localhost:5173
+      BACKEND_URL: http://localhost:8080
+      WARDEN_ENABLED: 'false'
+      PRE_AUTH_SECRET: test-pre-auth-secret
+    steps:
+      - name: Check out candidate
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Java
+        uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
+        with:
+          distribution: temurin
+          java-version: '26.0.2+101'
+
+      - name: Test persisted-suite selection and report validation
+        run: node --test .github/tests/warden-persisted-tests.test.mjs
+
+      - name: Start isolated local database fixtures
+        env:
+          MONGO_IMAGE: ${{ matrix.image }}
+        run: |
+          set -euo pipefail
+          docker pull "$MONGO_IMAGE"
+          docker run --detach --name warden-standalone --network host "$MONGO_IMAGE" \
+            mongod --bind_ip 127.0.0.1 --port 27030 --wiredTigerCacheSizeGB 0.25
+          docker run --detach --name warden-replica --network host "$MONGO_IMAGE" \
+            mongod --bind_ip 127.0.0.1 --port 27032 --replSet warden-ci --wiredTigerCacheSizeGB 0.25
+          for fixture in standalone replica; do
+            port=27030
+            if [[ "$fixture" == replica ]]; then port=27032; fi
+            ready=false
+            for attempt in {1..60}; do
+              if docker exec "warden-$fixture" mongosh --quiet --port "$port" \
+                --eval 'quit(db.adminCommand({ping: 1}).ok === 1 ? 0 : 1)'; then
+                ready=true
+                break
+              fi
+              sleep 1
+            done
+            [[ "$ready" == true ]]
+          done
+          docker exec warden-replica mongosh --quiet --port 27032 --eval \
+            'assert.commandWorked(rs.initiate({_id: "warden-ci", members: [{_id: 0, host: "127.0.0.1:27032"}]}))'
+          docker exec warden-replica mongosh --quiet --port 27032 --eval \
+            'assert.soon(() => db.hello().isWritablePrimary === true, "Replica fixture did not elect a primary", 60000)'
+
+      - name: Run every persisted Warden suite
+        run: |
+          set -euo pipefail
+          python3 .github/scripts/warden-persisted-tests.py list > "$RUNNER_TEMP/warden-suites.txt"
+          mapfile -t suites < "$RUNNER_TEMP/warden-suites.txt"
+          (( ${#suites[@]} > 0 ))
+          selectors=()
+          for suite in "${suites[@]}"; do selectors+=(--tests "$suite"); done
+          bash backend/gradlew -p backend cleanTest test "${selectors[@]}" \
+            --no-daemon --max-workers=2 -Dorg.gradle.jvmargs='-Xmx1g -XX:MaxMetaspaceSize=512m'
+          python3 .github/scripts/warden-persisted-tests.py verify
+
+      - name: Retain test and fixture reports
+        if: ${{ !cancelled() }}
+        run: |
+          mkdir -p backend/build/warden-fixture-logs
+          docker logs warden-standalone > backend/build/warden-fixture-logs/standalone.log 2>&1 || true
+          docker logs warden-replica > backend/build/warden-fixture-logs/replica.log 2>&1 || true
+
+      - name: Upload persisted-state evidence
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: warden-persisted-mongo-${{ matrix.version }}
+          path: |
+            backend/build/reports/tests/test
+            backend/build/test-results/test
+            backend/build/warden-fixture-logs
+          retention-days: 7
+          if-no-files-found: error
+
+      - name: Remove isolated fixtures
+        if: always()
+        run: docker rm --force --volumes warden-standalone warden-replica || true
