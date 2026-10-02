@@ -282,7 +282,7 @@ test('native transport preserves empty headers and never adds fetch metadata or 
     assert.equal(observed.length, 2);
     assert.ok(observed.every(item => item.url === '/fixed'));
     assert.equal(observed[0].headers['sec-fetch-mode'], undefined);
-    assert.equal(observed[0].headers['user-agent'], undefined);
+    assert.equal(observed[0].headers['user-agent'], 'node');
     assert.equal(observed[0].headers.origin, undefined);
     assert.equal(observed[0].headers.cookie, undefined);
     assert.equal(observed[1].headers.origin, '');

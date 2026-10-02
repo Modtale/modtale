@@ -7,7 +7,8 @@ export const PUBLIC_SSR_MAX_RESPONSE_BYTES = 8 * 1024 * 1024;
 // Keep this transport out of shared/client modules. Node's fetch adds
 // Sec-Fetch-Mode: cors, which correctly makes the API treat it as a browser
 // request and issue a CSRF cookie. These reads are anonymous server requests:
-// accept no caller headers, URL credentials, cookies, or redirects.
+// accept no caller headers, URL credentials, cookies, or redirects. Preserve
+// the truthful Node client identity previously supplied by Node fetch.
 export const fetchPublicJson = (resource: string, timeoutMs = 1500): Promise<PublicJsonResult> => new Promise(resolve => {
     let request: ClientRequest | undefined;
     let status = 0;
@@ -36,7 +37,7 @@ export const fetchPublicJson = (resource: string, timeoutMs = 1500): Promise<Pub
         const send = url.protocol === 'https:' ? httpsRequest : httpRequest;
         request = send(url, {
             method: 'GET',
-            headers: { Accept: 'application/json', 'Accept-Encoding': 'identity' },
+            headers: { Accept: 'application/json', 'Accept-Encoding': 'identity', 'User-Agent': 'node' },
         }, response => {
             status = response.statusCode ?? 0;
             response.on('error', stop);

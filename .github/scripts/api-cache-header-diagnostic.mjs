@@ -69,11 +69,12 @@ export function requestCases(input) {
 
 // Node fetch adds Sec-Fetch-Mode: cors even for server requests. Use the native
 // HTTPS client so public probes actually have no browser or credential headers.
+// Preserve the truthful Node identity previously supplied by Node fetch.
 // It does not follow redirects, maintain a cookie jar, decompress, or retry.
 export function requestWithoutBrowserHeaders(url, options, transport = https.request) {
   return new Promise((resolve, reject) => {
     const request = transport(url, {
-      method: options.method, headers: options.headers, signal: options.signal,
+      method: options.method, headers: { ...options.headers, 'User-Agent': 'node' }, signal: options.signal,
     }, response => {
       const headers = new Headers();
       for (let index = 0; index < response.rawHeaders.length; index += 2) {
@@ -353,7 +354,7 @@ export async function runApiHeaderDiagnostic(input, { request = requestWithoutBr
       'Empty Origin is checked by backend tests and edge-rule inspection, not live probing, because Spring CORS rejects it.',
       'A bounded public response to an empty header is indistinguishable from an anonymous request; normalization is unproven and this does not count as credential exclusion or catalog/project HIT evidence.',
       'No response bodies, arbitrary header values, credential values, cookies, or tokens are retained.',
-      'No retries, redirects, cache-busting, writes, purges, user-agent overrides, or WAF bypass.'] };
+      'No retries, redirects, cache-busting, writes, purges, client-identity rotation, browser impersonation, or WAF bypass.'] };
   try {
     for (const item of cases) {
       requireCondition(report.requestCount < MAX_REQUESTS, 'request_budget_exceeded');
