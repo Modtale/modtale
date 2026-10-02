@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
 import { once } from 'node:events';
-import { mkdtemp, rm, symlink } from 'node:fs/promises';
+import { mkdtemp, readFile, readdir, rm, symlink } from 'node:fs/promises';
 import http from 'node:http';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -66,7 +66,7 @@ const assertNoStore = response => {
 before(async () => {
     backend = http.createServer((req, res) => {
         const url = new URL(req.url, 'http://fixture');
-        upstreamRequests.push({ path: url.pathname, cookie: req.headers.cookie, authorization: req.headers.authorization });
+        upstreamRequests.push({ path: url.pathname, headers: { ...req.headers }, cookie: req.headers.cookie, authorization: req.headers.authorization });
         if (url.pathname === '/api/v1/projects') {
             if (homeMode === 'all-fail' || (homeMode === 'partial' && url.searchParams.get('sort') === 'trending')) return json(res, { error: 'temporarily unavailable' }, 503);
             if (homeMode === 'malformed') return json(res, { content: null });
@@ -135,6 +135,36 @@ before(async () => {
 
 after(async () => { await close(frontend); await close(backend); if (buildDir) await rm(buildDir, { recursive: true, force: true }); });
 beforeEach(() => { homeMode = 'success'; newsMode = 'success'; jamsMode = 'success'; wikiOverrides = {}; upstreamRequests = []; });
+
+describe('production server-only SSR transport', () => {
+    it('keeps Node HTTP transport out of browser assets', async () => {
+        const clientDir = path.join(buildDir, 'client');
+        const files = await readdir(clientDir, { recursive: true });
+        const scripts = files.filter(file => file.endsWith('.js'));
+        assert.ok(scripts.length > 0);
+        for (const script of scripts) {
+            const source = await readFile(path.join(clientDir, script), 'utf8');
+            assert.doesNotMatch(source, /["']node:https?["']|__vite-browser-external/, script);
+        }
+    });
+    for (const route of ['/', '/mods', '/mod/sky', '/modpack/pack', '/world/world', '/mod/sky/download', '/mod/sky/wiki', '/creator/ada']) {
+        it(`sends anonymous server API requests without browser metadata for ${route}`, async () => {
+            await get(route, {
+                Cookie: 'session=sentinel', Authorization: 'Bearer sentinel', 'X-API-Key': 'sentinel',
+                Origin: 'https://visitor.example', Referer: 'https://visitor.example/page',
+                'Sec-Fetch-Site': 'cross-site', 'Sec-Fetch-Mode': 'navigate',
+                'Sec-Fetch-Dest': 'document', 'Sec-Fetch-User': '?1',
+            });
+            // Private catch-all routes intentionally skip public project/wiki SSR.
+            // Their anonymous variants still exercise the same isolated transport.
+            if (!upstreamRequests.length) await get(route);
+            assert.ok(upstreamRequests.length > 0);
+            for (const request of upstreamRequests) {
+                assert.deepEqual(Object.keys(request.headers).sort(), ['accept', 'accept-encoding', 'connection', 'host']);
+            }
+        });
+    }
+});
 
 describe('production SSR homepage caching', () => {
     it('caches a complete homepage for five minutes with project/stats bootstrap and SEO', async () => {
