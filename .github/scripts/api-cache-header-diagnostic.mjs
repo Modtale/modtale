@@ -69,11 +69,12 @@ export function requestCases(input) {
 
 // Node fetch adds Sec-Fetch-Mode: cors even for server requests. Use the native
 // HTTPS client so public probes actually have no browser or credential headers.
+// Preserve the truthful Node identity previously supplied by Node fetch.
 // It does not follow redirects, maintain a cookie jar, decompress, or retry.
 export function requestWithoutBrowserHeaders(url, options, transport = https.request) {
   return new Promise((resolve, reject) => {
     const request = transport(url, {
-      method: options.method, headers: options.headers, signal: options.signal,
+      method: options.method, headers: { ...options.headers, 'User-Agent': 'node' }, signal: options.signal,
     }, response => {
       const headers = new Headers();
       for (let index = 0; index < response.rawHeaders.length; index += 2) {
@@ -312,6 +313,13 @@ export function validateObservation(response, body, item, requireEdge = true) {
   }
   requireCondition(response.status === 200 && item.kind !== 'missing', 'unexpected_success_status');
   requireCondition(item.contentType === 'application/json', 'successful_api_response_not_json');
+  if (item.kind === 'empty_header' && item.cacheControl.public) {
+    // Intermediaries may discard an empty header before it reaches the servlet.
+    // A public response is indistinguishable from an anonymous read: validate
+    // its full public policy, but do not call it credential-exclusion evidence.
+    requirePublicPolicy(item, requireEdge);
+    return 'empty_header_public_response';
+  }
   if (item.kind !== 'public') {
     requireNoStore(item, requireEdge);
     requireCondition(item.csrfCookieObserved, 'excluded_success_missing_csrf_cookie');
@@ -335,7 +343,7 @@ export async function runApiHeaderDiagnostic(input, { request = requestWithoutBr
   const report = { target: fixed.target, origin: fixed.origin, sampledAt: date().toISOString(), status: 'running',
     verificationScope: fixed.requireEdge ? 'origin_and_cloudflare_edge' : 'origin_only',
     edgeVerificationRequired: fixed.requireEdge, originPolicyVerified: false, edgeVerified: false,
-    maxRequests: MAX_REQUESTS, requestCount: 0, observations: [], publicSuccessCount: 0, catalogSuccessCount: 0, projectSuccessCount: 0, applicationErrorCount: 0,
+    maxRequests: MAX_REQUESTS, requestCount: 0, observations: [], publicSuccessCount: 0, catalogSuccessCount: 0, projectSuccessCount: 0, applicationErrorCount: 0, emptyHeaderPublicResponseCount: 0,
     confirmedPublicHit: false, confirmedCatalogHit: false, confirmedProjectHit: false, projectFixtureAvailable: false, csrfBootstrapVerified: false, authenticatedCrossUserCoverage: false,
     limitations: [fixed.requireEdge
       ? 'Production completion requires the origin policy matrix, excluded-request edge bypass, and a public Cloudflare HIT for both catalog and project-page rules.'
@@ -344,8 +352,9 @@ export async function runApiHeaderDiagnostic(input, { request = requestWithoutBr
       'The two project reads use only a validated public slug/id from the first catalog response; an absent fixture leaves coverage limited.',
       'Only fixed synthetic invalid credentials are tested; no real authentication or cross-user private data coverage.',
       'Empty Origin is checked by backend tests and edge-rule inspection, not live probing, because Spring CORS rejects it.',
+      'A bounded public response to an empty header is indistinguishable from an anonymous request; normalization is unproven and this does not count as credential exclusion or catalog/project HIT evidence.',
       'No response bodies, arbitrary header values, credential values, cookies, or tokens are retained.',
-      'No retries, redirects, cache-busting, writes, purges, user-agent overrides, or WAF bypass.'] };
+      'No retries, redirects, cache-busting, writes, purges, client-identity rotation, browser impersonation, or WAF bypass.'] };
   try {
     for (const item of cases) {
       requireCondition(report.requestCount < MAX_REQUESTS, 'request_budget_exceeded');
@@ -362,6 +371,11 @@ export async function runApiHeaderDiagnostic(input, { request = requestWithoutBr
       const result = observation(response, item, startedAt, ttfb, now() - start, body);
       report.observations.push(result);
       result.result = validateObservation(response, body, result, fixed.requireEdge);
+      if (result.result === 'empty_header_public_response') {
+        report.emptyHeaderPublicResponseCount++;
+        result.emptyHeaderInterpretation = 'indistinguishable_from_anonymous_request';
+        result.transportNormalizationVerified = false;
+      }
       if (result.result === 'public_bounded_300') {
         report.publicSuccessCount++;
         const projectRead = result.publicCacheGroup === 'project';
