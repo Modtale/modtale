@@ -6,10 +6,10 @@ import { performance } from 'node:perf_hooks';
 import { pathToFileURL } from 'node:url';
 
 const TARGETS = Object.freeze({
-  dev: { origin: 'https://dev.api.modtale.net', site: 'https://dev.modtale.net' },
-  production: { origin: 'https://api.modtale.net', site: 'https://modtale.net' },
+  dev: { origin: 'https://dev.api.modtale.net', site: 'https://dev.modtale.net', requireEdge: false },
+  production: { origin: 'https://api.modtale.net', site: 'https://modtale.net', requireEdge: true },
 });
-export const MAX_REQUESTS = 23;
+export const MAX_REQUESTS = 25;
 export const REQUEST_TIMEOUT_MS = 10000;
 export const MAX_BODY_BYTES = 512 * 1024;
 export const MISSING_PATH = '/api/v1/projects/modtale-cache-diagnostic-fixed-missing-project';
@@ -165,8 +165,10 @@ function observation(response, item, startedAt, ttfbMs, totalMs) {
     ? response.headers.get('cloudflare-cdn-cache-control') : response.headers.get('cdn-cache-control');
   return {
     case: item.id, path: item.path, kind: item.kind, startedAt,
+    publicCacheGroup: item.kind === 'public' ? item.cacheGroup || 'catalog' : null,
     status: response.status, ttfbMs: Math.round(ttfbMs), totalMs: Math.round(totalMs),
     cacheStatus: CACHE_STATES.has(cacheStatus) ? cacheStatus : null,
+    cloudflareHeadersObserved: rawCacheStatus !== null || response.headers.has('cf-ray'),
     malformedCacheStatusObserved: rawCacheStatus !== null && !CACHE_STATES.has(cacheStatus),
     ageSeconds: /^\d+$/.test(age || '') && Number.isSafeInteger(Number(age)) ? Number(age) : null,
     malformedAgeObserved: age !== null && (!/^\d+$/.test(age) || !Number.isSafeInteger(Number(age))),
@@ -180,18 +182,20 @@ function observation(response, item, startedAt, ttfbMs, totalMs) {
   };
 }
 
-function requireNoSharedCache(item) {
+function requireNoSharedCache(item, requireEdge) {
   requireCondition(!SHARED_CACHE_STATES.has(item.cacheStatus) && !(item.ageSeconds > 0), 'excluded_response_used_shared_cache');
   requireCondition(!item.malformedAgeObserved, 'unrecognized_cache_age');
   requireCondition(!item.malformedCacheStatusObserved, 'unrecognized_cache_status');
-  requireCondition(['BYPASS', 'DYNAMIC'].includes(item.cacheStatus), 'edge_bypass_not_observed');
+  if (requireEdge || item.cloudflareHeadersObserved) {
+    requireCondition(['BYPASS', 'DYNAMIC'].includes(item.cacheStatus), 'edge_bypass_not_observed');
+  }
 }
-function requireNoStore(item) {
+function requireNoStore(item, requireEdge) {
   requireCondition(item.cacheControl['no-store'] === true, 'credential_or_error_missing_no_store');
   if (item.cdnPolicyHeaderObserved) requireCondition(item.cdnCacheControl['no-store'] === true, 'cdn_policy_overrides_no_store');
-  requireNoSharedCache(item);
+  requireNoSharedCache(item, requireEdge);
 }
-function requirePublicPolicy(item) {
+function requirePublicPolicy(item, requireEdge) {
   const policy = item.cacheControl;
   requireCondition(!policy.invalid && policy.public && policy['max-age'] === 0 && policy['must-revalidate']
     && Number.isInteger(policy['s-maxage']) && policy['s-maxage'] > 0 && policy['s-maxage'] <= 300
@@ -207,22 +211,25 @@ function requirePublicPolicy(item) {
   requireCondition(!item.malformedAgeObserved, 'unrecognized_cache_age');
   requireCondition(!item.malformedCacheStatusObserved, 'unrecognized_cache_status');
   requireCondition(!['STALE', 'UPDATING'].includes(item.cacheStatus), 'public_api_response_served_stale');
+  if (requireEdge || item.cloudflareHeadersObserved) {
+    requireCondition(item.cacheStatus !== null, 'edge_cache_status_not_observed');
+  }
 }
 
-export function validateObservation(response, body, item) {
+export function validateObservation(response, body, item, requireEdge = true) {
   const reason = blockedReason(response, body);
   if (reason) throw new DiagnosticFailure(reason, true);
   requireCondition(response.status < 300 || response.status >= 400, 'redirect_not_followed');
   if (response.status >= 400) {
     requireCondition(isApplicationProblem(response, body), 'unrecognized_application_error_contract');
     if (item.kind === 'missing') requireCondition([404, 410].includes(response.status), 'missing_fixture_not_authoritatively_missing');
-    requireNoStore(item);
+    requireNoStore(item, requireEdge);
     return 'application_error_no_store';
   }
   requireCondition(response.status === 200 && item.kind !== 'missing', 'unexpected_success_status');
   requireCondition(item.contentType === 'application/json', 'successful_api_response_not_json');
   if (item.kind !== 'public') {
-    requireNoStore(item);
+    requireNoStore(item, requireEdge);
     requireCondition(item.csrfCookieObserved, 'excluded_success_missing_csrf_cookie');
     if (item.kind === 'bootstrap') {
       let token;
@@ -233,18 +240,24 @@ export function validateObservation(response, body, item) {
     }
     return 'excluded_success_no_store_with_csrf';
   }
-  requirePublicPolicy(item);
+  requirePublicPolicy(item, requireEdge);
   return 'public_bounded_300';
 }
 
 export async function runApiHeaderDiagnostic(input, { request = requestWithoutBrowserHeaders, now = () => performance.now(), date = () => new Date() } = {}) {
   const fixed = validateInputs({ API_DIAGNOSTIC_TARGET: input.target });
-  const cases = requestCases(fixed);
-  requireCondition(cases.length === MAX_REQUESTS, 'request_plan_budget_invalid');
+  const cases = [...requestCases(fixed)];
+  requireCondition(cases.length === MAX_REQUESTS - 2, 'request_plan_budget_invalid');
   const report = { target: fixed.target, origin: fixed.origin, sampledAt: date().toISOString(), status: 'running',
-    maxRequests: MAX_REQUESTS, requestCount: 0, observations: [], publicSuccessCount: 0, applicationErrorCount: 0,
-    confirmedPublicHit: false, csrfBootstrapVerified: false, authenticatedCrossUserCoverage: false,
-    limitations: ['Headers/Age alone do not prove the active Cloudflare rule TTL; reconcile live rule configuration separately.',
+    verificationScope: fixed.requireEdge ? 'origin_and_cloudflare_edge' : 'origin_only',
+    edgeVerificationRequired: fixed.requireEdge, originPolicyVerified: false, edgeVerified: false,
+    maxRequests: MAX_REQUESTS, requestCount: 0, observations: [], publicSuccessCount: 0, catalogSuccessCount: 0, projectSuccessCount: 0, applicationErrorCount: 0,
+    confirmedPublicHit: false, confirmedCatalogHit: false, confirmedProjectHit: false, projectFixtureAvailable: false, csrfBootstrapVerified: false, authenticatedCrossUserCoverage: false,
+    limitations: [fixed.requireEdge
+      ? 'Production completion requires the origin policy matrix, excluded-request edge bypass, and a public Cloudflare HIT for both catalog and project-page rules.'
+      : 'Dev is an origin-only check for the DNS-only staging deployment; completion does not verify Cloudflare edge caching. Any observed Cloudflare headers are still validated.',
+      'Headers/Age alone do not prove the active Cloudflare rule TTL; reconcile live rule configuration separately.',
+      'The two project reads use only a validated public slug/id from the first catalog response; an absent fixture leaves coverage limited.',
       'Only fixed synthetic invalid credentials are tested; no real authentication or cross-user private data coverage.',
       'Empty Origin is checked by backend tests and edge-rule inspection, not live probing, because Spring CORS rejects it.',
       'No response bodies, arbitrary header values, credential values, cookies, or tokens are retained.',
@@ -264,18 +277,40 @@ export async function runApiHeaderDiagnostic(input, { request = requestWithoutBr
       const body = await readBoundedBody(response);
       const result = observation(response, item, startedAt, ttfb, now() - start);
       report.observations.push(result);
-      result.result = validateObservation(response, body, result);
+      result.result = validateObservation(response, body, result, fixed.requireEdge);
       if (result.result === 'public_bounded_300') {
         report.publicSuccessCount++;
-        if (result.cacheStatus === 'HIT') report.confirmedPublicHit = true;
-        if (item.id === 'anonymous_projects') report.publicProjectFixturePath = publicProjectFixture(body);
+        const projectRead = result.publicCacheGroup === 'project';
+        if (projectRead) report.projectSuccessCount++;
+        else report.catalogSuccessCount++;
+        if (result.cacheStatus === 'HIT') {
+          report.confirmedPublicHit = true;
+          if (projectRead) report.confirmedProjectHit = true;
+          else report.confirmedCatalogHit = true;
+        }
+        if (item.id === 'anonymous_projects') {
+          report.publicProjectFixturePath = publicProjectFixture(body);
+          report.projectFixtureAvailable = report.publicProjectFixturePath !== null;
+          if (report.projectFixtureAvailable) {
+            const segment = report.publicProjectFixturePath.split('/').at(-1);
+            for (const prefix of ['anonymous', 'repeat']) cases.push({
+              id: `${prefix}_public_project`, path: `/api/v1/projects/${segment}`, kind: 'public', cacheGroup: 'project',
+            });
+          }
+        }
       }
       if (result.result === 'application_error_no_store') report.applicationErrorCount++;
       if (result.result === 'csrf_bootstrap_no_store') report.csrfBootstrapVerified = true;
     }
-    report.status = report.publicSuccessCount === 6 && report.csrfBootstrapVerified ? 'complete' : 'limited';
-    if (report.status === 'limited') report.errorCode = report.publicSuccessCount !== 6
-      ? 'public_policy_not_fully_observed' : 'csrf_bootstrap_not_observed';
+    report.originPolicyVerified = report.catalogSuccessCount === 6 && report.projectSuccessCount === 2 && report.csrfBootstrapVerified;
+    report.edgeVerified = fixed.requireEdge && report.originPolicyVerified && report.confirmedCatalogHit && report.confirmedProjectHit;
+    report.status = report.originPolicyVerified && (!fixed.requireEdge || report.edgeVerified) ? 'complete' : 'limited';
+    if (report.status === 'limited') report.errorCode = report.catalogSuccessCount !== 6
+      ? 'public_policy_not_fully_observed' : !report.csrfBootstrapVerified
+        ? 'csrf_bootstrap_not_observed' : !report.projectFixtureAvailable
+          ? 'public_project_fixture_not_observed' : report.projectSuccessCount !== 2
+            ? 'project_policy_not_fully_observed' : !report.confirmedCatalogHit
+              ? 'catalog_cache_hit_not_observed' : 'project_cache_hit_not_observed';
   } catch (error) {
     report.status = error instanceof DiagnosticFailure && error.blocked ? 'blocked' : 'failed';
     report.errorCode = error instanceof DiagnosticFailure ? error.code : 'request_failed_no_retry';
