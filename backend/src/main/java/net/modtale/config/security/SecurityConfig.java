@@ -48,7 +48,6 @@ import org.springframework.security.web.authentication.www.BasicAuthenticationFi
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.security.web.context.SecurityContextRepository;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
-import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
 import org.springframework.session.web.http.CookieSerializer;
 import org.springframework.session.web.http.DefaultCookieSerializer;
 import org.springframework.web.cors.CorsConfigurationSource;
@@ -237,8 +236,7 @@ public class SecurityConfig {
             }
         });
 
-        CsrfTokenRequestAttributeHandler requestHandler = new CsrfTokenRequestAttributeHandler();
-        requestHandler.setCsrfRequestAttributeName(null);
+        PublicReadCsrfTokenRequestHandler requestHandler = new PublicReadCsrfTokenRequestHandler();
 
         http
                 .authenticationProvider(authenticationProvider())

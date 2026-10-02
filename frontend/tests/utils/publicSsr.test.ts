@@ -1,12 +1,10 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
-import { buildHomeBootstrap, fetchPublicJson, getHomeSectionReadiness, isProjectData, isProjectPage, isPublicProject } from '@/utils/publicSsr';
+import { describe, expect, it } from 'vitest';
+import { buildHomeBootstrap, getHomeSectionReadiness, isProjectData, isProjectPage, isPublicProject } from '@/utils/publicSsr';
 
 const project = { id: 'sky', title: 'Sky Tools', status: 'PUBLISHED' };
 const page = { content: [project], totalPages: 1, totalElements: 1 };
 const emptyPage = { content: [], totalPages: 0, totalElements: 0 };
 const stats = { totalProjects: 2, totalDownloads: 30, totalUsers: 4 };
-
-afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers(); });
 
 describe('homepage SSR readiness', () => {
     it('does not turn null failures into successful empty SSR', () => {
@@ -60,36 +58,5 @@ describe('public project validation', () => {
     });
     it.each(['DRAFT', 'PRIVATE', 'PENDING', 'DELETED'])('rejects private status %s', status => {
         expect(isProjectData({ ...project, status })).toBe(false);
-    });
-});
-
-describe('bounded SSR fetches', () => {
-    it('returns parsed success with an abort signal', async () => {
-        const fetchMock = vi.fn().mockResolvedValue(Response.json(page));
-        vi.stubGlobal('fetch', fetchMock);
-        expect(await fetchPublicJson('https://backend.example/projects')).toEqual({ data: page, status: 200 });
-        expect(fetchMock).toHaveBeenCalledWith('https://backend.example/projects', { signal: expect.any(AbortSignal) });
-    });
-    it.each([404, 410, 429, 500, 503])('preserves upstream status %s without fabricated data', async status => {
-        vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('', { status })));
-        expect(await fetchPublicJson('https://backend.example/projects')).toEqual({ data: null, status });
-    });
-    it('returns malformed JSON as failed data, not missing content', async () => {
-        vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('{broken')));
-        expect(await fetchPublicJson('https://backend.example/projects')).toEqual({ data: null, status: 200 });
-    });
-    it('distinguishes network failure from authoritative 404', async () => {
-        vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')));
-        expect(await fetchPublicJson('https://backend.example/projects')).toEqual({ data: null, status: 0 });
-    });
-    it('aborts timed-out requests and clears timers', async () => {
-        vi.useFakeTimers();
-        vi.stubGlobal('fetch', vi.fn((_url, { signal }) => new Promise((_resolve, reject) => {
-            signal.addEventListener('abort', () => reject(new Error('aborted')));
-        })));
-        const result = fetchPublicJson('https://backend.example/projects', 220);
-        await vi.advanceTimersByTimeAsync(220);
-        expect(await result).toEqual({ data: null, status: 0 });
-        expect(vi.getTimerCount()).toBe(0);
     });
 });

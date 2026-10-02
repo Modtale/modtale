@@ -2,7 +2,7 @@
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import App from '../../App';
 import { HTML_CACHE, setPublicHtmlCache, setNoStore } from '@/utils/htmlCache';
-import { fetchPublicJson } from '@/utils/publicSsr';
+import { fetchPublicJson } from '@/utils/publicSsr.server';
 import { generateUserMeta } from '../../utils/meta';
 import { ROUTE_SEO } from '../../data/seo-constants';
 import { SERVER_BACKEND_URL } from "@/utils/api.ts";
