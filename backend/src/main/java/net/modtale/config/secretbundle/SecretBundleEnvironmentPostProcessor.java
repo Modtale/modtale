@@ -149,15 +149,32 @@ public final class SecretBundleEnvironmentPostProcessor implements EnvironmentPo
             } else {
                 throw invalid();
             }
-            environment.getPropertySources().addFirst(new MapPropertySource(SOURCE_NAME, Map.copyOf(properties)) {
-                @Override
-                public String toString() {
-                    return SOURCE_NAME;
-                }
-            });
+            environment.getPropertySources().addFirst(new ActivatedBundlePropertySource(profile, properties));
         } catch (IOException | RuntimeException failure) {
             // Parser/I/O exceptions may contain payload fragments. Do not retain their causes.
             throw invalid();
+        }
+    }
+
+    static String activatedProfile(ConfigurableEnvironment environment) {
+        var source = environment.getPropertySources().get(SOURCE_NAME);
+        return source instanceof ActivatedBundlePropertySource activated ? activated.profile : null;
+    }
+
+    private static final class ActivatedBundlePropertySource extends MapPropertySource {
+        private final String profile;
+
+        private ActivatedBundlePropertySource(String profile, Map<String, Object> properties) {
+            super(SOURCE_NAME, Map.copyOf(properties));
+            if (!Set.of("prod", "dev", "branch-preview", "pr-preview").contains(profile)) {
+                throw invalid();
+            }
+            this.profile = profile;
+        }
+
+        @Override
+        public String toString() {
+            return SOURCE_NAME;
         }
     }
 
