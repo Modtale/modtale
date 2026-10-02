@@ -89,6 +89,7 @@ class MigrationTests(unittest.TestCase):
     def test_workflow_validates_before_authentication(self):
         workflow=(scripts.parent/'workflows/migrate-secret-bundle.yml').read_text()
         self.assertIn('contains(fromJSON',workflow)
+        self.assertLess(workflow.index("vars.SECRET_BUNDLE_PREVIEW_WRITERS_READY == 'true'"),workflow.index('Authenticate main-project migration'))
         self.assertLess(workflow.index('Validate migration tooling with synthetic data'),workflow.index('Authenticate main-project migration'))
     def test_only_verified_owner_manual_entrypoint_is_allowed(self):
         env={'GITHUB_EVENT_NAME':'workflow_dispatch','GITHUB_REPOSITORY':'Modtale/modtale','GITHUB_REF':'refs/heads/main','BUNDLE_MIGRATION_CONFIRM':'PUBLISH_BUNDLE','BUNDLE_BOUNDARY':'shared','GITHUB_ACTOR':'Villagers654','GITHUB_TRIGGERING_ACTOR':'Villagers654'}
