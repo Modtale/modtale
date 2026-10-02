@@ -160,7 +160,8 @@ describe('production server-only SSR transport', () => {
             if (!upstreamRequests.length) await get(route);
             assert.ok(upstreamRequests.length > 0);
             for (const request of upstreamRequests) {
-                assert.deepEqual(Object.keys(request.headers).sort(), ['accept', 'accept-encoding', 'connection', 'host']);
+                assert.deepEqual(Object.keys(request.headers).sort(), ['accept', 'accept-encoding', 'connection', 'host', 'user-agent']);
+                assert.equal(request.headers['user-agent'], 'node');
             }
         });
     }

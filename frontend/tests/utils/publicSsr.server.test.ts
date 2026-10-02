@@ -35,9 +35,10 @@ describe('anonymous server-only public JSON transport', () => {
         expect(requests).toHaveLength(1);
         expect(requests[0].method).toBe('GET');
         expect(requests[0].url).toBe('/api/v1/projects?size=12');
-        expect(Object.keys(requests[0].headers).sort()).toEqual(['accept', 'accept-encoding', 'connection', 'host']);
+        expect(Object.keys(requests[0].headers).sort()).toEqual(['accept', 'accept-encoding', 'connection', 'host', 'user-agent']);
         expect(requests[0].headers.accept).toBe('application/json');
         expect(requests[0].headers['accept-encoding']).toBe('identity');
+        expect(requests[0].headers['user-agent']).toBe('node');
     });
     it('never stores or forwards upstream cookies on a subsequent request', async () => {
         handle = (_req, res) => {
