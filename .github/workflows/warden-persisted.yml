@@ -99,6 +99,13 @@ jobs:
           done
           [[ "$primary" == true ]]
 
+      - name: Verify closure transaction race before the full workload
+        timeout-minutes: 5
+        run: |
+          bash backend/gradlew -p backend -I "$PWD/.github/scripts/warden-persisted-test-resources.gradle" \
+            cleanTest test --tests net.modtale.service.admin.review.ReviewRepairClosureTest \
+            --no-daemon --max-workers=2 -Dorg.gradle.jvmargs='-Xmx1g -XX:MaxMetaspaceSize=512m'
+
       - name: Run every persisted Warden suite
         timeout-minutes: 30
         run: |

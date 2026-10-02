@@ -84,7 +84,7 @@ class ReviewRepairClosureTest {
         assertEquals("APPLIED",fixture.executor().closeExpired(p,"actor",()->true).outcome().state());assertEquals(operation,fixture.operation());assertEquals(before,fixture.version());
     }
     @Test void committedTransactionWinsWhileClosureWaitsOnTheJournalWrite()throws Exception {
-        var p=intent(System.currentTimeMillis()+1000);var sent=new CountDownLatch(1);
+        var sent=new CountDownLatch(1);
         String port=System.getenv().getOrDefault("WARDEN_REPAIR_TX_DB_PORT","27031");
         var settings=MongoClientSettings.builder().applyConnectionString(new ConnectionString("mongodb://127.0.0.1:"+port+"/?directConnection=true&serverSelectionTimeoutMS=3000&socketTimeoutMS=5000"))
                 .addCommandListener(new com.mongodb.event.CommandListener(){@Override public void commandStarted(com.mongodb.event.CommandStartedEvent e){
@@ -94,13 +94,21 @@ class ReviewRepairClosureTest {
             var mongo=new org.springframework.data.mongodb.core.MongoTemplate(client,fixture.mongo.getDb().getName());
             var closer=new ReviewIsolationExecutor(mongo,fixture.archive,fixture.reader,new ReviewRepairJournal(mongo,fixture.archive));
             var wrapped=spy(fixture.mongo);var factory=spy(fixture.mongo.getMongoDatabaseFactory());doReturn(factory).when(wrapped).getMongoDatabaseFactory();
+            // Mint the short-lived intent after client/Mockito startup; expiry is forced at commit below.
+            var p=intent(System.currentTimeMillis()+5000);
             var future=new AtomicReference<Future<ReviewIsolationExecutor.Receipt>>();
+            var commitFailure=new AtomicReference<Throwable>();
             doAnswer(i->{var session=spy((ClientSession)i.callRealMethod());doAnswer(c->{
                 expire(p);future.set(worker.submit(()->closer.closeExpired(p,"actor",()->true)));
-                assertTrue(sent.await(5,TimeUnit.SECONDS));return c.callRealMethod();
+                assertTrue(sent.await(5,TimeUnit.SECONDS));
+                try{return c.callRealMethod();}catch(Throwable failure){commitFailure.set(failure);throw failure;}
             }).when(session).commitTransaction();return session;}).when(factory).getSession(any(ClientSessionOptions.class));
             var result=new ReviewIsolationExecutor(wrapped,fixture.archive,fixture.reader,fixture.journal).execute(p,"actor",()->true);
-            assertEquals("APPLIED",result.state());assertEquals("APPLIED",future.get().get(10,TimeUnit.SECONDS).outcome().state());
+            assertNotNull(future.get(),"Transaction commit must reach the closure race: "+fixture.operation());
+            assertEquals("APPLIED",result.state(),()->"executor outcome: operation="+fixture.operation()+" commitFailure="+commitFailure.get());
+            var closure=future.get().get(10,TimeUnit.SECONDS);
+            assertEquals("APPLIED",closure.outcome().state(),()->"closure outcome: operation="+fixture.operation()+" commitFailure="+commitFailure.get());
+            assertEquals("APPLIED",fixture.operation().get("state"));
             assertNull(fixture.operation().get("resolution"));assertEquals(result.afterSha256(),fixture.reader.capture("p",0,"v").sha256());
         }
     }
