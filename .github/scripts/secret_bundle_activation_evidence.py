@@ -56,11 +56,12 @@ def activation_request(profile, revision, created_at, preview_id=None):
         'resource.type': 'cloud_run_revision', 'resource.labels.project_id': project,
         'resource.labels.location': 'us-central1', 'resource.labels.service_name': service,
         'resource.labels.revision_name': revision, 'jsonPayload.event': EVENT, 'jsonPayload.profile': profile,
+        'labels.modtale_secret_bundle_activation': 'v1',
     }
     expression = '\n'.join(f'{key}="{value}"' for key, value in filters.items()) + '\njsonPayload.activated=true' + f'\ntimestamp>="{created_at}"'
     return {'api': 'cloud-logging', 'origin': 'https://logging.googleapis.com', 'method': 'POST',
             'path': '/v2/entries:list', 'params': {'fields': FIELDS},
-            'body': {'resourceNames': ['projects/'+project], 'filter': expression,
+            'body': {'resourceNames': ['projects/'+project+'/locations/global/buckets/_Default/views/modtale-secret-bundle-activation'], 'filter': expression,
                      'pageSize': 100, 'orderBy': 'timestamp desc'}}
 
 

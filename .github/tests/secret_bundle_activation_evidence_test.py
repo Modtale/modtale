@@ -17,6 +17,8 @@ class EvidenceTests(unittest.TestCase):
             self.assertIn('resource.labels.revision_name="'+revision+'"',request['body']['filter'])
             self.assertIn('jsonPayload.profile="'+profile+'"',request['body']['filter'])
             self.assertIn('jsonPayload.activated=true',request['body']['filter'])
+            self.assertIn('labels.modtale_secret_bundle_activation="v1"',request['body']['filter'])
+            self.assertTrue(request['body']['resourceNames'][0].endswith('/locations/global/buckets/_Default/views/modtale-secret-bundle-activation'))
             self.assertIn('timestamp>="'+CREATED+'"',request['body']['filter'])
             self.assertNotIn('env',json.dumps(request))
             self.assertNotIn('Authorization',json.dumps(request))

@@ -38,10 +38,10 @@ class SecretBundleActivationReporterTest {
                 context.publishEvent("SYNTHETIC-PRIVATE-UNRELATED-EVENT");
                 assertTrue(events.isEmpty());
                 context.publishEvent(ready(context));
-                assertEquals(List.of("{\"severity\":\"INFO\",\"event\":\"modtale_secret_bundle_activation\",\"activated\":true,\"profile\":\""
+                assertEquals(List.of("{\"logging.googleapis.com/labels\":{\"modtale_secret_bundle_activation\":\"v1\"},\"severity\":\"INFO\",\"event\":\"modtale_secret_bundle_activation\",\"activated\":true,\"profile\":\""
                         + profile + "\"}"), events);
                 var evidence = JSON.readTree(events.getFirst());
-                assertEquals(Set.of("severity", "event", "activated", "profile"), Set.copyOf(evidence.propertyNames()));
+                assertEquals(Set.of("logging.googleapis.com/labels", "severity", "event", "activated", "profile"), Set.copyOf(evidence.propertyNames()));
                 assertTrue(evidence.get("activated").asBoolean());
                 assertEquals(profile, evidence.get("profile").stringValue());
                 assertFalse(events.getFirst().contains("SYNTHETIC-PRIVATE"));

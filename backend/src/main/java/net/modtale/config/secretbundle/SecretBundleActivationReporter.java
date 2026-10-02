@@ -38,7 +38,7 @@ public final class SecretBundleActivationReporter implements ApplicationListener
         try {
             // Profile comes from private immutable loader metadata, never an env override.
             // One JSON line lets Cloud Logging correlate evidence to its revision resource.
-            emitter.accept("{\"severity\":\"INFO\",\"event\":\"modtale_secret_bundle_activation\",\"activated\":true,\"profile\":\""
+            emitter.accept("{\"logging.googleapis.com/labels\":{\"modtale_secret_bundle_activation\":\"v1\"},\"severity\":\"INFO\",\"event\":\"modtale_secret_bundle_activation\",\"activated\":true,\"profile\":\""
                     + profile + "\"}");
         } catch (RuntimeException ignored) {
             // Observability must not fail a healthy startup or reveal emitter diagnostics.
