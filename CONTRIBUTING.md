@@ -65,29 +65,6 @@ node --test .github/tests/*.test.mjs mock-db/tests/*.test.mjs
 
 Launcher tests do not require building the platform installers. `./gradlew build` also packages the launcher and requires the host's packaging tools.
 
-### Deployment container checks and cache
-
-Trusted push deployments build on standard GitHub-hosted Ubuntu runners. Each
-component uses a separate Buildx GitHub Actions layer-cache scope (`modtale-backend`
-or `modtale-frontend`) with cache API v2 and `mode=max`; full application images
-are no longer pulled from GCR just to warm the cache. GitHub's branch access rules
-and cache storage/eviction limits still apply. Cache export failures are optional,
-but application build, test, typecheck, and security failures are fatal.
-
-Backend container builds run `test` before packaging, and frontend container
-builds run `check` and `test` before building. The resulting image is loaded once
-and scanned locally with a SHA-pinned Trivy installer and version-pinned scanner
-before its existing deployment tag is pushed. The scan blocks known CRITICAL
-OS/library vulnerabilities with available fixes; lower-severity and unfixed
-findings are outside this initial gate. Scanner/database failures block publishing
-rather than skipping the scan. Fix flagged dependencies/base images before retrying.
-
-Never pass credentials as Docker build arguments or add them to the build context:
-intermediate cache layers can be read by workflows with repository cache access.
-The component `.dockerignore` files exclude local environment/credential files
-and generated artifacts. Fork PR previews retain their separate trusted-base
-Cloud Build orchestration and preview-only credentials.
-
 ## 3. Git Workflow & Branching
 
 We use a feature-branch workflow rooted in `develop`.
