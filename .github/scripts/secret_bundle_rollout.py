@@ -63,6 +63,8 @@ SERVICE_FIELDS = ('name,uid,etag,generation,observedGeneration,reconciling,termi
                   'latestCreatedRevision,latestReadyRevision,traffic' + TRAFFIC + ',trafficStatuses' + TRAFFIC
                   + ',template(revision,' + CONFIG + ')')
 REVISION_FIELDS = 'name,uid,service,createTime,' + CONFIG
+# Readiness is mutable status, not part of the immutable journal snapshot.
+REVISION_READINESS_FIELDS = 'name,uid,conditions(type,state)'
 REVISION_TYPE = 'TRAFFIC_TARGET_ALLOCATION_TYPE_REVISION'
 LATEST_TYPE = 'TRAFFIC_TARGET_ALLOCATION_TYPE_LATEST'
 PHASES = {'stage_intent', 'stage_wait', 'promote_intent', 'promote_wait', 'complete',
@@ -312,10 +314,48 @@ def parse_revision(raw, profile, preview_id, expected):
     return configuration({key: raw[key] for key in ('containers', 'volumes')}, profile, preview_id)
 
 
-def ready(state, expected):
+def staged_ready(state, expected):
+    """The intended template is reconciled while saved traffic remains stable.
+
+    Service.latestReadyRevision describes the serving revision and may remain
+    the baseline for an untagged zero-traffic candidate. Callers must separately
+    bind revision_ready() to immutable candidate metadata and keep activation,
+    expected-image/probe/pin, saved-distribution and CAS checks before promotion.
+    """
     return (not state['reconciling'] and state['condition'] == 'CONDITION_SUCCEEDED'
-            and state['observed'] == state['generation'] and state['created'] == state['ready'] == expected
+            and state['observed'] == state['generation'] and state['created'] == state['template'] == expected
             and state['actual'] == state['traffic'])
+
+
+def revision_ready(raw, profile, preview_id, expected, expected_uid):
+    """Validate separate, secret-free platform readiness for the exact revision.
+
+    Only the Ready aggregate is sufficient, with no contradictory container
+    readiness condition. Active/ResourcesAvailable may differ for a zero-traffic
+    revision. This never substitutes for actual loader activation evidence.
+    Missing/unknown readiness waits; malformed or mismatched identity fails closed.
+    """
+    shape(raw, {'name', 'uid', 'conditions'}, {'name', 'uid'})
+    full = scope(profile, preview_id)[3]
+    if revision_name(raw['name'], full) != expected or text(raw['uid'], 128) != text(expected_uid, 128):
+        fail('Revision readiness identity does not match the immutable candidate.')
+    states = {}
+    for condition in array(raw.get('conditions', []), 32):
+        shape(condition, {'type', 'state'}, {'type'})
+        kind = text(condition['type'], 128)
+        state = condition.get('state', 'STATE_UNSPECIFIED')
+        if kind in states or state not in ('STATE_UNSPECIFIED', 'CONDITION_PENDING', 'CONDITION_RECONCILING',
+                                           'CONDITION_FAILED', 'CONDITION_SUCCEEDED'):
+            fail('Revision readiness metadata is invalid.')
+        states[kind] = state
+    return (states.get('Ready') == 'CONDITION_SUCCEEDED'
+            and all(states[kind] == 'CONDITION_SUCCEEDED'
+                    for kind in ('ContainerReady', 'ContainerHealthy') if kind in states))
+
+
+def ready(state, expected):
+    """Full serving readiness, required after promotion (not for a zero-traffic stage)."""
+    return staged_ready(state, expected) and state['ready'] == expected
 
 
 def _pairs(pairs):

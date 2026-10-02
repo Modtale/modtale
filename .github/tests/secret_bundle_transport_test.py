@@ -3,13 +3,51 @@ import os
 from pathlib import Path
 import sys
 import unittest
-from unittest.mock import patch
+from unittest.mock import patch,Mock
 sys.path.insert(0,str(Path(__file__).parents[1]/'scripts'))
 import secret_bundle_transport as t
 import secret_bundle_preview_inventory as i
 import secret_bundle_activation_evidence as e
 
 class TransportTests(unittest.TestCase):
+    def readiness(self):
+        base='https://modtale-backend-dev-ptpi2wdeva-uc.a.run.app'
+        return {'api':'cloud-run-readiness','method':'HEAD','origin':base.replace('https://','https://sb-abcdef123456---'),
+                'path':'/actuator/health/readiness','service':'projects/gen-lang-client-0244308719/locations/us-central1/services/modtale-backend-dev',
+                'service_uid':'a774a283-cd49-476c-92a9-1bee6b952f9f','revision':'modtale-backend-dev-bd-abcdef123456','tag':'sb-abcdef123456','base_uri':base}
+    def test_readiness_masks_are_separate_from_immutable_projection(self):
+        for mask in ('name,uid,conditions(type,state)','name,uid,generation,trafficStatuses(type,revision,percent,tag,uri)'):
+            request=self.run_read();request['params']['fields']=mask;t.validate_request(request)
+    def test_readiness_requires_exact_tagged_service_and_benign_path(self):
+        t.validate_request(self.readiness())
+        for key,value in [('origin','https://example.invalid'),('base_uri','https://other-ptpi2wdeva-uc.a.run.app'),('origin','https://user:password@sb-abcdef123456---modtale-backend-dev-ptpi2wdeva-uc.a.run.app'),('origin',self.readiness()['origin']+'?secret=x'),('origin',self.readiness()['origin']+':443'),('origin',self.readiness()['origin']+':invalid'),('method','GET'),('path','/api/v1/projects'),('tag','sb-111111111111'),('revision','modtale-backend-bd-abcdef123456'),('service_uid','bad\nuid'),('service','projects/other/locations/us-central1/services/modtale-backend-dev')]:
+            request=self.readiness();request[key]=value
+            with self.subTest(key=key,value=value),self.assertRaises(t.TransportError):t.validate_request(request)
+        for key,value in [('headers',{'Authorization':'must-never-send'}),('body',{}),('params',{})]:
+            request=self.readiness();request[key]=value
+            with self.assertRaises(t.TransportError):t.validate_request(request)
+    def test_readiness_head_returns_status_only_without_redirects_or_body(self):
+        session=Mock();response=Mock();response.status_code=503;session.request.return_value=response
+        request=self.readiness()
+        self.assertEqual(t.readiness_head(session,request),{'status':503,'body':{}})
+        session.request.assert_called_once_with('HEAD',request['origin']+request['path'],timeout=45,allow_redirects=False,stream=True)
+        response.json.assert_not_called();response.close.assert_called_once();self.assertEqual(session.cookies.clear.call_count,2)
+    def test_mount_readiness_has_its_own_exact_tag_namespace(self):
+        request=self.readiness();request['revision']=request['revision'].replace('-bd-','-sb-');request['tag']='sr-abcdef123456';request['origin']=request['origin'].replace('https://sb-','https://sr-')
+        t.validate_request(request)
+        for key,value in [('tag','sb-abcdef123456'),('revision','modtale-backend-dev-sbr-abcdef123456'),('revision','modtale-backend-dev-sb-zzzzzzzzzzzz')]:
+            changed=copy.deepcopy(request);changed[key]=value
+            with self.assertRaises(t.TransportError):t.validate_request(changed)
+    def test_readiness_only_transient_failures_are_pending(self):
+        class TransientError(Exception):pass
+        class CertificateError(TransientError):pass
+        session=Mock();session.request.side_effect=TransientError('not displayed')
+        self.assertEqual(t.readiness_head(session,self.readiness(),(TransientError,),(CertificateError,)),{'status':0,'body':{}})
+        self.assertEqual(session.request.call_count,1)
+        session.request.side_effect=CertificateError('not displayed')
+        with self.assertRaises(CertificateError):t.readiness_head(session,self.readiness(),(TransientError,),(CertificateError,))
+        session.request.side_effect=ValueError('not displayed')
+        with self.assertRaises(ValueError):t.readiness_head(session,self.readiness(),(TransientError,),(CertificateError,))
     def run_read(self):
         return {'api':'cloud-run-v2','origin':'https://run.googleapis.com','method':'GET','path':'/v2/projects/gen-lang-client-0244308719/locations/us-central1/services/modtale-backend-dev','params':{'fields':i.SERVICE_FIELDS}}
     def test_known_masks_and_fixed_endpoints(self):

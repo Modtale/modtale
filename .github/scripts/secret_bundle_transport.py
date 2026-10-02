@@ -8,6 +8,7 @@ from pathlib import Path
 import re
 import subprocess
 import sys
+from urllib.parse import urlsplit
 
 PROJECTS = ('gen-lang-client-0244308719','modtale-pr-preview')
 ACCOUNTS = ('github-branch-preview-deployer@gen-lang-client-0244308719.iam.gserviceaccount.com',
@@ -17,11 +18,60 @@ VIEWS = tuple('projects/'+p+'/locations/global/buckets/_Default/views/modtale-se
 class TransportError(RuntimeError):
     pass
 
+def readiness_scope(request):
+    required={'api','origin','method','path','service','service_uid','revision','tag','base_uri'}
+    if set(request)!=required or any(not isinstance(value,str) for value in request.values()) or request['api']!='cloud-run-readiness' or request['method']!='HEAD' or request['path']!='/actuator/health/readiness':
+        raise TransportError('Only fixed readiness HEAD requests are supported.')
+    service=request['service']
+    match=re.fullmatch(r'projects/(gen-lang-client-0244308719|modtale-pr-preview)/locations/us-central1/services/([a-z][a-z0-9-]{0,62})',service or '')
+    if not match:raise TransportError('Invalid readiness service scope.')
+    project,name=match.groups()
+    allowed=(name=='modtale-backend' or re.fullmatch(r'modtale-backend-[a-z0-9-]{1,20}',name)) if project==PROJECTS[0] else re.fullmatch(r'modtale-pr-[1-9][0-9]*-backend',name)
+    candidate=re.fullmatch(re.escape(name)+r'-(bd|sb)-([a-f0-9]{12})',request['revision'] or '')
+    if not allowed or not candidate:
+        raise TransportError('Invalid readiness candidate identity.')
+    if not re.fullmatch(r'(?:sb|sr)-[a-f0-9]{12}',request['tag'] or '') or not re.fullmatch(r'[A-Za-z0-9-]{1,128}',request['service_uid'] or ''):
+        raise TransportError('Invalid readiness ownership metadata.')
+    prefix='sb-' if candidate.group(1)=='bd' else 'sr-'
+    if request['tag']!=prefix+candidate.group(2):raise TransportError('Readiness tag does not belong to its candidate.')
+    parsed=[]
+    for value in (request['base_uri'],request['origin']):
+        if not isinstance(value,str) or any(ord(c)<33 or ord(c)>126 for c in value):
+            raise TransportError('Invalid readiness URL.')
+        try:
+            uri=urlsplit(value)
+            port=uri.port
+        except ValueError:raise TransportError('Invalid readiness URL.') from None
+        if uri.scheme!='https' or uri.username or uri.password or port or uri.path or uri.query or uri.fragment or not uri.hostname or value!='https://'+uri.hostname:
+            raise TransportError('Only canonical HTTPS Cloud Run origins are supported.')
+        parsed.append(uri.hostname)
+    base,tagged=parsed
+    if not re.fullmatch(re.escape(name)+r'-[a-z0-9-]+\.a\.run\.app',base) or tagged!=request['tag']+'---'+base:
+        raise TransportError('Readiness URL does not match its exact owned Cloud Run tag.')
+    return project
+
+def readiness_head(session,request,transient_errors=(),fatal_errors=()):
+    """No authentication, redirects, headers or response content are returned."""
+    readiness_scope(request)
+    session.cookies.clear()
+    response=None
+    try:
+        response=session.request('HEAD',request['origin']+request['path'],timeout=45,allow_redirects=False,stream=True)
+        return {'status':response.status_code,'body':{}}
+    except fatal_errors:raise
+    except transient_errors:return {'status':0,'body':{}}
+    finally:
+        if response is not None:response.close()
+        session.cookies.clear()
+
 def validate_request(request):
     if not isinstance(request,dict):raise TransportError('Invalid request.')
     api=request.get('api');origin=request.get('origin');method=request.get('method');path=request.get('path')
     if not isinstance(path,str) or not path.startswith('/') or any(x in path for x in ('?','#','..','\\')):
         raise TransportError('Invalid fixed API path.')
+    if api=='cloud-run-readiness':
+        readiness_scope(request)
+        return
     if api=='github':
         from secret_bundle_preview_inventory import BRANCH_QUERY,PR_QUERY
         if origin!='https://api.github.com' or method!='POST' or path!='/graphql' or request.get('query') not in (BRANCH_QUERY,PR_QUERY):
@@ -43,6 +93,7 @@ def validate_request(request):
         allowed.update((rollout_service,rollout_revision,rollout_service+',uri,ingress'))
     except ModuleNotFoundError:
         pass
+    allowed.update(('name,uid,conditions(type,state)','name,uid,generation,trafficStatuses(type,revision,percent,tag,uri)'))
     if fields not in allowed:raise TransportError('Unsupported response mask.')
     scope=r'projects/(?:gen-lang-client-0244308719|modtale-pr-preview)/locations/us-central1'
     if api=='cloud-run-v2':
@@ -99,18 +150,24 @@ def create_transport():
     import requests
     google=AuthorizedSession(store.Load(account=account,allow_account_impersonation=False))
     public=requests.Session()
+    readiness=requests.Session()
+    readiness.trust_env=False  # Never attach ambient netrc credentials to a canary.
     token=os.environ.get('GITHUB_TOKEN','') or os.environ.get('GH_TOKEN','')
     def transport(request):
         validate_request(request)
         project=PROJECTS[ACCOUNTS.index(account)]
-        if request['api'].startswith('cloud-run') or request['api']=='secret-manager-metadata':
+        if request['api']=='cloud-run-readiness':
+            if readiness_scope(request)!=project:raise TransportError('Authenticated readiness project boundary mismatch.')
+        elif request['api'].startswith('cloud-run') or request['api']=='secret-manager-metadata':
             expected='/namespaces/'+project+'/' if request['api']=='cloud-run-v1-ownership' else '/projects/'+project+'/'
             if expected not in request['path']:raise TransportError('Authenticated project boundary mismatch.')
         if request['api']=='cloud-logging' and request['body']['resourceNames']!=[VIEWS[PROJECTS.index(project)]]:
             raise TransportError('Authenticated log-view boundary mismatch.')
         try:
             api=request['api'];kwargs={'timeout':90,'allow_redirects':False}
-            if api=='github':
+            if api=='cloud-run-readiness':
+                return readiness_head(readiness,request,(requests.exceptions.Timeout,requests.exceptions.ConnectionError),(requests.exceptions.SSLError,))
+            elif api=='github':
                 if not token:raise TransportError('Existing GitHub token is required for lifecycle reads.')
                 kwargs.update(json={'query':request['query'],'variables':request['variables']},headers={'Authorization':'Bearer '+token,'Accept':'application/vnd.github+json'})
                 response=public.request('POST',request['origin']+request['path'],**kwargs)

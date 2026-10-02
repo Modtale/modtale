@@ -178,6 +178,64 @@ class RolloutTests(unittest.TestCase):
             self.assertNotIn('httpHeaders(name,value)', fields)
             self.assertNotIn('env', fields)
 
+    def test_zero_traffic_stage_stability_does_not_require_serving_pointer_move(self):
+        baseline = self.api.service['latestReadyRevision']
+        candidate = self.api.short + '-zero-traffic'
+        self.api.service['latestCreatedRevision'] = candidate
+        self.api.service['template']['revision'] = candidate
+        state = r.parse_service(self.api.service, self.api.profile, self.api.preview)
+        self.assertTrue(r.staged_ready(state, candidate))
+        self.assertFalse(r.ready(state, candidate))
+        self.assertEqual(state['ready'], baseline)
+        metadata = {'name': self.api.full + '/revisions/' + candidate, 'uid': 'candidate-uid', 'conditions': [
+            {'type': 'Ready', 'state': 'CONDITION_SUCCEEDED'},
+            {'type': 'ContainerReady', 'state': 'CONDITION_SUCCEEDED'},
+            {'type': 'Active', 'state': 'CONDITION_FAILED'},
+            {'type': 'ResourcesAvailable', 'state': 'CONDITION_RECONCILING'}]}
+        self.assertTrue(r.revision_ready(metadata, self.api.profile, self.api.preview, candidate, 'candidate-uid'))
+        self.assertEqual(self.api.patches, [])
+
+    def test_stage_stability_retains_generation_configuration_and_traffic_guards(self):
+        original = r.parse_service(self.api.service, self.api.profile, self.api.preview)
+        for changes in ({'reconciling': True}, {'condition': 'CONDITION_PENDING'}, {'observed': 0},
+                        {'created': 'foreign'}, {'template': 'foreign'}, {'actual': []}):
+            with self.subTest(changes=changes):
+                self.assertFalse(r.staged_ready({**original, **changes}, original['created']))
+
+    def test_separate_readiness_mask_does_not_change_immutable_journal_projection(self):
+        self.assertEqual(r.REVISION_READINESS_FIELDS, 'name,uid,conditions(type,state)')
+        self.assertNotIn('conditions', r.REVISION_FIELDS)
+        self.assertNotIn('message', r.REVISION_READINESS_FIELDS)
+        self.assertNotIn('reason', r.REVISION_READINESS_FIELDS)
+        self.begin()
+        self.assertNotIn('conditions', self.journal.raw.decode())
+
+    def test_revision_readiness_missing_failed_pending_unknown_and_conflict_do_not_pass(self):
+        name = self.api.service['latestCreatedRevision']
+        conditions = [[], [{'type': 'Ready'}], [{'type': 'Active', 'state': 'CONDITION_SUCCEEDED'}]]
+        conditions += [[{'type': 'Ready', 'state': state}] for state in
+                       ('STATE_UNSPECIFIED', 'CONDITION_PENDING', 'CONDITION_RECONCILING', 'CONDITION_FAILED')]
+        conditions += [[{'type': 'Ready', 'state': 'CONDITION_SUCCEEDED'},
+                        {'type': 'ContainerReady', 'state': 'CONDITION_FAILED'}]]
+        for values in conditions:
+            with self.subTest(values=values):
+                self.assertFalse(r.revision_ready({'name': name, 'uid': 'uid', 'conditions': values},
+                                 self.api.profile, self.api.preview, name, 'uid'))
+        self.assertFalse(r.revision_ready({'name': name, 'uid': 'uid'}, self.api.profile, self.api.preview, name, 'uid'))
+
+    def test_revision_readiness_rejects_foreign_revision_uid_and_malformed_shapes(self):
+        name = self.api.service['latestCreatedRevision']
+        good = {'name': name, 'uid': 'uid', 'conditions': [{'type': 'Ready', 'state': 'CONDITION_SUCCEEDED'}]}
+        bad = [dict(good, name='projects/foreign/locations/us-central1/services/x/revisions/' + name),
+               dict(good, uid='different'), dict(good, conditions=good['conditions'] * 2),
+               dict(good, conditions=[{'type': 'Ready', 'state': 'NOT_A_STATE'}]),
+               dict(good, conditions=[{'type': 'Ready', 'state': 'CONDITION_FAILED', 'message': 'SYNTHETIC-PRIVATE'}]),
+               dict(good, conditions=None), dict(good, conditions=[{}]), dict(good, conditions=[{'type': 'Ready'}] * 33)]
+        for metadata in bad:
+            with self.subTest(metadata=metadata), self.assertRaises(r.RolloutError) as error:
+                r.revision_ready(metadata, self.api.profile, self.api.preview, name, 'uid')
+            self.assertNotIn('SYNTHETIC-PRIVATE', str(error.exception))
+
     def test_long_opaque_etag_preserves_quotes_and_exact_conditional_token(self):
         for size in (133, r.MAX_ETAG_BYTES):
             with self.subTest(size=size):
