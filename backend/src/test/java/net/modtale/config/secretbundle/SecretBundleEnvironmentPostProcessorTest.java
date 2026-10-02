@@ -1,4 +1,4 @@
-package net.modtale.config.secrets;
+package net.modtale.config.secretbundle;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestFactory;

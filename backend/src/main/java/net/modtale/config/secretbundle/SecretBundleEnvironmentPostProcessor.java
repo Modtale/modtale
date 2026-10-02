@@ -1,4 +1,4 @@
-package net.modtale.config.secrets;
+package net.modtale.config.secretbundle;
 
 import org.springframework.boot.EnvironmentPostProcessor;
 import org.springframework.boot.SpringApplication;
@@ -49,10 +49,13 @@ public final class SecretBundleEnvironmentPostProcessor implements EnvironmentPo
             Map.entry("ADMIN_DISCORD_WEBHOOK_URL", "app.admin-discord-webhook.url"));
     private static final Map<String, String> PRODUCTION_PROPERTIES = Map.of(
             "WEBHOOK_URL", "app.webhook.url", "HYTALEMODDING_KEY", "app.webhook.key");
-    private static final JsonMapper JSON = JsonMapper.builder()
-            .enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION)
-            .disable(StreamReadFeature.INCLUDE_SOURCE_IN_LOCATION)
-            .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS).build();
+    // Keep the default-off startup path independent of JSON mapper initialization.
+    private static final class BundleJson {
+        private static final JsonMapper JSON = JsonMapper.builder()
+                .enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION)
+                .disable(StreamReadFeature.INCLUDE_SOURCE_IN_LOCATION)
+                .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS).build();
+    }
     private final BundleReader reader;
 
     public SecretBundleEnvironmentPostProcessor() {
@@ -161,7 +164,7 @@ public final class SecretBundleEnvironmentPostProcessor implements EnvironmentPo
         }
         String json = StandardCharsets.UTF_8.newDecoder().onMalformedInput(CodingErrorAction.REPORT)
                 .onUnmappableCharacter(CodingErrorAction.REPORT).decode(ByteBuffer.wrap(raw)).toString();
-        JsonNode root = JSON.readTree(json);
+        JsonNode root = BundleJson.JSON.readTree(json);
         if (root == null || !root.isObject() || !Set.copyOf(root.propertyNames()).equals(Set.of("schemaVersion", "boundary", "secrets"))
                 || !root.get("schemaVersion").isIntegralNumber() || !root.get("schemaVersion").asString().equals("1")
                 || !root.get("boundary").isTextual() || !boundary.equals(root.get("boundary").stringValue())

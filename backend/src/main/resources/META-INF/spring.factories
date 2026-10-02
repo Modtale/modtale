@@ -1,1 +1,1 @@
-org.springframework.boot.EnvironmentPostProcessor=net.modtale.config.secrets.SecretBundleEnvironmentPostProcessor
+org.springframework.boot.EnvironmentPostProcessor=net.modtale.config.secretbundle.SecretBundleEnvironmentPostProcessor
