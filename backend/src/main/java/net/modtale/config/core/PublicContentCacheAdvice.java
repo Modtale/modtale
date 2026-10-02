@@ -101,6 +101,8 @@ public class PublicContentCacheAdvice implements ResponseBodyAdvice<Object> {
   private static boolean isContentRead(String path, String method) {
     if (!("GET".equals(method) || "HEAD".equals(method))) return false;
     return path.equals("/api/v1/projects")
+        || path.equals("/api/v1/tags")
+        || path.equals("/api/v1/analytics/platform/stats")
         || path.startsWith("/api/v1/projects/")
         || path.equals("/api/v1/news")
         || path.startsWith("/api/v1/news/")

@@ -19,6 +19,14 @@ public profile changes also clear locally embedded creator fields and invalidate
 External wiki upstream edits have no incoming mutation callback here, so their
 freshness is bounded by the wiki TTL rather than promised immediate invalidation.
 
+The exact public `/api/v1/tags` and `/api/v1/analytics/platform/stats` endpoints also
+receive the 300-second API edge policy. Stats use the existing five-minute
+`platformStats` origin cache, so those two layers can compound to roughly ten minutes.
+Tags return a build-time static list from `ValidationService`, with no origin cache
+layer. The separately declared `allTags` cache retains the default 60-minute policy
+but is not used by that endpoint; other stable-metadata caches are not covered by
+the five-minute project/wiki origin-cache bound.
+
 ## Disabled-by-default deployment configuration
 
 - `PUBLIC_CACHE_PURGE_ENABLED=false` by default

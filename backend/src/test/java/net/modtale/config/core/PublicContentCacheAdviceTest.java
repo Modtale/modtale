@@ -3,6 +3,7 @@ package net.modtale.config.core;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.head;
 
 import java.util.Map;
 import net.modtale.service.system.PublicContentCacheInvalidator;
@@ -17,9 +18,13 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 class PublicContentCacheAdviceTest {
+  private static final String[] CATALOG_PATHS = {
+    "/api/v1/tags", "/api/v1/analytics/platform/stats"
+  };
   private MockMvc mvc;
   private PublicContentCacheInvalidator invalidator;
 
@@ -56,6 +61,65 @@ class PublicContentCacheAdviceTest {
       assertEquals("modtale-api-api.modtale.net", response.getHeader("Cache-Tag"));
     }
     verify(invalidator, times(4)).flushPending();
+  }
+
+  @Test
+  void anonymousTagsAndPlatformStatsCapDeclaredPublicTtlAndCarryTheApiTag() throws Exception {
+    for (String path : CATALOG_PATHS) {
+      for (var request :
+          new org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder[] {
+            get(path), head(path)
+          }) {
+        var response = mvc.perform(request).andReturn().getResponse();
+        assertEquals(200, response.getStatus());
+        assertEquals(
+            PublicContentCacheAdvice.PUBLIC_CACHE_CONTROL,
+            response.getHeader(HttpHeaders.CACHE_CONTROL));
+        assertEquals("modtale-api-api.modtale.net", response.getHeader("Cache-Tag"));
+      }
+    }
+    verify(invalidator, times(4)).flushPending();
+  }
+
+  @Test
+  void tagsAndPlatformStatsRejectCredentialCookieSessionAndAuthenticatedCaching() throws Exception {
+    for (String path : CATALOG_PATHS) {
+      for (String header :
+          new String[] {
+            HttpHeaders.AUTHORIZATION, HttpHeaders.COOKIE, "X-Modtale-Key", "X-API-Key"
+          }) {
+        var response = mvc.perform(get(path).header(header, "test")).andReturn().getResponse();
+        assertEquals("private, no-store", response.getHeader(HttpHeaders.CACHE_CONTROL));
+        assertNull(response.getHeader("Cache-Tag"));
+      }
+      var response =
+          mvc.perform(get(path).session(new MockHttpSession())).andReturn().getResponse();
+      assertEquals("private, no-store", response.getHeader(HttpHeaders.CACHE_CONTROL));
+      assertNull(response.getHeader("Cache-Tag"));
+    }
+    SecurityContextHolder.getContext()
+        .setAuthentication(
+            new UsernamePasswordAuthenticationToken("user", null, java.util.List.of()));
+    for (String path : CATALOG_PATHS) {
+      var response = mvc.perform(get(path)).andReturn().getResponse();
+      assertEquals("private, no-store", response.getHeader(HttpHeaders.CACHE_CONTROL));
+      assertNull(response.getHeader("Cache-Tag"));
+    }
+  }
+
+  @Test
+  void tagsAndPlatformStatsErrorsAndCookieSettingResponsesAreNeverShared() throws Exception {
+    for (String path : CATALOG_PATHS) {
+      for (String status : new String[] {"404", "500"}) {
+        var response = mvc.perform(get(path).param("status", status)).andReturn().getResponse();
+        assertEquals(Integer.parseInt(status), response.getStatus());
+        assertEquals("no-store", response.getHeader(HttpHeaders.CACHE_CONTROL));
+        assertNull(response.getHeader("Cache-Tag"));
+      }
+      var response = mvc.perform(get(path).param("setCookie", "true")).andReturn().getResponse();
+      assertEquals("private, no-store", response.getHeader(HttpHeaders.CACHE_CONTROL));
+      assertNull(response.getHeader("Cache-Tag"));
+    }
   }
 
   @Test
@@ -101,7 +165,14 @@ class PublicContentCacheAdviceTest {
 
   @Test
   void downloadAndAdminResponsesAreOutsideThePublicContentCacheSurface() throws Exception {
-    for (String path : new String[] {"/api/v1/download/token", "/api/v1/admin/news"}) {
+    for (String path :
+        new String[] {
+          "/api/v1/download/token",
+          "/api/v1/admin/news",
+          "/api/v1/analytics/platform/full",
+          "/api/v1/tags/extra",
+          "/api/v1/analytics/platform/stats/extra"
+        }) {
       var response = mvc.perform(get(path)).andReturn().getResponse();
       assertEquals("no-store", response.getHeader(HttpHeaders.CACHE_CONTROL));
       assertNull(response.getHeader("Cache-Tag"));
@@ -111,6 +182,16 @@ class PublicContentCacheAdviceTest {
 
   @RestController
   static class ContentController {
+    @GetMapping({"/api/v1/tags", "/api/v1/analytics/platform/stats"})
+    ResponseEntity<?> catalog(
+        @RequestParam(name = "status", defaultValue = "200") int status,
+        @RequestParam(name = "setCookie", defaultValue = "false") boolean setCookie) {
+      var response =
+          ResponseEntity.status(status).header(HttpHeaders.CACHE_CONTROL, "public, max-age=86400");
+      if (setCookie) response.header(HttpHeaders.SET_COOKIE, "session=test");
+      return response.body(Map.of("count", 10));
+    }
+
     @GetMapping("/api/v1/projects/test")
     ResponseEntity<?> project() {
       return ResponseEntity.ok()
@@ -152,7 +233,13 @@ class PublicContentCacheAdviceTest {
           .body(Map.of("title", "Public project"));
     }
 
-    @GetMapping({"/api/v1/download/token", "/api/v1/admin/news"})
+    @GetMapping({
+      "/api/v1/download/token",
+      "/api/v1/admin/news",
+      "/api/v1/analytics/platform/full",
+      "/api/v1/tags/extra",
+      "/api/v1/analytics/platform/stats/extra"
+    })
     ResponseEntity<?> excluded() {
       return ResponseEntity.ok()
           .header(HttpHeaders.CACHE_CONTROL, "no-store")

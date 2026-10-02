@@ -16,7 +16,7 @@ class CacheConfigTest {
     void publicOriginCachesHaveBoundedTtlWhileAuthorityCachePolicyIsUnchanged() {
         CacheManager manager = new CacheConfig().cacheManager();
         for (String name : java.util.List.of("projectDetails", "projectPageDtos", "projectSummarySearch",
-                "wikiProjectPayload", "wikiPageJson", "wikiPageBundleJson", "sitemapData")) {
+                "wikiProjectPayload", "wikiPageJson", "wikiPageBundleJson", "sitemapData", "platformStats")) {
             var cache = (CaffeineCache) manager.getCache(name);
             assertNotNull(cache);
             assertEquals(java.time.Duration.ofMinutes(5), cache.getNativeCache().policy()
