@@ -9,8 +9,15 @@ on:
       - created
 
 concurrency:
-  group: pr-preview-${{ github.event.pull_request.number || github.event.issue.number }}
-  cancel-in-progress: true
+  group: modtale-secret-bundle-mutations-v1
+  cancel-in-progress: false
+  queue: max
+
+env:
+  MODTALE_SECRET_BUNDLE_LOCK_GROUP: modtale-secret-bundle-mutations-v1
+  GH_TOKEN: ${{ github.token }}
+  GITHUB_TOKEN: ${{ github.token }}
+  ENV_TYPE: pr-preview
 
 permissions:
   contents: read
@@ -196,6 +203,14 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
+      - name: Resolve environment-specific bundle settings
+        env:
+          BUNDLE_SETTINGS_ENVIRONMENT: pr-preview
+          BUNDLE_SETTINGS_PR_PREVIEW_ENABLED: ${{ vars.MODTALE_PR_PREVIEW_SECRET_BUNDLES_ENABLED }}
+          BUNDLE_SETTINGS_PR_PREVIEW_NEW_SERVICE_APPROVED: ${{ vars.MODTALE_PR_PREVIEW_NEW_SERVICE_APPROVED }}
+          BUNDLE_SETTINGS_PR_PREVIEW_CREDENTIAL_PROVISION_APPROVED: ${{ vars.MODTALE_PR_PREVIEW_CREDENTIAL_PROVISION_APPROVED }}
+        run: python3 "$GITHUB_WORKSPACE/base/.github/scripts/secret_bundle_ci.py" resolve-settings
+
       - name: Check out pull request code
         uses: actions/checkout@v4
         with:
@@ -246,7 +261,17 @@ jobs:
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v2
 
+      - name: Guard existing backend secret mode
+        run: python3 "$GITHUB_WORKSPACE/base/.github/scripts/secret_bundle_ci.py" validate-mode
+
+      - name: Prepare pinned preview bundle
+        if: env.MODTALE_SECRET_BUNDLES_ENABLED == 'true'
+        run: |
+          command -v aws >/dev/null || { sudo apt-get update && sudo apt-get install -y awscli; }
+          python3 "$GITHUB_WORKSPACE/base/.github/scripts/secret_bundle_ci.py" prepare
+
       - name: Provision PR Preview R2 Bucket and Runtime Token
+        if: env.MODTALE_SECRET_BUNDLES_ENABLED != 'true'
         run: |
           set -euo pipefail
 
@@ -290,9 +315,16 @@ jobs:
           echo "::add-mask::$existing_token_id"
           export EXISTING_R2_RUNTIME_TOKEN_ID="$existing_token_id"
 
-          node "$GITHUB_WORKSPACE/base/.github/scripts/cloudflare-r2-preview.mjs" provision
+          provisioning_kind=new
+          if [ -n "$existing_token_id" ]; then
+            provisioning_kind=replacement
+          fi
+          python3 "$GITHUB_WORKSPACE/base/.github/scripts/secret_bundle_ci.py" guard-legacy-provision "$provisioning_kind"
+          R2_BUNDLE_LIFECYCLE_SCRIPT="$GITHUB_WORKSPACE/base/.github/scripts/secret_bundle_ci.py" \
+            node "$GITHUB_WORKSPACE/base/.github/scripts/cloudflare-r2-preview.mjs" provision
 
       - name: Store PR Preview R2 runtime secrets
+        if: env.MODTALE_SECRET_BUNDLES_ENABLED != 'true'
         run: |
           set -euo pipefail
 
@@ -311,11 +343,7 @@ jobs:
                 --data-file=-
             fi
 
-            gcloud secrets add-iam-policy-binding "$name" \
-              --project "$PROJECT_ID" \
-              --member="serviceAccount:$RUNTIME_SERVICE_ACCOUNT" \
-              --role="roles/secretmanager.secretAccessor" \
-              --quiet >/dev/null
+            python3 "$GITHUB_WORKSPACE/base/.github/scripts/secret_bundle_ci.py" ensure-legacy-accessor "$name"
           }
 
           upsert_secret "$R2_ACCESS_KEY_SECRET_NAME" "$R2_RUNTIME_ACCESS_KEY"
@@ -334,42 +362,52 @@ jobs:
 
       - name: Deploy backend preview
         run: |
-          backend_url="$(
-            gcloud run deploy "$BACKEND_SERVICE" \
-              --project "$PROJECT_ID" \
-              --image "gcr.io/$PROJECT_ID/modtale-backend:$TAG" \
-              --region "$REGION" \
-              --service-account "$RUNTIME_SERVICE_ACCOUNT" \
-              --allow-unauthenticated \
-              --use-http2 \
-              --cpu "1" \
-              --memory "1Gi" \
-              --concurrency "80" \
-              --cpu-throttling \
-              --min-instances "0" \
-              --max-instances "2" \
-              --set-env-vars "MONGODB_DATABASE_NAME=$DB_NAME" \
-              --set-env-vars "APP_SEEDING_ENABLED=true" \
-              --set-env-vars "APP_SEEDING_MODE=template" \
-              --set-env-vars "APP_SEEDING_RESET=false" \
-              --set-env-vars "APP_SEEDING_SOURCE_DB=modtale-mock-template" \
-              --set-env-vars "APP_SEEDING_SOURCE_R2_BUCKET_NAME=$SEEDING_SOURCE_R2_BUCKET_NAME" \
-              --set-env-vars "WARDEN_ENABLED=false" \
-              --set-env-vars "OAUTH_ENABLED=false" \
-              --set-env-vars "FRONTEND_URL=placeholder" \
-              --set-env-vars "BACKEND_URL=placeholder" \
-              --set-env-vars "R2_BUCKET_NAME=$R2_BUCKET_NAME" \
-              --set-env-vars "R2_PUBLIC_DOMAIN=$R2_PUBLIC_DOMAIN" \
-              --update-secrets "MONGODB_URI=$MONGODB_SECRET_NAME:latest" \
-              --update-secrets "R2_ACCESS_KEY=$R2_ACCESS_KEY_SECRET_NAME:latest" \
-              --update-secrets "R2_SECRET_KEY=$R2_SECRET_KEY_SECRET_NAME:latest" \
-              --update-secrets "R2_ENDPOINT=$R2_ENDPOINT_SECRET_NAME:latest" \
-              --update-secrets "APP_SEEDING_SOURCE_R2_ACCESS_KEY=$SEEDING_SOURCE_R2_ACCESS_KEY_SECRET_NAME:latest" \
-              --update-secrets "APP_SEEDING_SOURCE_R2_SECRET_KEY=$SEEDING_SOURCE_R2_SECRET_KEY_SECRET_NAME:latest" \
-              --update-secrets "APP_SEEDING_SOURCE_R2_ENDPOINT=$SEEDING_SOURCE_R2_ENDPOINT_SECRET_NAME:latest" \
-              --format "value(status.url)"
-          )"
-
+          set -euo pipefail
+          ARGS=(
+            --project "$PROJECT_ID"
+            --image "gcr.io/$PROJECT_ID/modtale-backend:$TAG"
+            --region "$REGION"
+            --service-account "$RUNTIME_SERVICE_ACCOUNT"
+            --allow-unauthenticated
+            --use-http2
+            --cpu "1"
+            --memory "1Gi"
+            --concurrency "80"
+            --cpu-throttling
+            --min-instances "0"
+            --max-instances "2"
+            --update-env-vars "MONGODB_DATABASE_NAME=$DB_NAME"
+            --update-env-vars "APP_SEEDING_ENABLED=true"
+            --update-env-vars "APP_SEEDING_MODE=template"
+            --update-env-vars "APP_SEEDING_RESET=false"
+            --update-env-vars "APP_SEEDING_SOURCE_DB=modtale-mock-template"
+            --update-env-vars "APP_SEEDING_SOURCE_R2_BUCKET_NAME=$SEEDING_SOURCE_R2_BUCKET_NAME"
+            --update-env-vars "WARDEN_ENABLED=false"
+            --update-env-vars "OAUTH_ENABLED=false"
+            --update-env-vars "FRONTEND_URL=placeholder"
+            --update-env-vars "BACKEND_URL=placeholder"
+            --update-env-vars "R2_BUCKET_NAME=$R2_BUCKET_NAME"
+            --update-env-vars "R2_PUBLIC_DOMAIN=$R2_PUBLIC_DOMAIN"
+            --labels "app=modtale,environment=pr-preview,component=backend,pr=$PR_NUMBER,commit-sha=$PR_HEAD_SHA"
+          )
+          if [ "$MODTALE_SECRET_BUNDLES_ENABLED" = "true" ]; then
+            backend_url="$(python3 "$GITHUB_WORKSPACE/base/.github/scripts/secret_bundle_ci.py" deploy -- "${ARGS[@]}")"
+          else
+            ARGS+=(--update-secrets "MONGODB_URI=$MONGODB_SECRET_NAME:latest")
+            ARGS+=(--update-secrets "R2_ACCESS_KEY=$R2_ACCESS_KEY_SECRET_NAME:latest")
+            ARGS+=(--update-secrets "R2_SECRET_KEY=$R2_SECRET_KEY_SECRET_NAME:latest")
+            ARGS+=(--update-secrets "R2_ENDPOINT=$R2_ENDPOINT_SECRET_NAME:latest")
+            ARGS+=(--update-secrets "APP_SEEDING_SOURCE_R2_ACCESS_KEY=$SEEDING_SOURCE_R2_ACCESS_KEY_SECRET_NAME:latest")
+            ARGS+=(--update-secrets "APP_SEEDING_SOURCE_R2_SECRET_KEY=$SEEDING_SOURCE_R2_SECRET_KEY_SECRET_NAME:latest")
+            ARGS+=(--update-secrets "APP_SEEDING_SOURCE_R2_ENDPOINT=$SEEDING_SOURCE_R2_ENDPOINT_SECRET_NAME:latest")
+            # Preserve the legacy replacement semantics when bundle mode is off.
+            for index in "${!ARGS[@]}"; do
+              if [ "${ARGS[$index]}" = "--update-env-vars" ]; then
+                ARGS[$index]="--set-env-vars"
+              fi
+            done
+            backend_url="$(gcloud run deploy "$BACKEND_SERVICE" "${ARGS[@]}" --format "value(status.url)")"
+          fi
           echo "BACKEND_URL=$backend_url" >> "$GITHUB_ENV"
           echo "API_URL=$backend_url/api/v1" >> "$GITHUB_ENV"
 
@@ -388,6 +426,7 @@ jobs:
             gcloud run deploy "$FRONTEND_SERVICE" \
               --project "$PROJECT_ID" \
               --image "gcr.io/$PROJECT_ID/modtale-frontend:$TAG" \
+              --labels "app=modtale,environment=pr-preview,component=frontend,pr=$PR_NUMBER,commit-sha=$PR_HEAD_SHA" \
               --region "$REGION" \
               --service-account "$RUNTIME_SERVICE_ACCOUNT" \
               --allow-unauthenticated \
@@ -405,10 +444,19 @@ jobs:
 
       - name: Update backend preview URLs
         run: |
-          gcloud run services update "$BACKEND_SERVICE" \
-            --project "$PROJECT_ID" \
-            --region "$REGION" \
-            --update-env-vars "FRONTEND_URL=$FRONTEND_URL,BACKEND_URL=$BACKEND_URL"
+          if [ "$MODTALE_SECRET_BUNDLES_ENABLED" = "true" ]; then
+            python3 "$GITHUB_WORKSPACE/base/.github/scripts/secret_bundle_ci.py" deploy -- \
+              --update-env-vars "FRONTEND_URL=$FRONTEND_URL,BACKEND_URL=$BACKEND_URL" >/dev/null
+          else
+            gcloud run services update "$BACKEND_SERVICE" \
+              --project "$PROJECT_ID" \
+              --region "$REGION" \
+              --update-env-vars "FRONTEND_URL=$FRONTEND_URL,BACKEND_URL=$BACKEND_URL"
+          fi
+
+      - name: Finish pinned preview fanout
+        if: env.MODTALE_SECRET_BUNDLES_ENABLED == 'true'
+        run: python3 "$GITHUB_WORKSPACE/base/.github/scripts/secret_bundle_ci.py" finalize-preview
 
       - name: Publish preview comment
         env:
@@ -452,6 +500,14 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
+      - name: Resolve environment-specific bundle settings
+        env:
+          BUNDLE_SETTINGS_ENVIRONMENT: pr-preview
+          BUNDLE_SETTINGS_PR_PREVIEW_ENABLED: ${{ vars.MODTALE_PR_PREVIEW_SECRET_BUNDLES_ENABLED }}
+          BUNDLE_SETTINGS_PR_PREVIEW_NEW_SERVICE_APPROVED: ${{ vars.MODTALE_PR_PREVIEW_NEW_SERVICE_APPROVED }}
+          BUNDLE_SETTINGS_PR_PREVIEW_CREDENTIAL_PROVISION_APPROVED: ${{ vars.MODTALE_PR_PREVIEW_CREDENTIAL_PROVISION_APPROVED }}
+        run: python3 .github/scripts/secret_bundle_ci.py resolve-settings
+
       - name: Validate preview isolation config
         run: |
           : "${PROJECT_ID:?Set repository variable GCP_PREVIEW_PROJECT_ID to a dedicated preview GCP project.}"
@@ -493,154 +549,25 @@ jobs:
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v2
 
-      - name: Delete preview Cloud Run services
+      - name: Clean up pinned preview bundle
+        if: env.MODTALE_SECRET_BUNDLES_ENABLED == 'true'
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
-          gcloud run services delete "$BACKEND_SERVICE" \
-            --project "$PROJECT_ID" \
-            --region "$REGION" \
-            --quiet || true
-
-          gcloud run services delete "$FRONTEND_SERVICE" \
-            --project "$PROJECT_ID" \
-            --region "$REGION" \
-            --quiet || true
-
-      - name: Remove PR preview image tags
-        run: |
-          gcloud container images untag "gcr.io/$PROJECT_ID/modtale-backend:$IMAGE_TAG" --quiet || true
-          gcloud container images untag "gcr.io/$PROJECT_ID/modtale-frontend:$IMAGE_TAG" --quiet || true
-
-      - name: Empty PR Preview R2 Bucket
-        run: |
-          set -euo pipefail
-
-          case "$R2_BUCKET_NAME" in
-            modtale-pr-[0-9]*)
-              ;;
-            *)
-              echo "::error::Refusing to delete non-preview R2 bucket '$R2_BUCKET_NAME'."
-              exit 1
-              ;;
-          esac
-
-          r2_access_key="$(gcloud secrets versions access latest --project "$PROJECT_ID" --secret="$R2_ACCESS_KEY_SECRET_NAME" 2>/dev/null || true)"
-          r2_secret_key="$(gcloud secrets versions access latest --project "$PROJECT_ID" --secret="$R2_SECRET_KEY_SECRET_NAME" 2>/dev/null || true)"
-          r2_endpoint="$(gcloud secrets versions access latest --project "$PROJECT_ID" --secret="$R2_ENDPOINT_SECRET_NAME" 2>/dev/null || true)"
-          r2_endpoint="$(printf '%s' "$r2_endpoint" | sed -E 's#(https?://[^/]+).*#\1#')"
-
-          echo "::add-mask::$r2_access_key"
-          echo "::add-mask::$r2_secret_key"
-
-          if [ -z "$r2_access_key" ] || [ -z "$r2_secret_key" ] || [ -z "$r2_endpoint" ]; then
-            echo "Per-PR R2 runtime secrets are missing; skipping object empty step."
-            exit 0
-          fi
-
-          if ! command -v aws >/dev/null 2>&1; then
-            sudo apt-get update
-            sudo apt-get install -y awscli
-          fi
-
-          if AWS_ACCESS_KEY_ID="$r2_access_key" \
-             AWS_SECRET_ACCESS_KEY="$r2_secret_key" \
-             AWS_DEFAULT_REGION=auto \
-             aws s3api head-bucket \
-               --endpoint-url "$r2_endpoint" \
-               --bucket "$R2_BUCKET_NAME" >/dev/null 2>&1; then
-            AWS_ACCESS_KEY_ID="$r2_access_key" \
-            AWS_SECRET_ACCESS_KEY="$r2_secret_key" \
-            AWS_DEFAULT_REGION=auto \
-            aws s3 rm \
-              --endpoint-url "$r2_endpoint" \
-              "s3://$R2_BUCKET_NAME" \
-              --recursive
-          else
-            echo "R2 bucket '$R2_BUCKET_NAME' does not exist; nothing to delete."
-          fi
-
-      - name: Delete PR Preview R2 bucket and token
-        run: |
-          set -euo pipefail
-
-          case "$R2_BUCKET_NAME" in
-            modtale-pr-[0-9]*)
-              ;;
-            *)
-              echo "::error::Refusing to delete non-preview R2 bucket '$R2_BUCKET_NAME'."
-              exit 1
-              ;;
-          esac
-
-          runtime_token_id="$(
-            gcloud secrets versions access latest \
-              --project "$PROJECT_ID" \
-              --secret="$R2_TOKEN_ID_SECRET_NAME" 2>/dev/null || true
-          )"
-          if [ -z "$runtime_token_id" ]; then
-            runtime_token_id="$(
-              gcloud secrets versions access latest \
-                --project "$PROJECT_ID" \
-                --secret="$R2_ACCESS_KEY_SECRET_NAME" 2>/dev/null || true
-            )"
-          fi
-          echo "::add-mask::$runtime_token_id"
-          export R2_RUNTIME_TOKEN_ID="$runtime_token_id"
-
-          node "$GITHUB_WORKSPACE/.github/scripts/cloudflare-r2-preview.mjs" cleanup
-
-      - name: Delete PR Preview R2 runtime secrets
-        run: |
-          set -euo pipefail
-
-          for secret_name in \
-            "$R2_ACCESS_KEY_SECRET_NAME" \
-            "$R2_SECRET_KEY_SECRET_NAME" \
-            "$R2_ENDPOINT_SECRET_NAME" \
-            "$R2_TOKEN_ID_SECRET_NAME"; do
-            gcloud secrets delete "$secret_name" \
-              --project "$PROJECT_ID" \
-              --quiet || true
-          done
-
-      - name: Drop PR Preview Mongo Database
-        run: |
-          set -euo pipefail
-
-          case "$DB_NAME" in
-            modtale-pr-[0-9]*)
-              ;;
-            *)
-              echo "::error::Refusing to drop non-PR Mongo database '$DB_NAME'."
-              exit 1
-              ;;
-          esac
-
-          mongodb_uri="$(gcloud secrets versions access latest --project "$PROJECT_ID" --secret="$MONGODB_SECRET_NAME")"
-          echo "::add-mask::$mongodb_uri"
-
+          command -v aws >/dev/null || { sudo apt-get update && sudo apt-get install -y awscli; }
           npm install --silent --prefix "$RUNNER_TEMP/mongo-cleanup" mongodb@6
+          NODE_PATH="$RUNNER_TEMP/mongo-cleanup/node_modules" python3 .github/scripts/secret_bundle_ci.py cleanup
 
-          MONGODB_URI="$mongodb_uri" \
-          NODE_PATH="$RUNNER_TEMP/mongo-cleanup/node_modules" \
-          node <<'NODE'
-          const { MongoClient } = require('mongodb');
-
-          const uri = process.env.MONGODB_URI;
-          const dbName = process.env.DB_NAME;
-
-          if (!/^modtale-pr-[0-9]+$/.test(dbName)) {
-            throw new Error(`Refusing to drop unsafe database name: ${dbName}`);
-          }
-
-          const client = new MongoClient(uri, { appName: 'modtale-pr-preview-cleanup' });
-          try {
-            await client.connect();
-            const result = await client.db(dbName).dropDatabase();
-            console.log(`Dropped Mongo database ${dbName}: ${result}`);
-          } finally {
-            await client.close();
-          }
-          NODE
+      - name: Clean up legacy preview while retaining original credentials
+        if: env.MODTALE_SECRET_BUNDLES_ENABLED != 'true'
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          command -v aws >/dev/null || { sudo apt-get update && sudo apt-get install -y awscli; }
+          npm install --silent --prefix "$RUNNER_TEMP/mongo-cleanup" mongodb@6
+          NODE_PATH="$RUNNER_TEMP/mongo-cleanup/node_modules" python3 .github/scripts/secret_bundle_ci.py cleanup-legacy
 
       - name: Publish cleanup comment
         env:

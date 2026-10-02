@@ -170,6 +170,15 @@ async function bucketExists(accountId, token, bucketName, jurisdiction) {
   }
 }
 
+async function recheckBundleLifecycle() {
+  const script = optional("R2_BUNDLE_LIFECYCLE_SCRIPT");
+  if (!script) return;
+  const { spawnSync } = await import("node:child_process");
+  const operation = mode === "cleanup" ? "check-cleanup" : "check-lifecycle";
+  const result = spawnSync("python3", [script, operation], { env: process.env, stdio: "pipe" });
+  if (result.status !== 0) throw new Error("Preview lifecycle changed; the R2 mutation was stopped.");
+}
+
 async function ensureBucket(accountId, token, bucketName, jurisdiction) {
   if (await bucketExists(accountId, token, bucketName, jurisdiction)) {
     console.log(`R2 bucket '${bucketName}' already exists.`);
@@ -188,6 +197,7 @@ async function ensureBucket(accountId, token, bucketName, jurisdiction) {
     body.storageClass = storageClass;
   }
 
+  await recheckBundleLifecycle();
   await cloudflare(token, `/accounts/${accountId}/r2/buckets`, {
     method: "POST",
     headers: { "cf-r2-jurisdiction": jurisdiction },
@@ -249,6 +259,7 @@ async function createRuntimeToken(accountId, token, bucketName, jurisdiction, re
     body.expires_on = expiresOn;
   }
 
+  await recheckBundleLifecycle();
   const payload = await cloudflare(token, tokenCollectionPath(accountId), {
     method: "POST",
     body: JSON.stringify(body),
@@ -328,6 +339,7 @@ async function cleanup() {
   const jurisdiction = normalizeJurisdiction(optional("CLOUDFLARE_R2_JURISDICTION"));
   const tokenProvisioner = optional("CLOUDFLARE_API_TOKEN_PROVISIONER");
 
+  await recheckBundleLifecycle();
   try {
     await cloudflare(
       bucketToken,
@@ -363,6 +375,11 @@ try {
     await provision(true);
   } else if (mode === "ensure-bucket") {
     await ensureOnly();
+  } else if (mode === "inspect-bucket") {
+    const exists = await bucketExists(required("CLOUDFLARE_ACCOUNT_ID"),
+      firstRequired(["CLOUDFLARE_R2_PROVISIONER", "CLOUDFLARE_R2_BUCKET_PROVISIONER_TOKEN"]),
+      required("R2_BUCKET_NAME"), normalizeJurisdiction(optional("CLOUDFLARE_R2_JURISDICTION")));
+    console.log(JSON.stringify({ exists }));
   } else if (mode === "cleanup") {
     await cleanup();
   } else {
