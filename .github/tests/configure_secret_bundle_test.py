@@ -6,18 +6,24 @@ from configure_secret_bundle import plan, restore_legacy_development
 from secret_bundle import BundleError
 class DeployPlanTests(unittest.TestCase):
     def test_off_is_exact_noop(self):self.assertEqual(plan('false','prod',{}),[])
-    def test_prod_both_boundaries(self):
-        args=plan('true','prod',{'shared':'4','production':'2'})
+    def test_prod_shared_and_original_hytale(self):
+        args=plan('true','prod',{'shared':'4'})
         self.assertIn('/app/secrets/bundles/shared.json=MODTALE_CONFIG_SHARED:4',args)
-        self.assertIn('/app/secrets/bundles/production.json=MODTALE_CONFIG_PRODUCTION:2',args)
+        self.assertIn('HYTALE_CLIENT_SECRET=HYTALE_CLIENT_SECRET:latest',args)
+        self.assertNotIn('HYTALE_CLIENT_SECRET',args[args.index('--remove-secrets')+1].split(','))
+        self.assertFalse(any('CONFIG_PRODUCTION' in x for x in args))
         self.assertNotIn('--set-secrets',args)
     def test_warden_keeps_existing_rotation_path(self):
         args=plan('true','dev',{'shared':'1'})
         self.assertNotIn('WARDEN_API_KEY',args[args.index('--remove-secrets')+1].split(','))
         self.assertIn('WARDEN_API_KEY=WARDEN_API_KEY:latest',args)
+        self.assertIn('HYTALE_CLIENT_SECRET',args[args.index('--remove-secrets')+1].split(','))
+        self.assertFalse(any('HYTALE_CLIENT_SECRET=' in x for x in args))
     def test_dev_cannot_mount_prod(self):
         with self.assertRaises(BundleError):plan('true','dev',{'shared':'1','production':'1'})
         self.assertFalse(any('CONFIG_PRODUCTION' in x for x in plan('true','dev',{'shared':'1'})))
+    def test_prod_rejects_removed_bundle_pin(self):
+        with self.assertRaises(BundleError):plan('true','prod',{'shared':'1','production':'1'})
     def test_requires_numeric_pins(self):
         for pin in ('latest','','0'):
             with self.assertRaises(BundleError):plan('true','dev',{'shared':pin})

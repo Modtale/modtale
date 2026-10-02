@@ -32,7 +32,7 @@ public final class SecretBundleEnvironmentPostProcessor implements EnvironmentPo
     static final Set<String> BRANCH_BASE = words("BRANCH_PREVIEW_MONGODB_URI R2_SOURCE_READ_ACCESS_KEY R2_SOURCE_READ_ENDPOINT R2_SOURCE_READ_SECRET_KEY R2_TEMPLATE_READ_ACCESS_KEY R2_TEMPLATE_READ_ENDPOINT R2_TEMPLATE_READ_SECRET_KEY");
     static final Set<String> PR_BASE = words("PREVIEW_MONGODB_URI PREVIEW_SOURCE_R2_ACCESS_KEY PREVIEW_SOURCE_R2_ENDPOINT PREVIEW_SOURCE_R2_SECRET_KEY");
     private static final Map<String, Set<String>> BOUNDARIES = Map.of(
-            "shared", SHARED, "production", Set.of("HYTALE_CLIENT_SECRET"),
+            "shared", SHARED,
             "branch-preview", BRANCH_BASE, "pr-preview", PR_BASE);
     private static final Map<String, String> COMMON_PROPERTIES = Map.ofEntries(
             Map.entry("MONGODB_URI", "spring.mongodb.uri"),
@@ -95,10 +95,17 @@ public final class SecretBundleEnvironmentPostProcessor implements EnvironmentPo
                     throw invalid();
                 }
                 // Keep backend/scanner rotation coupled to the original secret binding.
-                // The audited bundle retains its copied key, but must never activate it.
+                // Older bundles may retain a copied key, but must never activate it.
                 String originalWardenKey = environment.getProperty("WARDEN_API_KEY");
                 if (originalWardenKey == null || originalWardenKey.isEmpty()) {
                     throw invalid();
+                }
+                if ("prod".equals(profile)) {
+                    // Hytale remains on its original production-only secret binding too.
+                    String originalHytaleSecret = environment.getProperty("HYTALE_CLIENT_SECRET");
+                    if (originalHytaleSecret == null || originalHytaleSecret.isEmpty()) {
+                        throw invalid();
+                    }
                 }
                 Map<String, String> shared = load("shared");
                 require(shared, SHARED.stream().filter(key -> !key.equals("MODTALE_PUBLIC_CACHE_PURGE_TOKEN") && !key.equals("WARDEN_API_KEY")).toList());
@@ -117,9 +124,6 @@ public final class SecretBundleEnvironmentPostProcessor implements EnvironmentPo
                 put(properties, "CLOUDFLARE_CACHE_PURGE_TOKEN", "app.public-cache-purge.token", shared.getOrDefault("MODTALE_PUBLIC_CACHE_PURGE_TOKEN", ""));
                 if ("prod".equals(profile)) {
                     PRODUCTION_PROPERTIES.forEach((key, property) -> put(properties, key, property, shared.get(key)));
-                    Map<String, String> production = load("production");
-                    require(production, Set.of("HYTALE_CLIENT_SECRET"));
-                    put(properties, "HYTALE_CLIENT_SECRET", "spring.security.oauth2.client.registration.hytale.client-secret", production.get("HYTALE_CLIENT_SECRET"));
                 }
             } else if ("branch-preview".equals(profile) || "pr-preview".equals(profile)) {
                 String id = environment.getProperty(PREVIEW_ID);

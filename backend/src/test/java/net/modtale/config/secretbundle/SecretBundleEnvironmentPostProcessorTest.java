@@ -130,15 +130,17 @@ class SecretBundleEnvironmentPostProcessorTest {
         Map<String, String> values = shared();
         values.put("WARDEN_API_KEY", "unused-bundle-warden-key");
         bundle("shared", values);
-        MockEnvironment environment = environment("dev").withProperty("WARDEN_API_KEY", "original-warden-key");
-        environment.getPropertySources().addLast(new ResourcePropertySource("classpath:application.properties"));
-        processor.postProcessEnvironment(environment, null);
-        assertEquals("original-warden-key", environment.getProperty("WARDEN_API_KEY"));
-        assertEquals("original-warden-key", environment.getProperty("app.warden.api-key"));
-        assertEquals("original-warden-key", Binder.get(environment).bind("app.warden.api-key", String.class).orElseThrow(AssertionError::new));
-        var source = environment.getPropertySources().get(SecretBundleEnvironmentPostProcessor.SOURCE_NAME);
-        assertNull(source.getProperty("WARDEN_API_KEY"));
-        assertNull(source.getProperty("app.warden.api-key"));
+        for (String profile : new String[]{"prod", "dev"}) {
+            MockEnvironment environment = environment(profile).withProperty("WARDEN_API_KEY", "original-warden-key");
+            environment.getPropertySources().addLast(new ResourcePropertySource("classpath:application.properties"));
+            processor.postProcessEnvironment(environment, null);
+            assertEquals("original-warden-key", environment.getProperty("WARDEN_API_KEY"));
+            assertEquals("original-warden-key", environment.getProperty("app.warden.api-key"));
+            assertEquals("original-warden-key", Binder.get(environment).bind("app.warden.api-key", String.class).orElseThrow(AssertionError::new));
+            var source = environment.getPropertySources().get(SecretBundleEnvironmentPostProcessor.SOURCE_NAME);
+            assertNull(source.getProperty("WARDEN_API_KEY"));
+            assertNull(source.getProperty("app.warden.api-key"));
+        }
     }
 
     @Test
@@ -156,7 +158,6 @@ class SecretBundleEnvironmentPostProcessorTest {
     @Test
     void prodAndDevRequireTheOriginalWardenBindingEvenWithABundleCopy() {
         bundle("shared", shared());
-        bundle("production", Map.of("HYTALE_CLIENT_SECRET", "hytale-value"));
         for (String profile : new String[]{"prod", "dev"}) {
             MockEnvironment missing = new MockEnvironment()
                     .withProperty(SecretBundleEnvironmentPostProcessor.ENABLED, "true")
@@ -168,14 +169,79 @@ class SecretBundleEnvironmentPostProcessorTest {
     }
 
     @Test
-    void prodReadsBothBoundariesAndActivatesHytaleAndProductionWebhooks() {
+    void prodReadsOnlySharedAndPreservesOriginalHytaleWithProductionWebhooks() throws IOException {
         bundle("shared", shared());
-        bundle("production", Map.of("HYTALE_CLIENT_SECRET", "hytale-value"));
-        MockEnvironment environment = environment("prod");
+        // An obsolete production file, even malformed, must never be opened.
+        files.put("production.json", new byte[]{1});
+        MockEnvironment environment = environment("prod").withProperty("HYTALE_CLIENT_SECRET", "original-hytale-value");
+        environment.getPropertySources().addLast(new ResourcePropertySource("classpath:application.properties"));
         processor.postProcessEnvironment(environment, null);
-        assertEquals(List.of(Path.of("/app/secrets/bundles/shared.json"), Path.of("/app/secrets/bundles/production.json")), reads);
-        assertEquals("hytale-value", environment.getProperty("spring.security.oauth2.client.registration.hytale.client-secret"));
+        processor.postProcessEnvironment(environment, null);
+        assertEquals(List.of(Path.of("/app/secrets/bundles/shared.json")), reads);
+        assertEquals("original-hytale-value", environment.getProperty("HYTALE_CLIENT_SECRET"));
+        assertEquals("original-hytale-value", environment.getProperty("spring.security.oauth2.client.registration.hytale.client-secret"));
+        assertEquals("original-hytale-value", Binder.get(environment)
+                .bind("spring.security.oauth2.client.registration.hytale.client-secret", String.class).orElseThrow(AssertionError::new));
+        var source = environment.getPropertySources().get(SecretBundleEnvironmentPostProcessor.SOURCE_NAME);
+        assertNull(source.getProperty("HYTALE_CLIENT_SECRET"));
+        assertNull(source.getProperty("spring.security.oauth2.client.registration.hytale.client-secret"));
         assertEquals("fixture-ADMIN_DISCORD_WEBHOOK_URL", environment.getProperty("app.admin-discord-webhook.url"));
+        assertEquals("fixture-HYTALEMODDING_KEY", environment.getProperty("app.webhook.key"));
+        assertEquals("fixture-WEBHOOK_URL", environment.getProperty("app.webhook.url"));
+    }
+
+    @Test
+    void restartSeesRotatedOriginalHytaleBindingWithoutChangingSharedBundle() throws IOException {
+        bundle("shared", shared());
+        for (String original : new String[]{"original-before-rotation", "original-after-rotation"}) {
+            MockEnvironment environment = environment("prod").withProperty("HYTALE_CLIENT_SECRET", original);
+            environment.getPropertySources().addLast(new ResourcePropertySource("classpath:application.properties"));
+            processor.postProcessEnvironment(environment, null);
+            assertEquals(original, environment.getProperty("spring.security.oauth2.client.registration.hytale.client-secret"));
+        }
+        assertEquals(List.of(Path.of("/app/secrets/bundles/shared.json"), Path.of("/app/secrets/bundles/shared.json")), reads);
+    }
+
+    @Test
+    void sharedRejectsHytaleAliasesRatherThanShadowingOriginalBindings() {
+        for (String key : new String[]{"HYTALE_CLIENT_SECRET", "spring.security.oauth2.client.registration.hytale.client-secret", "app.warden.api-key"}) {
+            Map<String, String> secrets = shared();
+            secrets.put(key, "sensitive-fixture-stale-alias");
+            bundle("shared", secrets);
+            for (String profile : new String[]{"prod", "dev"}) {
+                assertSafeFailure(environment(profile));
+            }
+        }
+    }
+
+    @Test
+    void devAndPreviewsNeitherRequireNorGainHytaleCredentials() {
+        bundle("shared", shared());
+        bundle("branch-preview", preview("branch-preview", "feature"));
+        bundle("pr-preview", preview("pr-preview", "42"));
+        bundle("production", Map.of("HYTALE_CLIENT_SECRET", "sensitive-fixture-obsolete-hytale"));
+        for (String profile : new String[]{"dev", "branch-preview", "pr-preview"}) {
+            MockEnvironment environment = environment(profile);
+            if (!profile.equals("dev")) {
+                environment.setProperty(SecretBundleEnvironmentPostProcessor.PREVIEW_ID, profile.equals("branch-preview") ? "feature" : "42");
+            }
+            processor.postProcessEnvironment(environment, null);
+            assertNull(environment.getProperty("HYTALE_CLIENT_SECRET"));
+            assertNull(environment.getProperty("spring.security.oauth2.client.registration.hytale.client-secret"));
+        }
+        assertFalse(reads.contains(Path.of("/app/secrets/bundles/production.json")));
+    }
+
+    @Test
+    void disabledProdDoesNotRequireOriginalHytaleOrWarden() {
+        MockEnvironment environment = new MockEnvironment()
+                .withProperty(SecretBundleEnvironmentPostProcessor.ENABLED, "false")
+                .withProperty(SecretBundleEnvironmentPostProcessor.PROFILE, "prod")
+                .withProperty("HYTALE_CLIENT_SECRET", "")
+                .withProperty("WARDEN_API_KEY", "");
+        processor.postProcessEnvironment(environment, null);
+        assertTrue(reads.isEmpty());
+        assertFalse(environment.getPropertySources().contains(SecretBundleEnvironmentPostProcessor.SOURCE_NAME));
     }
 
     @Test
@@ -268,9 +334,19 @@ class SecretBundleEnvironmentPostProcessorTest {
     }
 
     @Test
-    void prodMissingProductionFileDoesNotPublishPartialSharedProperties() {
+    void prodRequiresOriginalHytaleEvenWithAnObsoleteProductionBundle() {
         bundle("shared", shared());
-        assertSafeFailure(environment("prod"));
+        bundle("production", Map.of("HYTALE_CLIENT_SECRET", "sensitive-fixture-obsolete-hytale"));
+        MockEnvironment missing = new MockEnvironment()
+                .withProperty(SecretBundleEnvironmentPostProcessor.ENABLED, "true")
+                .withProperty(SecretBundleEnvironmentPostProcessor.PROFILE, "prod")
+                .withProperty("WARDEN_API_KEY", "fixture-original-warden-key");
+        assertSafeFailure(missing);
+        assertSafeFailure(environment("prod").withProperty("HYTALE_CLIENT_SECRET", ""));
+        // A canonical override is not a substitute for the original secret binding.
+        missing.setProperty("spring.security.oauth2.client.registration.hytale.client-secret", "sensitive-fixture-canonical");
+        assertSafeFailure(missing);
+        assertTrue(reads.isEmpty());
     }
 
     @Test
@@ -362,9 +438,11 @@ class SecretBundleEnvironmentPostProcessorTest {
     }
 
     private MockEnvironment environment(String profile) {
-        return new MockEnvironment().withProperty(SecretBundleEnvironmentPostProcessor.ENABLED, "true")
+        MockEnvironment environment = new MockEnvironment().withProperty(SecretBundleEnvironmentPostProcessor.ENABLED, "true")
                 .withProperty(SecretBundleEnvironmentPostProcessor.PROFILE, profile)
                 .withProperty("WARDEN_API_KEY", "fixture-original-warden-key");
+        if (profile.equals("prod")) environment.setProperty("HYTALE_CLIENT_SECRET", "fixture-original-hytale-secret");
+        return environment;
     }
 
     private void assertSafeFailure(MockEnvironment environment) {

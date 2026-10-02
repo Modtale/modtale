@@ -12,8 +12,8 @@ def raw(boundary='shared', **secrets):
     return json.dumps({'schemaVersion': 1, 'boundary': boundary, 'secrets': secrets}).encode()
 
 class BundleTests(unittest.TestCase):
-    def test_all_four_boundaries(self):
-        for boundary, key in [('shared','MONGODB_URI'), ('production','HYTALE_CLIENT_SECRET'), ('branch-preview','BRANCH_PREVIEW_MONGODB_URI'), ('pr-preview','PREVIEW_MONGODB_URI')]:
+    def test_all_three_boundaries(self):
+        for boundary, key in [('shared','MONGODB_URI'), ('branch-preview','BRANCH_PREVIEW_MONGODB_URI'), ('pr-preview','PREVIEW_MONGODB_URI')]:
             self.assertEqual(b.parse(raw(boundary, **{key: 'synthetic'}), boundary)['secrets'][key], 'synthetic')
     def test_cross_boundary_rejected(self):
         for boundary in ('shared','branch-preview','pr-preview'):
