@@ -69,7 +69,7 @@ class MigrationTests(unittest.TestCase):
         self.assertNotIn('WARDEN_API_KEY',manifest['shared']['sourceVersions'])
         self.assertEqual(len(manifest['shared']['sourceVersions']),29)
     def test_preview_gate_blocks_before_cloud_access(self):
-        with patch.dict('os.environ', {'GITHUB_EVENT_NAME':'workflow_dispatch','GITHUB_REPOSITORY':'Modtale/modtale','GITHUB_REF':'refs/heads/main','BUNDLE_MIGRATION_CONFIRM':'PUBLISH_BUNDLE','BUNDLE_BOUNDARY':'branch-preview'}, clear=True):
+        with patch.dict('os.environ', {'GITHUB_EVENT_NAME':'workflow_dispatch','GITHUB_REPOSITORY':'Modtale/modtale','GITHUB_REF':'refs/heads/main','BUNDLE_MIGRATION_CONFIRM':'PUBLISH_BUNDLE','BUNDLE_BOUNDARY':'branch-preview','GITHUB_ACTOR':'Villagers654','GITHUB_TRIGGERING_ACTOR':'Villagers654'}, clear=True):
             with patch.object(m,'migrate') as call, contextlib.redirect_stderr(io.StringIO()):
                 self.assertEqual(m.main(),1)
                 call.assert_not_called()
@@ -90,6 +90,21 @@ class MigrationTests(unittest.TestCase):
         workflow=(scripts.parent/'workflows/migrate-secret-bundle.yml').read_text()
         self.assertIn('contains(fromJSON',workflow)
         self.assertLess(workflow.index('Validate migration tooling with synthetic data'),workflow.index('Authenticate main-project migration'))
+    def test_only_verified_owner_manual_entrypoint_is_allowed(self):
+        env={'GITHUB_EVENT_NAME':'workflow_dispatch','GITHUB_REPOSITORY':'Modtale/modtale','GITHUB_REF':'refs/heads/main','BUNDLE_MIGRATION_CONFIRM':'PUBLISH_BUNDLE','BUNDLE_BOUNDARY':'shared','GITHUB_ACTOR':'Villagers654','GITHUB_TRIGGERING_ACTOR':'Villagers654'}
+        with patch.dict('os.environ',env,clear=True),patch.object(m,'migrate',return_value={'version':'1'}) as call,contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(m.main(),0)
+            call.assert_called_once_with('shared')
+        for key in ('GITHUB_EVENT_NAME','GITHUB_REPOSITORY','GITHUB_REF','BUNDLE_MIGRATION_CONFIRM','GITHUB_ACTOR','GITHUB_TRIGGERING_ACTOR'):
+            changed=dict(env);changed[key]='not-authorized'
+            with patch.dict('os.environ',changed,clear=True),patch.object(m,'migrate') as call,contextlib.redirect_stderr(io.StringIO()):
+                self.assertEqual(m.main(),1)
+                call.assert_not_called()
+        workflow=(scripts.parent/'workflows/migrate-secret-bundle.yml').read_text()
+        self.assertIn("github.actor == 'Villagers654'",workflow)
+        self.assertIn("github.triggering_actor == 'Villagers654'",workflow)
+        self.assertIn('contents: read',workflow)
+        self.assertNotIn('actions: write',workflow)
     def test_workflow_manual_only(self):
         workflow=(scripts.parent/'workflows/migrate-secret-bundle.yml').read_text()
         self.assertIn('workflow_dispatch:',workflow)

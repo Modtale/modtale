@@ -98,7 +98,8 @@ def migrate(boundary, api=gcloud):
 
 def main():
     if (os.environ.get('GITHUB_EVENT_NAME')!='workflow_dispatch' or os.environ.get('GITHUB_REPOSITORY')!='Modtale/modtale'
-        or os.environ.get('GITHUB_REF')!='refs/heads/main' or os.environ.get('BUNDLE_MIGRATION_CONFIRM')!='PUBLISH_BUNDLE'):
+        or os.environ.get('GITHUB_REF')!='refs/heads/main' or os.environ.get('BUNDLE_MIGRATION_CONFIRM')!='PUBLISH_BUNDLE'
+        or os.environ.get('GITHUB_ACTOR')!='Villagers654' or os.environ.get('GITHUB_TRIGGERING_ACTOR')!='Villagers654'):
         print('This migration requires the reviewed manual main-branch workflow.',file=sys.stderr)
         return 1
     boundary=os.environ.get('BUNDLE_BOUNDARY','')
