@@ -58,3 +58,22 @@ test('rejects skipped, failed, empty, malformed and miscounted results', () => {
   report('ReviewTest', undefined, '<testcase name="hidden"><skipped/></testcase>');
   assert.notEqual(run('verify').status, 0);
 });
+
+test('fixture commands use supported mongosh results rather than legacy shell assertions', async () => {
+  const { runInNewContext } = await import('node:vm');
+  const workflow = fs.readFileSync(new URL('../workflows/warden-persisted.yml', import.meta.url), 'utf8');
+  const expressions = [...workflow.matchAll(/^[ \t]+(?:--eval )?'(quit\(.+\))';?[ \t]*(?:then)?$/gm)].map(match => match[1]);
+  assert.equal(expressions.length, 3);
+  for (const expression of expressions) {
+    for (const valid of [true, false]) {
+      let status;
+      runInNewContext(expression, {
+        rs: { initiate: () => ({ ok: valid ? 1 : 0 }) },
+        db: { adminCommand: () => ({ ok: valid ? 1 : 0 }), hello: () => ({ isWritablePrimary: valid }) },
+        quit: code => { status = code; },
+      });
+      assert.equal(status, valid ? 0 : 1, expression);
+    }
+  }
+  assert.doesNotMatch(workflow, /assert\.(?:commandWorked|soon)/);
+});

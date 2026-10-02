@@ -86,9 +86,17 @@ jobs:
             [[ "$ready" == true ]]
           done
           docker exec warden-replica mongosh --quiet --port 27032 --eval \
-            'assert.commandWorked(rs.initiate({_id: "warden-ci", members: [{_id: 0, host: "127.0.0.1:27032"}]}))'
-          docker exec warden-replica mongosh --quiet --port 27032 --eval \
-            'assert.soon(() => db.hello().isWritablePrimary === true, "Replica fixture did not elect a primary", 60000)'
+            'quit(rs.initiate({_id: "warden-ci", members: [{_id: 0, host: "127.0.0.1:27032"}]}).ok === 1 ? 0 : 1)'
+          primary=false
+          for attempt in {1..60}; do
+            if docker exec warden-replica mongosh --quiet --port 27032 --eval \
+              'quit(db.hello().isWritablePrimary === true ? 0 : 1)'; then
+              primary=true
+              break
+            fi
+            sleep 1
+          done
+          [[ "$primary" == true ]]
 
       - name: Run every persisted Warden suite
         run: |
