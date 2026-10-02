@@ -19,6 +19,57 @@ function assert(condition, message) {
   if (!condition) throw new Error(message);
 }
 
+function renderedMarkup(html) {
+  return html.replace(/<!--[\s\S]*?-->/g, '').replace(/<(script|style|template|svg)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, '');
+}
+
+function textContent(html) {
+  return html.replace(/<[^>]*>/g, '').replace(/&#(x[\da-f]+|\d+);/gi, (entity, code) => {
+    const value = code[0].toLowerCase() === 'x' ? parseInt(code.slice(1), 16) : Number(code);
+    return value > 0 && value <= 0x10ffff ? String.fromCodePoint(value) : entity;
+  }).replace(/&(amp|lt|gt|quot|apos|nbsp|ZeroWidthSpace);/gi, (_, name) => ({ amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ', zerowidthspace: ' ' })[name.toLowerCase()])
+    .replace(/[\s\u200b]+/g, ' ').trim();
+}
+
+export function validateRenderedHtml(html, { path }) {
+  const markup = renderedMarkup(html);
+  assert(textContent(markup.match(/<title\b[^>]*>([\s\S]*?)<\/title\s*>/i)?.[1] || ''), `${path}: SEO title missing`);
+  const body = markup.match(/<body\b[^>]*>([\s\S]*?)<\/body\s*>/i)?.[1] || markup;
+  const main = body.match(/<main\b[^>]*>([\s\S]*?)<\/main\s*>/i)?.[1];
+  if (main !== undefined) {
+    assert(textContent(main), `${path}: rendered main is blank`);
+    return;
+  }
+  // These views (and their loading shells) use divs, not a main landmark.
+  // Keep the exception route-specific and require the actual SSR App island
+  // plus its expected heading. Public detail divs also need their actual
+  // public bootstrap identity, so a placeholder cannot pass this exception.
+  const route = new URL(path, 'https://fixture.invalid');
+  let expectedHeadings = {
+    '/terms': ['Terms of Service'],
+    '/privacy': ['Privacy Policy'],
+    '/dashboard': ['Your Projects'],
+    // Astro currently passes pathname alone to StaticRouter, so the SSR token
+    // route can render Invalid Request before the client reads its query.
+    '/reset-password': ['Reset Password', 'Invalid Request'],
+  }[route.pathname];
+  const projectRoute = /^\/(mod|modpack|world)\/[^/?#]+(?:\/wiki(?:\/[^?#]+)?)?$/.test(route.pathname);
+  const creatorRoute = /^\/creator\/[^/?#]+$/.test(route.pathname);
+  if (projectRoute || creatorRoute) {
+    let data;
+    try { data = JSON.parse(html.replace(/<!--[\s\S]*?-->/g, '').match(/<script\b[^>]*>\s*window\.INITIAL_DATA\s*=\s*([\s\S]*?);\s*<\/script\s*>/i)?.[1] || 'null'); }
+    catch { throw new Error(`${path}: malformed public bootstrap`); }
+    assert(data && typeof data.id === 'string' && data.id.trim(), `${path}: public bootstrap identity missing`);
+    const title = creatorRoute ? data.username : data.title;
+    assert(typeof title === 'string' && title.trim(), `${path}: public bootstrap heading missing`);
+    if (projectRoute) assert(!data.status || ['PUBLISHED', 'ARCHIVED'].includes(data.status), `${path}: non-public project bootstrap`);
+    expectedHeadings = [title.replace(/[\s\u200b]+/g, ' ').trim()];
+  }
+  const island = body.match(/<astro-island\b(?=[^>]*\bcomponent-url=["']\/_astro\/App\.[^"'/?#]+\.js["'])(?=[^>]*\bcomponent-export=["'](?:default|App)["'])(?=[^>]*\bssr(?:\s|=|>))[^>]*>([\s\S]*?)<\/astro-island\s*>/i)?.[1];
+  const headings = [...(island || '').matchAll(/<h1\b[^>]*>([\s\S]*?)<\/h1\s*>/gi)].map(match => textContent(match[1]));
+  assert(expectedHeadings?.some(heading => headings.includes(heading)), `${path}: rendered shell/heading missing`);
+}
+
 export function validateHtmlResponse(response, { path, cache, revision }) {
   assert(response.status === 200, `${path}: expected 200, received ${response.status}`);
   assert((response.headers.get('content-type') || '').includes('text/html'), `${path}: HTML missing`);
@@ -63,7 +114,7 @@ export async function checkFrontendCache(env, { request = fetch, now = () => per
     const ttfbMs = now() - start;
     const headers = validateHtmlResponse(response, { ...item, revision: env.GITHUB_SHA });
     const body = await response.text();
-    assert(/<title>[^<]+<\/title>/i.test(body) && /<main[\s>]/i.test(body), `${item.path}: rendered shell/SEO title missing`);
+    validateRenderedHtml(body, item);
     results.push({ path: item.path, status: response.status, ttfbMs: Math.round(ttfbMs), totalMs: Math.round(now() - start), ...headers });
   }
   const report = { sampledAt: new Date().toISOString(), baseUrl: base.origin, results, confirmedEdgeHit: results.some(r => r.cacheStatus === 'HIT'), authenticatedLeakageTest: 'not run: no authorized disposable account', coldStartVerified: false, lcpMeasured: false };
