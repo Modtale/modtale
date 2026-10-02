@@ -66,6 +66,8 @@ class MigrationTests(unittest.TestCase):
         for boundary in ['shared','branch-preview','pr-preview']:
             self.assertNotIn('HYTALE_CLIENT_SECRET',manifest[boundary]['sourceVersions'])
         self.assertNotIn('MODTALE_PUBLIC_CACHE_PURGE_TOKEN',manifest['shared']['sourceVersions'])
+        self.assertNotIn('WARDEN_API_KEY',manifest['shared']['sourceVersions'])
+        self.assertEqual(len(manifest['shared']['sourceVersions']),29)
     def test_preview_gate_blocks_before_cloud_access(self):
         with patch.dict('os.environ', {'GITHUB_EVENT_NAME':'workflow_dispatch','GITHUB_REPOSITORY':'Modtale/modtale','GITHUB_REF':'refs/heads/main','BUNDLE_MIGRATION_CONFIRM':'PUBLISH_BUNDLE','BUNDLE_BOUNDARY':'branch-preview'}, clear=True):
             with patch.object(m,'migrate') as call, contextlib.redirect_stderr(io.StringIO()):

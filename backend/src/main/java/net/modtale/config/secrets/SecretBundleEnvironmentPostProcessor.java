@@ -98,7 +98,7 @@ public final class SecretBundleEnvironmentPostProcessor implements EnvironmentPo
                     throw invalid();
                 }
                 Map<String, String> shared = load("shared");
-                require(shared, SHARED.stream().filter(key -> !key.equals("MODTALE_PUBLIC_CACHE_PURGE_TOKEN")).toList());
+                require(shared, SHARED.stream().filter(key -> !key.equals("MODTALE_PUBLIC_CACHE_PURGE_TOKEN") && !key.equals("WARDEN_API_KEY")).toList());
                 if ("true".equals(environment.getProperty("PUBLIC_CACHE_PURGE_ENABLED", "false"))
                         || "true".equals(environment.getProperty("app.public-cache-purge.enabled", "false"))) {
                     require(shared, Set.of("MODTALE_PUBLIC_CACHE_PURGE_TOKEN"));

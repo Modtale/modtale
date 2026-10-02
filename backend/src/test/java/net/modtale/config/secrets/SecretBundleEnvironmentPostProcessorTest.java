@@ -114,6 +114,18 @@ class SecretBundleEnvironmentPostProcessorTest {
     }
 
     @Test
+    void newSharedBundlesOmitWardenWhileOriginalBindingRemainsAuthoritative() throws IOException {
+        Map<String, String> values = shared();
+        values.remove("WARDEN_API_KEY");
+        bundle("shared", values);
+        MockEnvironment environment = environment("dev").withProperty("WARDEN_API_KEY", "original-only");
+        environment.getPropertySources().addLast(new ResourcePropertySource("classpath:application.properties"));
+        processor.postProcessEnvironment(environment, null);
+        assertEquals("original-only", environment.getProperty("app.warden.api-key"));
+        assertNull(environment.getPropertySources().get(SecretBundleEnvironmentPostProcessor.SOURCE_NAME).getProperty("WARDEN_API_KEY"));
+    }
+
+    @Test
     void originalWardenBindingWinsOverTheUnusedBundleCopy() throws IOException {
         Map<String, String> values = shared();
         values.put("WARDEN_API_KEY", "unused-bundle-warden-key");
