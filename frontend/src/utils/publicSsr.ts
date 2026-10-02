@@ -1,26 +1,5 @@
 import type { Project } from '@/types';
 
-export type PublicJsonResult = { data: any | null; status: number };
-
-export const fetchPublicJson = async (resource: string, timeoutMs = 1500): Promise<PublicJsonResult> => {
-    const controller = new AbortController();
-    const timeoutHandle = setTimeout(() => controller.abort(), timeoutMs);
-    try {
-        const response = await fetch(resource, { signal: controller.signal });
-        if (!response.ok) return { data: null, status: response.status };
-        try {
-            return { data: await response.json(), status: response.status };
-        } catch {
-            return { data: null, status: response.status };
-        }
-    } catch {
-        // A timeout/network error is not evidence that the resource is missing.
-        return { data: null, status: 0 };
-    } finally {
-        clearTimeout(timeoutHandle);
-    }
-};
-
 export const isProjectData = (data: any): data is Project => Boolean(
     data && typeof data.id === 'string' && typeof data.title === 'string'
     && (!data.status || ['PUBLISHED', 'ARCHIVED', 'UNLISTED'].includes(data.status))

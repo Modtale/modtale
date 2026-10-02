@@ -1,6 +1,7 @@
 ---
 import { HTML_CACHE, setPublicHtmlCache, setNoStore } from '@/utils/htmlCache';
-import { fetchPublicJson, isProjectData, isPublicProject } from '@/utils/publicSsr';
+import { isProjectData, isPublicProject } from '@/utils/publicSsr';
+import { fetchPublicJson } from '@/utils/publicSsr.server';
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import App from '../../App';
 import { SiteRoutes } from '../../utils/routes';
