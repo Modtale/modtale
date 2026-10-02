@@ -1,9 +1,11 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import http from 'node:http';
+import { once } from 'node:events';
 import { fileURLToPath } from 'node:url';
 import { test } from 'node:test';
-import { MAX_REQUESTS, MAX_BODY_BYTES, MISSING_PATH, validateInputs, requestCases,
-  blockedReason, publicProjectFixture, runApiHeaderDiagnostic } from '../scripts/api-cache-header-diagnostic.mjs';
+import { MAX_REQUESTS, MAX_BODY_BYTES, REQUEST_TIMEOUT_MS, MISSING_PATH, validateInputs, requestCases,
+  blockedReason, publicProjectFixture, requestWithoutBrowserHeaders, runApiHeaderDiagnostic } from '../scripts/api-cache-header-diagnostic.mjs';
 
 const publicPolicy = 'public, max-age=0, s-maxage=300, must-revalidate';
 const sha = 'a'.repeat(40);
@@ -13,15 +15,18 @@ function problem(status, detail = 'Application error, not retained') {
   return { type: 'about:blank', title: TITLES[status], status, detail, error: detail, message: detail };
 }
 function fixture(url, options, overrides = {}) {
-  const credential = options.headers && !options.headers.Origin;
+  const excluded = options.headers !== undefined;
+  const bootstrap = new URL(url).pathname === '/api/v1/auth/csrf';
   const missing = new URL(url).pathname === MISSING_PATH;
   const status = overrides.status ?? (missing ? 404 : 200);
-  const body = overrides.body ?? (status >= 400 ? problem(status) : projects);
+  const body = overrides.body ?? (status >= 400 ? problem(status) : bootstrap ? { token: 'ephemeral-csrf-not-retained' } : projects);
   return new Response(typeof body === 'string' ? body : JSON.stringify(body), { status, headers: {
     'content-type': status >= 400 ? 'application/problem+json' : 'application/json',
-    'cache-control': credential || missing || status >= 400 ? 'private, no-store' : publicPolicy,
-    'cf-cache-status': credential || options.headers?.Origin || missing || status >= 400 ? 'DYNAMIC' : 'HIT',
-    'x-modtale-revision': sha, ...overrides.headers,
+    'cache-control': excluded || missing || status >= 400 ? 'private, no-store' : publicPolicy,
+    'cf-cache-status': excluded || missing || status >= 400 ? 'DYNAMIC' : 'HIT',
+    'x-modtale-revision': sha,
+    ...(excluded && status === 200 ? { 'set-cookie': 'XSRF-TOKEN=ephemeral-csrf-not-retained; Path=/; Secure; SameSite=None' } : {}),
+    ...overrides.headers,
   } });
 }
 const input = (target = 'dev') => validateInputs({ API_DIAGNOSTIC_TARGET: target });
@@ -39,7 +44,7 @@ test('only exact fixed dev/production choices are accepted and dev is the defaul
   assert.ok(cases.every(item => item.path.startsWith('/api/v1/') && !/[?#%]/.test(item.path)));
 });
 
-test('at most12ordinaryGETs, no redirects/cache busting or real auth; summaries retain no raw data', async () => {
+test('at most 23 fixed ordinary GETs, no redirects/cache busting or real auth; summaries retain no raw data', async () => {
   for (const target of ['dev', 'production']) {
     const calls = [];
     const report = await runApiHeaderDiagnostic({ ...input(target), origin: 'https://ignored-evil.test' }, {
@@ -76,8 +81,9 @@ test('at most12ordinaryGETs, no redirects/cache busting or real auth; summaries 
     assert.equal(good.publicProjectFixturePath, '/mod/public-fixture');
     assert.equal(good.authenticatedCrossUserCoverage, false);
     assert.equal(good.confirmedPublicHit, true);
+    assert.equal(good.csrfBootstrapVerified, true);
     assert.ok(goodCalls.slice(0, 6).every(([, options]) => options.headers === undefined));
-    assert.ok(!/invalid-token|invalid-key|invalid-session|not retained|responseHeaders|requestHeaders/.test(JSON.stringify(good)));
+    assert.ok(!/invalid-token|invalid-key|invalid-session|not retained|ephemeral-csrf-not-retained|responseHeaders|requestHeaders/.test(JSON.stringify(good)));
   }
 });
 
@@ -107,8 +113,8 @@ test('source bound and legacy age, not pass-through origin headers alone, are ch
   }
 });
 
-test('all synthetic credentials require no-store and Origin cannot be a shared HIT', async () => {
-  for (const failureCase of ['origin_projects', 'cookie_projects', 'authorization_projects', 'modtale_key_projects', 'legacy_key_projects']) {
+test('every credential, browser, empty-header and bootstrap request must bypass shared cache', async () => {
+  for (const failureCase of requestCases(input()).filter(item => !['public', 'missing'].includes(item.kind)).map(item => item.id)) {
     const cases = requestCases(input());
     let count = 0;
     const report = await runApiHeaderDiagnostic(input(), { request: async (url, options) => {
@@ -132,6 +138,34 @@ test('all synthetic credentials require no-store and Origin cannot be a shared H
   assert.equal(cdnOverride.errorCode, 'cdn_policy_overrides_no_store');
 });
 
+test('excluded successes must issue XSRF specifically; bootstrap token must match its cookie', async () => {
+  for (const item of requestCases(input()).filter(item => !['public', 'missing'].includes(item.kind))) {
+    for (const badHeaders of [
+      { 'cache-control': publicPolicy },
+      { 'set-cookie': 'SESSION=not-an-xsrf-cookie; Secure' },
+      { 'set-cookie': 'XSRF-TOKEN=; Max-Age=0' },
+    ]) {
+      let count = 0;
+      const report = await runApiHeaderDiagnostic(input(), { request: async (url, options) => {
+        const current = requestCases(input())[count++];
+        return fixture(url, options, current.id === item.id ? { headers: badHeaders } : {});
+      } });
+      assert.equal(report.status, 'failed', item.id);
+      assert.equal(report.errorCode, badHeaders['cache-control']
+        ? 'credential_or_error_missing_no_store' : 'excluded_success_missing_csrf_cookie', item.id);
+    }
+  }
+  const mismatch = await runApiHeaderDiagnostic(input(), { request: async (url, options) => fixture(url, options,
+    new URL(url).pathname === '/api/v1/auth/csrf' ? { body: { token: 'different-secret-token' } } : {}) });
+  assert.equal(mismatch.errorCode, 'bootstrap_token_cookie_mismatch');
+  assert.ok(!JSON.stringify(mismatch).includes('different-secret-token'));
+  const unavailable = await runApiHeaderDiagnostic(input(), { request: async (url, options) => fixture(url, options,
+    new URL(url).pathname === '/api/v1/auth/csrf' ? { status: 500 } : {}) });
+  assert.equal(unavailable.status, 'limited');
+  assert.equal(unavailable.errorCode, 'csrf_bootstrap_not_observed');
+  assert.equal(unavailable.csrfBootstrapVerified, false);
+});
+
 test('actual application401/403 contract is accepted but generic access denials/WAF stop immediately', async () => {
   for (const status of [401, 403]) {
     const report = await runApiHeaderDiagnostic(input(), { request: async (url, options) => fixture(url, options,
@@ -142,6 +176,7 @@ test('actual application401/403 contract is accepted but generic access denials/
   for (const overrides of [
     { status: 403, body: 'error code: 1010', headers: { 'content-type': 'text/plain' } },
     { status: 403, body: { error: 'forbidden' }, headers: { 'content-type': 'application/json' } },
+    { status: 403, body: 'Invalid CORS request', headers: { 'content-type': 'text/plain' } },
     { status: 200, body: '<title>Just a moment...</title>', headers: { 'content-type': 'text/html' } },
     { status: 403, body: problem(403), headers: { 'cf-mitigated': 'challenge' } },
     { status: 429, body: problem(403) },
@@ -157,7 +192,7 @@ test('actual application401/403 contract is accepted but generic access denials/
 
 test('authoritative errors must be no-store, and the fixed missing fixture cannot silently exist', async () => {
   const limited = await runApiHeaderDiagnostic(input(), { request: async (url, options) => fixture(url, options,
-    new URL(url).pathname === MISSING_PATH ? {} : { status: 500 }) });
+    [MISSING_PATH, '/api/v1/auth/csrf'].includes(new URL(url).pathname) ? {} : { status: 500 }) });
   assert.equal(limited.status, 'limited');
   assert.equal(limited.errorCode, 'public_policy_not_fully_observed');
   assert.equal(limited.publicSuccessCount, 0);
@@ -210,4 +245,56 @@ test('manual workflow has fixed choices, read-only permissions and no deployment
   assert.match(workflow, /timeout-minutes: 5/);
   assert.doesNotMatch(workflow, /secrets\.|id-token:|write\b|gcloud|purge_cache|deploy\b|curl|retry/);
   assert.equal(blockedReason(new Response('error code: 1010', { status: 403 }), 'error code: 1010'), 'waf_1010');
+});
+
+
+test('empty-header probes are presence-based and the fixed time budget fits the workflow', () => {
+  const cases = requestCases(input());
+  const empty = cases.filter(item => item.kind === 'empty_header');
+  assert.equal(empty.length, 7);
+  assert.deepEqual(empty.map(item => Object.keys(item.headers)[0]),
+    ['Cookie', 'Authorization', 'Referer', 'X-Modtale-Key', 'X-API-Key', 'Sec-Fetch-Site', 'Sec-Fetch-Unknown']);
+  assert.ok(empty.every(item => Object.values(item.headers)[0] === ''));
+  assert.ok(MAX_REQUESTS * REQUEST_TIMEOUT_MS < 5 * 60 * 1000);
+});
+
+test('native transport preserves empty headers and never adds fetch metadata or follows redirects', async () => {
+  const observed = [];
+  const server = http.createServer((request, response) => {
+    observed.push({ url: request.url, headers: request.headers });
+    response.writeHead(302, { Location: '/not-followed', 'Set-Cookie': ['one=secret-a', 'two=secret-b'] });
+    response.end('redirect body');
+  });
+  server.listen(0, '127.0.0.1');
+  await once(server, 'listening');
+  const url = new URL(`http://127.0.0.1:${server.address().port}/fixed`);
+  try {
+    for (const headers of [undefined, { Origin: '', Cookie: '', 'Sec-Fetch-Unknown': '' }]) {
+      const response = await requestWithoutBrowserHeaders(url,
+        { method: 'GET', redirect: 'manual', headers, signal: AbortSignal.timeout(1000) }, http.request);
+      assert.equal(response.status, 302);
+      assert.deepEqual(response.headers.getSetCookie(), ['one=secret-a', 'two=secret-b']);
+      assert.equal(await new Response(response.body).text(), 'redirect body');
+    }
+    assert.equal(observed.length, 2);
+    assert.ok(observed.every(item => item.url === '/fixed'));
+    assert.equal(observed[0].headers['sec-fetch-mode'], undefined);
+    assert.equal(observed[0].headers['user-agent'], undefined);
+    assert.equal(observed[0].headers.origin, undefined);
+    assert.equal(observed[0].headers.cookie, undefined);
+    assert.equal(observed[1].headers.origin, '');
+    assert.equal(observed[1].headers.cookie, '');
+    assert.equal(observed[1].headers['sec-fetch-unknown'], '');
+  } finally { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); }
+});
+
+test('native request deadline also aborts a response body that stalls after headers', async () => {
+  const server = http.createServer((request, response) => { response.writeHead(200); response.write('{'); });
+  server.listen(0, '127.0.0.1');
+  await once(server, 'listening');
+  try {
+    const response = await requestWithoutBrowserHeaders(new URL(`http://127.0.0.1:${server.address().port}/fixed`),
+      { method: 'GET', signal: AbortSignal.timeout(200) }, http.request);
+    await assert.rejects(new Response(response.body).text());
+  } finally { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); }
 });

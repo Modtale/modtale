@@ -40,9 +40,16 @@ class ExternalDependencyArtifactServiceTest {
         ProjectDependency dependency = new ProjectDependency();
         dependency.setSource(ProjectDependency.Source.GITHUB);
         dependency.setExternalFileUrl("https://github.com/example/mod/releases/download/1/mod.jar");
-        InvalidVersionRequestException error = assertThrows(InvalidVersionRequestException.class,
-                () -> service.prepareExternalArtifacts(List.of(dependency)));
-        assertEquals("CurseForge files must be downloaded by the launcher. Add a CurseForge file reference instead.", error.getMessage());
+        java.net.InetAddress publicAddress = java.net.InetAddress.getByAddress(new byte[] {93, (byte) 184, (byte) 216, 34});
+        try (var dns = org.mockito.Mockito.mockStatic(java.net.InetAddress.class)) {
+            dns.when(() -> java.net.InetAddress.getAllByName("github.com"))
+                    .thenReturn(new java.net.InetAddress[] {publicAddress});
+            dns.when(() -> java.net.InetAddress.getAllByName("mediafilez.forgecdn.net"))
+                    .thenReturn(new java.net.InetAddress[] {publicAddress});
+            InvalidVersionRequestException error = assertThrows(InvalidVersionRequestException.class,
+                    () -> service.prepareExternalArtifacts(List.of(dependency)));
+            assertEquals("CurseForge files must be downloaded by the launcher. Add a CurseForge file reference instead.", error.getMessage());
+        }
         org.mockito.Mockito.verify(httpClient, org.mockito.Mockito.times(1)).send(
                 org.mockito.ArgumentMatchers.any(java.net.http.HttpRequest.class), org.mockito.ArgumentMatchers.any());
     }

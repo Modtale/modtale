@@ -1,4 +1,6 @@
 import fs from 'node:fs/promises';
+import https from 'node:https';
+import { Readable } from 'node:stream';
 import path from 'node:path';
 import { performance } from 'node:perf_hooks';
 import { pathToFileURL } from 'node:url';
@@ -7,7 +9,8 @@ const TARGETS = Object.freeze({
   dev: { origin: 'https://dev.api.modtale.net', site: 'https://dev.modtale.net' },
   production: { origin: 'https://api.modtale.net', site: 'https://modtale.net' },
 });
-export const MAX_REQUESTS = 12;
+export const MAX_REQUESTS = 23;
+export const REQUEST_TIMEOUT_MS = 10000;
 export const MAX_BODY_BYTES = 512 * 1024;
 export const MISSING_PATH = '/api/v1/projects/modtale-cache-diagnostic-fixed-missing-project';
 const SHARED_CACHE_STATES = new Set(['HIT', 'STALE', 'UPDATING', 'REVALIDATED']);
@@ -33,13 +36,47 @@ export function requestCases(input) {
   return Object.freeze([
     ...publicCases.map(item => ({ ...item, id: `anonymous_${item.id}` })),
     ...publicCases.map(item => ({ ...item, id: `repeat_${item.id}` })),
-    { id: 'origin_projects', path: '/api/v1/projects', kind: 'origin', headers: { Origin: fixed.site } },
+    { id: 'origin_projects', path: '/api/v1/projects', kind: 'browser', headers: { Origin: fixed.site } },
+    { id: 'referer_projects', path: '/api/v1/projects', kind: 'browser', headers: { Referer: `${fixed.site}/` } },
+    { id: 'sec_fetch_projects', path: '/api/v1/projects', kind: 'browser', headers: { 'Sec-Fetch-Site': 'same-site' } },
+    { id: 'sec_fetch_unknown_projects', path: '/api/v1/projects', kind: 'browser', headers: { 'Sec-Fetch-Unknown': 'diagnostic' } },
     { id: 'cookie_projects', path: '/api/v1/projects', kind: 'credential', headers: { Cookie: 'SESSION=modtale-cache-diagnostic-invalid-session' } },
     { id: 'authorization_projects', path: '/api/v1/projects', kind: 'credential', headers: { Authorization: 'Bearer modtale-cache-diagnostic-invalid-token' } },
     { id: 'modtale_key_projects', path: '/api/v1/projects', kind: 'credential', headers: { 'X-Modtale-Key': 'modtale-cache-diagnostic-invalid-key' } },
     { id: 'legacy_key_projects', path: '/api/v1/projects', kind: 'credential', headers: { 'X-API-Key': 'modtale-cache-diagnostic-invalid-key' } },
+    // Empty Origin is rejected by Spring CORS before token issuance; verify that
+    // case in backend tests and edge configuration, never bypass its generic403.
+    ...['Cookie', 'Authorization', 'Referer', 'X-Modtale-Key', 'X-API-Key', 'Sec-Fetch-Site', 'Sec-Fetch-Unknown']
+      .map(name => ({ id: `empty_${name.toLowerCase().replaceAll('-', '_')}_projects`, path: '/api/v1/projects',
+        kind: 'empty_header', headers: { [name]: '' } })),
     { id: 'missing_project', path: MISSING_PATH, kind: 'missing' },
+    { id: 'csrf_bootstrap', path: '/api/v1/auth/csrf', kind: 'bootstrap', headers: { Origin: fixed.site } },
   ]);
+}
+
+// Node fetch adds Sec-Fetch-Mode: cors even for server requests. Use the native
+// HTTPS client so public probes actually have no browser or credential headers.
+// It does not follow redirects, maintain a cookie jar, decompress, or retry.
+export function requestWithoutBrowserHeaders(url, options, transport = https.request) {
+  return new Promise((resolve, reject) => {
+    const request = transport(url, {
+      method: options.method, headers: options.headers, signal: options.signal,
+    }, response => {
+      const headers = new Headers();
+      for (let index = 0; index < response.rawHeaders.length; index += 2) {
+        headers.append(response.rawHeaders[index], response.rawHeaders[index + 1]);
+      }
+      resolve({ status: response.statusCode, headers, body: Readable.toWeb(response) });
+    });
+    request.on('error', reject);
+    request.end();
+  });
+}
+
+function csrfCookies(response) {
+  const cookies = typeof response.headers.getSetCookie === 'function'
+    ? response.headers.getSetCookie() : [response.headers.get('set-cookie') || ''];
+  return cookies.map(cookie => /^XSRF-TOKEN=([^;]+)/.exec(cookie)?.[1]).filter(Boolean);
 }
 
 function cachePolicy(raw = '') {
@@ -139,6 +176,7 @@ function observation(response, item, startedAt, ttfbMs, totalMs) {
     contentType: ['application/json', 'application/problem+json', 'text/html', 'text/plain'].includes(type) ? type : 'other',
     revision: /^[a-f0-9]{40}$/.test(revision || '') ? revision : null,
     setCookieObserved: response.headers.has('set-cookie'),
+    csrfCookieObserved: csrfCookies(response).length > 0,
   };
 }
 
@@ -183,24 +221,32 @@ export function validateObservation(response, body, item) {
   }
   requireCondition(response.status === 200 && item.kind !== 'missing', 'unexpected_success_status');
   requireCondition(item.contentType === 'application/json', 'successful_api_response_not_json');
-  if (item.kind === 'credential') {
+  if (item.kind !== 'public') {
     requireNoStore(item);
-    return 'synthetic_credential_no_store';
+    requireCondition(item.csrfCookieObserved, 'excluded_success_missing_csrf_cookie');
+    if (item.kind === 'bootstrap') {
+      let token;
+      try { token = JSON.parse(body)?.token; } catch { /* Report only the fixed error code. */ }
+      requireCondition(typeof token === 'string' && token.length > 0 && csrfCookies(response).includes(token),
+        'bootstrap_token_cookie_mismatch');
+      return 'csrf_bootstrap_no_store';
+    }
+    return 'excluded_success_no_store_with_csrf';
   }
   requirePublicPolicy(item);
-  if (item.kind === 'origin') requireNoSharedCache(item);
-  return item.kind === 'origin' ? 'origin_excluded_from_shared_cache' : 'public_bounded_300';
+  return 'public_bounded_300';
 }
 
-export async function runApiHeaderDiagnostic(input, { request = fetch, now = () => performance.now(), date = () => new Date() } = {}) {
+export async function runApiHeaderDiagnostic(input, { request = requestWithoutBrowserHeaders, now = () => performance.now(), date = () => new Date() } = {}) {
   const fixed = validateInputs({ API_DIAGNOSTIC_TARGET: input.target });
   const cases = requestCases(fixed);
   requireCondition(cases.length === MAX_REQUESTS, 'request_plan_budget_invalid');
   const report = { target: fixed.target, origin: fixed.origin, sampledAt: date().toISOString(), status: 'running',
     maxRequests: MAX_REQUESTS, requestCount: 0, observations: [], publicSuccessCount: 0, applicationErrorCount: 0,
-    confirmedPublicHit: false, authenticatedCrossUserCoverage: false,
+    confirmedPublicHit: false, csrfBootstrapVerified: false, authenticatedCrossUserCoverage: false,
     limitations: ['Headers/Age alone do not prove the active Cloudflare rule TTL; reconcile live rule configuration separately.',
       'Only fixed synthetic invalid credentials are tested; no real authentication or cross-user private data coverage.',
+      'Empty Origin is checked by backend tests and edge-rule inspection, not live probing, because Spring CORS rejects it.',
       'No response bodies, arbitrary header values, credential values, cookies, or tokens are retained.',
       'No retries, redirects, cache-busting, writes, purges, user-agent overrides, or WAF bypass.'] };
   try {
@@ -210,7 +256,7 @@ export async function runApiHeaderDiagnostic(input, { request = fetch, now = () 
       requireCondition(url.origin === fixed.origin && !url.search && !url.hash && !url.username && !url.password, 'request_outside_fixed_scope');
       const start = now();
       const startedAt = date().toISOString();
-      const options = { method: 'GET', redirect: 'manual', signal: AbortSignal.timeout(15000) };
+      const options = { method: 'GET', redirect: 'manual', signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) };
       if (item.headers) options.headers = { ...item.headers };
       report.requestCount++;
       const response = await request(url, options);
@@ -225,9 +271,11 @@ export async function runApiHeaderDiagnostic(input, { request = fetch, now = () 
         if (item.id === 'anonymous_projects') report.publicProjectFixturePath = publicProjectFixture(body);
       }
       if (result.result === 'application_error_no_store') report.applicationErrorCount++;
+      if (result.result === 'csrf_bootstrap_no_store') report.csrfBootstrapVerified = true;
     }
-    report.status = report.publicSuccessCount === 6 ? 'complete' : 'limited';
-    if (report.status === 'limited') report.errorCode = 'public_policy_not_fully_observed';
+    report.status = report.publicSuccessCount === 6 && report.csrfBootstrapVerified ? 'complete' : 'limited';
+    if (report.status === 'limited') report.errorCode = report.publicSuccessCount !== 6
+      ? 'public_policy_not_fully_observed' : 'csrf_bootstrap_not_observed';
   } catch (error) {
     report.status = error instanceof DiagnosticFailure && error.blocked ? 'blocked' : 'failed';
     report.errorCode = error instanceof DiagnosticFailure ? error.code : 'request_failed_no_retry';

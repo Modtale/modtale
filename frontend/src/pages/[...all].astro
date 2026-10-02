@@ -23,7 +23,8 @@ import {
 import { BACKEND_URL, SERVER_BACKEND_URL } from '@/utils/api.ts';
 import { HTML_CACHE, PUBLIC_SHELL_PATHS, isPrivateHtmlRequest, setPublicHtmlCache, setNoStore } from '@/utils/htmlCache';
 import { isWikiMetadata, isWikiPage } from '@/utils/wikiPayload';
-import { buildHomeBootstrap, fetchPublicJson, isProjectData, isProjectPage, isPublicProject } from '@/utils/publicSsr';
+import { buildHomeBootstrap, isProjectData, isProjectPage, isPublicProject } from '@/utils/publicSsr';
+import { fetchPublicJson } from '@/utils/publicSsr.server';
 
 const url = Astro.url;
 const path = url.pathname;
