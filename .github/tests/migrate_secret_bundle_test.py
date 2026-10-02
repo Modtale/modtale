@@ -12,7 +12,7 @@ sys.path.insert(0,str(scripts))
 import migrate_secret_bundle as m
 
 class FakeCloud:
-    def __init__(self, boundary='production', bad_iam=False, populated=False, changed=False):
+    def __init__(self, boundary='shared', bad_iam=False, populated=False, changed=False):
         self.boundary=boundary; self.bad_iam=bad_iam;self.populated=populated;self.changed=changed;self.calls=[];self.upload=None
     def __call__(self,*args):
         self.calls.append(args)
@@ -21,7 +21,7 @@ class FakeCloud:
         if args[2]=='list':
             if args[3].startswith('MODTALE_CONFIG_'):
                 return [{'name':'projects/p/secrets/s/versions/1','state':'ENABLED'}] if self.populated else []
-            version='999' if self.changed else '1'
+            version='999' if self.changed else json.loads((scripts/'secret-bundle-source-manifest.json').read_text())[self.boundary]['sourceVersions'][args[3]]
             return [{'name':f'projects/p/secrets/s/versions/{version}','state':'ENABLED'}]
         if args[2]=='describe':return {'state':'ENABLED'}
         if args[2]=='access':
@@ -35,35 +35,53 @@ class FakeCloud:
 class MigrationTests(unittest.TestCase):
     def test_fixed_destination_metadata_and_safe_output(self):
         api=FakeCloud();stream=io.StringIO()
-        with contextlib.redirect_stdout(stream),contextlib.redirect_stderr(stream):result=m.migrate('production',api)
-        self.assertEqual(result['destination'],'MODTALE_CONFIG_PRODUCTION')
+        with contextlib.redirect_stdout(stream),contextlib.redirect_stderr(stream):result=m.migrate('shared',api)
+        self.assertEqual(result['destination'],'MODTALE_CONFIG_SHARED')
         self.assertEqual(result['version'],'42')
         self.assertNotIn('SYNTHETIC',json.dumps(result)+stream.getvalue())
-        self.assertEqual(json.loads(api.upload)['secrets']['HYTALE_CLIENT_SECRET'],'SYNTHETIC_CREDENTIAL_${LITERAL}')
+        self.assertEqual(json.loads(api.upload)['secrets']['MONGODB_URI'],'SYNTHETIC_CREDENTIAL_${LITERAL}')
         self.assertTrue(all('--project' in c and c[c.index('--project')+1]=='gen-lang-client-0244308719' for c in api.calls))
         self.assertFalse(any(x in c for c in api.calls for x in ('delete','destroy','disable','create','add-iam-policy-binding','deploy')))
+    def test_all_three_fixed_destinations_use_their_frozen_sources(self):
+        manifest=json.loads((scripts/'secret-bundle-source-manifest.json').read_text())
+        for boundary in manifest:
+            with self.subTest(boundary=boundary):
+                api=FakeCloud(boundary)
+                result=m.migrate(boundary,api)
+                self.assertEqual(result['destination'],manifest[boundary]['destination'])
+                self.assertEqual(result['entries'],len(manifest[boundary]['sourceVersions']))
+                self.assertEqual(set(json.loads(api.upload)['secrets']),set(manifest[boundary]['sourceVersions']))
+                self.assertTrue(all(c[c.index('--project')+1]==manifest[boundary]['project'] for c in api.calls))
+    def test_retired_production_destination_is_rejected_before_access(self):
+        api=FakeCloud()
+        with self.assertRaises(m.MigrationError):m.migrate('production',api)
+        self.assertEqual(api.calls,[])
     def test_iam_failure_before_payload(self):
         api=FakeCloud(bad_iam=True)
-        with self.assertRaises(m.MigrationError):m.migrate('production',api)
+        with self.assertRaises(m.MigrationError):m.migrate('shared',api)
         self.assertFalse(any('access' in c for c in api.calls))
     def test_populated_destination_refuses_retry(self):
         api=FakeCloud(populated=True)
-        with self.assertRaises(m.MigrationError):m.migrate('production',api)
+        with self.assertRaises(m.MigrationError):m.migrate('shared',api)
         self.assertFalse(any('access' in c for c in api.calls))
     def test_source_change_refuses_payload_read(self):
         api=FakeCloud(changed=True)
-        with self.assertRaises(m.MigrationError):m.migrate('production',api)
+        with self.assertRaises(m.MigrationError):m.migrate('shared',api)
         self.assertFalse(any('access' in c for c in api.calls))
     def test_arbitrary_destination_rejected(self):
         api=FakeCloud()
         with self.assertRaises(m.MigrationError):m.migrate('../../other',api)
         self.assertEqual(api.calls,[])
     def test_no_unapproved_conditions(self):
-        policy={'bindings':[{'role':'roles/secretmanager.secretAccessor','members':m.EXPECTED_MEMBERS['production'],'condition':{'expression':'true'}}]}
-        self.assertFalse(m.policy_ok(policy,'production'))
-    def test_no_production_hytale_in_other_manifests(self):
+        policy={'bindings':[{'role':'roles/secretmanager.secretAccessor','members':m.EXPECTED_MEMBERS['shared'],'condition':{'expression':'true'}}]}
+        self.assertFalse(m.policy_ok(policy,'shared'))
+    def test_three_destinations_preserve_both_original_keys(self):
         manifest=json.loads((scripts/'secret-bundle-source-manifest.json').read_text())
-        for boundary in ['shared','branch-preview','pr-preview']:
+        self.assertEqual(set(manifest), {'shared','branch-preview','pr-preview'})
+        self.assertEqual(set(m.TARGETS), set(manifest))
+        self.assertEqual(set(m.EXPECTED_MEMBERS), set(manifest))
+        self.assertNotIn('production', (scripts.parent/'workflows/migrate-secret-bundle.yml').read_text().split('options:')[1].split('\n')[0])
+        for boundary in manifest:
             self.assertNotIn('HYTALE_CLIENT_SECRET',manifest[boundary]['sourceVersions'])
         self.assertNotIn('MODTALE_PUBLIC_CACHE_PURGE_TOKEN',manifest['shared']['sourceVersions'])
         self.assertNotIn('WARDEN_API_KEY',manifest['shared']['sourceVersions'])
@@ -84,7 +102,7 @@ class MigrationTests(unittest.TestCase):
             result=base(*args)
             if args[2:3]==('access',):base.changed=True
             return result
-        with self.assertRaises(m.MigrationError):m.migrate('production',race)
+        with self.assertRaises(m.MigrationError):m.migrate('shared',race)
         self.assertIsNone(base.upload)
     def test_workflow_validates_before_authentication(self):
         workflow=(scripts.parent/'workflows/migrate-secret-bundle.yml').read_text()

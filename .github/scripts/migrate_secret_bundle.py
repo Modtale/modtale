@@ -10,7 +10,6 @@ from secret_bundle import BundleError, TARGETS, encode, numeric_version
 BASE = Path(__file__).resolve().parent
 EXPECTED_MEMBERS = {
     'shared': ['serviceAccount:modtale-dev-runtime@gen-lang-client-0244308719.iam.gserviceaccount.com', 'serviceAccount:modtale-prod-runtime@gen-lang-client-0244308719.iam.gserviceaccount.com'],
-    'production': ['serviceAccount:modtale-prod-runtime@gen-lang-client-0244308719.iam.gserviceaccount.com'],
     'branch-preview': ['serviceAccount:modtale-branch-preview-runtime@gen-lang-client-0244308719.iam.gserviceaccount.com'],
     'pr-preview': ['serviceAccount:modtale-pr-preview-runtime@modtale-pr-preview.iam.gserviceaccount.com'],
 }
