@@ -315,7 +315,13 @@ jobs:
           echo "::add-mask::$existing_token_id"
           export EXISTING_R2_RUNTIME_TOKEN_ID="$existing_token_id"
 
-          node "$GITHUB_WORKSPACE/base/.github/scripts/cloudflare-r2-preview.mjs" provision
+          provisioning_kind=new
+          if [ -n "$existing_token_id" ]; then
+            provisioning_kind=replacement
+          fi
+          python3 "$GITHUB_WORKSPACE/base/.github/scripts/secret_bundle_ci.py" guard-legacy-provision "$provisioning_kind"
+          R2_BUNDLE_LIFECYCLE_SCRIPT="$GITHUB_WORKSPACE/base/.github/scripts/secret_bundle_ci.py" \
+            node "$GITHUB_WORKSPACE/base/.github/scripts/cloudflare-r2-preview.mjs" provision
 
       - name: Store PR Preview R2 runtime secrets
         if: env.MODTALE_SECRET_BUNDLES_ENABLED != 'true'
@@ -337,11 +343,7 @@ jobs:
                 --data-file=-
             fi
 
-            gcloud secrets add-iam-policy-binding "$name" \
-              --project "$PROJECT_ID" \
-              --member="serviceAccount:$RUNTIME_SERVICE_ACCOUNT" \
-              --role="roles/secretmanager.secretAccessor" \
-              --quiet >/dev/null
+            python3 "$GITHUB_WORKSPACE/base/.github/scripts/secret_bundle_ci.py" ensure-legacy-accessor "$name"
           }
 
           upsert_secret "$R2_ACCESS_KEY_SECRET_NAME" "$R2_RUNTIME_ACCESS_KEY"
@@ -451,6 +453,10 @@ jobs:
               --region "$REGION" \
               --update-env-vars "FRONTEND_URL=$FRONTEND_URL,BACKEND_URL=$BACKEND_URL"
           fi
+
+      - name: Finish pinned preview fanout
+        if: env.MODTALE_SECRET_BUNDLES_ENABLED == 'true'
+        run: python3 "$GITHUB_WORKSPACE/base/.github/scripts/secret_bundle_ci.py" finalize-preview
 
       - name: Publish preview comment
         env:

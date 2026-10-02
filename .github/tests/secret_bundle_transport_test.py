@@ -48,6 +48,24 @@ class TransportTests(unittest.TestCase):
         with self.assertRaises(CertificateError):t.readiness_head(session,self.readiness(),(TransientError,),(CertificateError,))
         session.request.side_effect=ValueError('not displayed')
         with self.assertRaises(ValueError):t.readiness_head(session,self.readiness(),(TransientError,),(CertificateError,))
+    def test_baseline_readiness_is_fixed_normal_service_head_only(self):
+        request=self.readiness();request.update(api='cloud-run-baseline-readiness',origin=request['base_uri'],revision_uid='baseline-revision-uid',revision='modtale-backend-dev-00001-abc');request.pop('tag')
+        t.validate_request(request)
+        session=Mock();session.request.return_value.status_code=200
+        self.assertEqual(t.readiness_head(session,request),{'status':200,'body':{}})
+        for key,value in [('origin',self.readiness()['origin']),('base_uri','https://other-uc.a.run.app'),('revision','modtale-backend-00001-abc'),('revision_uid','bad\nuid'),('path','/api/v1/projects'),('method','GET'),('tag','unowned')]:
+            changed=copy.deepcopy(request);changed[key]=value
+            with self.assertRaises(t.TransportError):t.validate_request(changed)
+    def test_short_owned_tags_fit_maximum_branch_dns_label(self):
+        name='modtale-backend-'+'a'*20
+        for suffix,prefix in (('bd','b'),('sb','r')):
+            request=self.readiness();request.update(service=request['service'].rsplit('/',1)[0]+'/'+name,revision=name+'-'+suffix+'-abcdef123456',tag=prefix+'abcdef123',base_uri='https://'+name+'-ptpi2wdeva-uc.a.run.app')
+            request['origin']='https://'+request['tag']+'---'+request['base_uri'].removeprefix('https://')
+            self.assertEqual(len(request['origin'].removeprefix('https://').split('.')[0]),63)
+            t.validate_request(request)
+            request['tag']=('sb-' if suffix=='bd' else 'sr-')+'abcdef123456'
+            request['origin']='https://'+request['tag']+'---'+request['base_uri'].removeprefix('https://')
+            with self.assertRaises(t.TransportError):t.validate_request(request)
     def run_read(self):
         return {'api':'cloud-run-v2','origin':'https://run.googleapis.com','method':'GET','path':'/v2/projects/gen-lang-client-0244308719/locations/us-central1/services/modtale-backend-dev','params':{'fields':i.SERVICE_FIELDS}}
     def test_known_masks_and_fixed_endpoints(self):
@@ -70,6 +88,15 @@ class TransportTests(unittest.TestCase):
             with self.assertRaises(t.TransportError):t.validate_request(changed)
         changed=copy.deepcopy(r);changed['path']=changed['path'].replace('MODTALE_CONFIG_SHARED','MONGODB_URI')
         with self.assertRaises(t.TransportError):t.validate_request(changed)
+    def test_fixed_numeric_version_validation_never_accesses_payload(self):
+        request={'api':'secret-manager-metadata','origin':'https://secretmanager.googleapis.com','method':'GET','path':'/v1/projects/gen-lang-client-0244308719/secrets/MODTALE_CONFIG_SHARED/versions/1','params':{'fields':'name,state'}}
+        t.validate_request(request)
+        for suffix in ('latest','0','-1','1:access','1:destroy','1:disable','1:enable','99999999999999999999'):
+            changed=copy.deepcopy(request);changed['path']=request['path'].rsplit('/',1)[0]+'/'+suffix
+            with self.assertRaises(t.TransportError):t.validate_request(changed)
+        for key,value in [('method','PATCH'),('body',{}),('params',{'fields':'name,payload'}),('path',request['path'].replace('MODTALE_CONFIG_SHARED','MONGODB_URI'))]:
+            changed=copy.deepcopy(request);changed[key]=value
+            with self.assertRaises(t.TransportError):t.validate_request(changed)
     def test_log_project_wide_or_markerless_reads_rejected(self):
         request=e.activation_request('dev','modtale-backend-dev-00001-abc','2026-10-02T00:00:00Z')
         for key,value in [('resourceNames',['projects/gen-lang-client-0244308719']),('filter','severity>=0')]:

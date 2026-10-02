@@ -19,21 +19,27 @@ class TransportError(RuntimeError):
     pass
 
 def readiness_scope(request):
-    required={'api','origin','method','path','service','service_uid','revision','tag','base_uri'}
-    if set(request)!=required or any(not isinstance(value,str) for value in request.values()) or request['api']!='cloud-run-readiness' or request['method']!='HEAD' or request['path']!='/actuator/health/readiness':
+    baseline=request.get('api')=='cloud-run-baseline-readiness'
+    required={'api','origin','method','path','service','service_uid','revision','base_uri'}|({'revision_uid'} if baseline else {'tag'})
+    if set(request)!=required or any(not isinstance(value,str) for value in request.values()) or request['api'] not in ('cloud-run-readiness','cloud-run-baseline-readiness') or request['method']!='HEAD' or request['path']!='/actuator/health/readiness':
         raise TransportError('Only fixed readiness HEAD requests are supported.')
     service=request['service']
     match=re.fullmatch(r'projects/(gen-lang-client-0244308719|modtale-pr-preview)/locations/us-central1/services/([a-z][a-z0-9-]{0,62})',service or '')
     if not match:raise TransportError('Invalid readiness service scope.')
     project,name=match.groups()
     allowed=(name=='modtale-backend' or re.fullmatch(r'modtale-backend-[a-z0-9-]{1,20}',name)) if project==PROJECTS[0] else re.fullmatch(r'modtale-pr-[1-9][0-9]*-backend',name)
-    candidate=re.fullmatch(re.escape(name)+r'-(bd|sb)-([a-f0-9]{12})',request['revision'] or '')
-    if not allowed or not candidate:
-        raise TransportError('Invalid readiness candidate identity.')
-    if not re.fullmatch(r'(?:sb|sr)-[a-f0-9]{12}',request['tag'] or '') or not re.fullmatch(r'[A-Za-z0-9-]{1,128}',request['service_uid'] or ''):
+    if not allowed or not re.fullmatch(r'[A-Za-z0-9-]{1,128}',request['service_uid'] or ''):
         raise TransportError('Invalid readiness ownership metadata.')
-    prefix='sb-' if candidate.group(1)=='bd' else 'sr-'
-    if request['tag']!=prefix+candidate.group(2):raise TransportError('Readiness tag does not belong to its candidate.')
+    if baseline:
+        if len(request['revision'])>63 or not re.fullmatch(re.escape(name)+r'-[a-z0-9](?:[a-z0-9-]*[a-z0-9])?',request['revision']) or not re.fullmatch(r'[A-Za-z0-9-]{1,128}',request['revision_uid']):
+            raise TransportError('Invalid baseline revision identity.')
+    else:
+        candidate=re.fullmatch(re.escape(name)+r'-(bd|sb)-([a-f0-9]{12})',request['revision'] or '')
+        if not candidate:raise TransportError('Invalid readiness candidate identity.')
+        prefix='sb-' if candidate.group(1)=='bd' else 'sr-'
+        short='b' if candidate.group(1)=='bd' else 'r'
+        if request['tag'] not in (prefix+candidate.group(2),short+candidate.group(2)[:9]):
+            raise TransportError('Readiness tag does not belong to its candidate.')
     parsed=[]
     for value in (request['base_uri'],request['origin']):
         if not isinstance(value,str) or any(ord(c)<33 or ord(c)>126 for c in value):
@@ -44,9 +50,11 @@ def readiness_scope(request):
         except ValueError:raise TransportError('Invalid readiness URL.') from None
         if uri.scheme!='https' or uri.username or uri.password or port or uri.path or uri.query or uri.fragment or not uri.hostname or value!='https://'+uri.hostname:
             raise TransportError('Only canonical HTTPS Cloud Run origins are supported.')
+        if any(len(label)>63 for label in uri.hostname.split('.')):raise TransportError('Cloud Run hostname exceeds DNS bounds.')
         parsed.append(uri.hostname)
     base,tagged=parsed
-    if not re.fullmatch(re.escape(name)+r'-[a-z0-9-]+\.a\.run\.app',base) or tagged!=request['tag']+'---'+base:
+    expected=base if baseline else request['tag']+'---'+base
+    if not re.fullmatch(re.escape(name)+r'-[a-z0-9-]+\.a\.run\.app',base) or tagged!=expected:
         raise TransportError('Readiness URL does not match its exact owned Cloud Run tag.')
     return project
 
@@ -69,7 +77,7 @@ def validate_request(request):
     api=request.get('api');origin=request.get('origin');method=request.get('method');path=request.get('path')
     if not isinstance(path,str) or not path.startswith('/') or any(x in path for x in ('?','#','..','\\')):
         raise TransportError('Invalid fixed API path.')
-    if api=='cloud-run-readiness':
+    if api in ('cloud-run-readiness','cloud-run-baseline-readiness'):
         readiness_scope(request)
         return
     if api=='github':
@@ -122,6 +130,11 @@ def validate_request(request):
     elif api=='secret-manager-metadata':
         from secret_bundle import TARGETS
         roots={'/v1/projects/'+p+'/secrets/'+name for p,name in TARGETS.values()}
+        version=any(re.fullmatch(re.escape(root)+r'/versions/[1-9][0-9]{0,18}',path) for root in roots)
+        if version:
+            if origin!='https://secretmanager.googleapis.com' or method!='GET' or params!={'fields':'name,state'} or 'body' in request:
+                raise TransportError('Only fixed numeric version metadata reads are supported.')
+            return
         if origin!='https://secretmanager.googleapis.com' or method not in ('GET','PATCH') or path not in roots:
             raise TransportError('Only fixed bundle container metadata is supported.')
         if fields not in (('name,etag,annotations',) if method=='GET' else ('name,etag','name,etag,annotations')):raise TransportError('Unexpected journal response mask.')
@@ -156,7 +169,7 @@ def create_transport():
     def transport(request):
         validate_request(request)
         project=PROJECTS[ACCOUNTS.index(account)]
-        if request['api']=='cloud-run-readiness':
+        if request['api'] in ('cloud-run-readiness','cloud-run-baseline-readiness'):
             if readiness_scope(request)!=project:raise TransportError('Authenticated readiness project boundary mismatch.')
         elif request['api'].startswith('cloud-run') or request['api']=='secret-manager-metadata':
             expected='/namespaces/'+project+'/' if request['api']=='cloud-run-v1-ownership' else '/projects/'+project+'/'
@@ -165,7 +178,7 @@ def create_transport():
             raise TransportError('Authenticated log-view boundary mismatch.')
         try:
             api=request['api'];kwargs={'timeout':90,'allow_redirects':False}
-            if api=='cloud-run-readiness':
+            if api in ('cloud-run-readiness','cloud-run-baseline-readiness'):
                 return readiness_head(readiness,request,(requests.exceptions.Timeout,requests.exceptions.ConnectionError),(requests.exceptions.SSLError,))
             elif api=='github':
                 if not token:raise TransportError('Existing GitHub token is required for lifecycle reads.')
