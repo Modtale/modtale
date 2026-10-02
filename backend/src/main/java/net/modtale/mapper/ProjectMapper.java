@@ -196,7 +196,8 @@ public class ProjectMapper {
                 project.getProjectRoles(),
                 project.getTeamMembers(),
                 project.getTeamInvites(),
-                toAdminVersionSummaryDTOs(project.getVersions())
+                toAdminVersionSummaryDTOs(project.getVersions()),
+                net.modtale.service.admin.review.ProjectReviewSnapshot.token(project)
         );
     }
 
@@ -321,7 +322,7 @@ public class ProjectMapper {
         dto.setId(version.getId());
         dto.setVersionNumber(version.getVersionNumber());
         dto.setGameVersions(version.getGameVersions());
-        dto.setFileUrl(version.getFileUrl());
+        dto.setFileName(displayArtifactName(version.getFileUrl()));
         dto.setDownloadCount(version.getDownloadCount());
         dto.setReleaseDate(version.getReleaseDate());
         if (includeChangelog) {
@@ -367,7 +368,8 @@ public class ProjectMapper {
                 version.getChannel(),
                 version.getReviewStatus(),
                 version.getRejectionReason(),
-                version.getScanResult()
+                version.getScanResult(),
+                net.modtale.service.admin.review.VersionReviewSnapshot.token(version)
         );
     }
 
@@ -388,6 +390,11 @@ public class ProjectMapper {
                         .findFirst()
                         .orElseGet(() -> project.getVersions().stream().filter(java.util.Objects::nonNull).findFirst().orElse(null));
 
+        return toVerificationQueueItemDTO(project, pendingVersion);
+    }
+
+    public static AdminVerificationQueueItemDTO toVerificationQueueItemDTO(Project project, ProjectVersion pendingVersion) {
+        if (project == null) return null;
         return new AdminVerificationQueueItemDTO(
                 project.getId(),
                 project.getTitle(),
@@ -417,6 +424,9 @@ public class ProjectMapper {
         return new AdminVerificationQueueScanDTO(
                 scanResult.getStatus(),
                 scanResult.getVerdict(),
+                scanResult.getScanState(),
+                scanResult.getSecurityEvidence() == null ? null : scanResult.getSecurityEvidence().reviewState(),
+                false,
                 scanResult.getRiskScore(),
                 scanResult.getKnownIssueCount(),
                 scanResult.getNewIssueCount(),
@@ -437,7 +447,6 @@ public class ProjectMapper {
                 dependency.getExternalUrl(),
                 dependency.getExternalFileUrl(),
                 dependency.getExternalFileName(),
-                dependency.getCachedFileUrl(),
                 dependency.isHytaleProjectConfirmed(),
                 dependency.getIcon(),
                 dependency.getTitle() != null ? dependency.getTitle() : dependency.getProjectTitle(),
@@ -453,5 +462,13 @@ public class ProjectMapper {
         return dependencies.stream()
                 .map(ProjectMapper::toDependencyDTO)
                 .collect(Collectors.toList());
+    }
+
+    private static String displayArtifactName(String key) {
+        if (key == null || key.isBlank()) return null;
+        String name = key.substring(key.lastIndexOf('/') + 1);
+        if (name.matches("(?i)^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-.+"))
+            return name.substring(37);
+        return name;
     }
 }

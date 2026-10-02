@@ -15,7 +15,7 @@ import net.modtale.model.project.ProjectClassification;
 import net.modtale.model.project.ProjectDependency;
 import net.modtale.model.project.ProjectStatus;
 import net.modtale.model.project.ProjectVersion;
-import net.modtale.repository.project.ProjectRepository;
+import net.modtale.service.admin.review.ProjectReviewPersistence;
 import net.modtale.service.project.query.ProjectService;
 import net.modtale.service.project.version.ExternalDependencyArtifactService;
 import net.modtale.service.project.version.VersionDependencyService;
@@ -56,7 +56,8 @@ class CurseForgeModpackFlowTest {
         curseForge.setExternalFileStatus(4);
         curseForge.setExternalDistributionAllowed(false);
 
-        ProjectRepository projectRepository = mock(ProjectRepository.class);
+        ProjectReviewPersistence reviewPersistence = mock(ProjectReviewPersistence.class);
+        when(reviewPersistence.cacheModpackArchive(any(), any(), any(), any(), any())).thenReturn(true);
         DownloadArchiveSupport archiveSupport = mock(DownloadArchiveSupport.class);
         ProjectVersion packVersion = new ProjectVersion();
         packVersion.setId("pack-version-1");
@@ -71,13 +72,13 @@ class CurseForgeModpackFlowTest {
         ProjectVersion hostedVersion = hostedProject.getVersions().getFirst();
         when(archiveSupport.resolveDependency(resolved.dependencies().getFirst()))
                 .thenReturn(new DownloadArchiveSupport.ResolvedDependency(hostedProject, hostedVersion));
-        when(archiveSupport.download("files/hosted.jar")).thenReturn("hosted-binary".getBytes(StandardCharsets.UTF_8));
+        when(archiveSupport.downloadApproved(hostedVersion)).thenReturn("hosted-binary".getBytes(StandardCharsets.UTF_8));
         when(archiveSupport.extractOriginalFilename("files/hosted.jar")).thenReturn("hosted.jar");
         when(archiveSupport.newZipMultipartFile(eq("test-pack-2.0.0.zip"), any()))
                 .thenAnswer(invocation -> mock(MultipartFile.class));
         when(archiveSupport.upload(any(MultipartFile.class), eq("modpacks"))).thenReturn("modpacks/test-pack.zip");
 
-        byte[] archive = new ModpackArchiveService(projectRepository, archiveSupport).generateModpackZip(pack, packVersion);
+        byte[] archive = new ModpackArchiveService(reviewPersistence, archiveSupport).generateModpackZip(pack, packVersion);
         Map<String, byte[]> entries = unzip(archive);
         JsonNode manifest = new ObjectMapper().readTree(entries.get("modpack.json"));
         JsonNode lock = new ObjectMapper().readTree(entries.get("modtale.lock.json"));

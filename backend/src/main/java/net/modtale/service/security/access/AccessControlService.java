@@ -210,6 +210,11 @@ public class AccessControlService {
         return hasProjectPermission(project, user, perm, findAuthorForPermission(project != null ? project.getAuthorId() : null));
     }
 
+    public boolean hasCurrentProjectMembershipPermission(Project project, User user, ApiKey.ApiPermission permission) {
+        return permission != null && hasProjectPermission(project,user,permission,
+                findAuthorForPermission(project != null ? project.getAuthorId() : null));
+    }
+
     private boolean hasProjectPermission(Project project, User user, ApiKey.ApiPermission perm, User authorUser) {
         if (project == null || user == null) return false;
         if (project.getAuthorId() != null && project.getAuthorId().equals(user.getId())) return true;

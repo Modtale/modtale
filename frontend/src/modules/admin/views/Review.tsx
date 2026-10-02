@@ -1,8 +1,14 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import { FindingGroups } from './FindingGroups';
+import { findingRows } from './findingRows';
+import { PriorFindingReasoning } from './PriorFindingReasoning';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { Shield, List, FileText, Box, User as UserIcon, Check, ArrowLeft, Copy, ExternalLink, Terminal, Download, ArrowRight, X, ImageIcon, ChevronDown, ChevronUp, ShieldAlert, Eye, RefreshCw, PlayCircle } from 'lucide-react';
 import { API_BASE_URL, BACKEND_URL, extractApiErrorMessage } from '@/utils/api';
 import { adminClient } from '../api/adminClient';
 import { SourceInspector } from './SourceInspector';
+import { ArtifactChanges, contextChangeMessage, type ArtifactChangeSummary } from './ArtifactChanges';
+import { DependencyInspection } from './DependencyInspection';
+import { FindingDecisions } from './FindingDecisions';
 import { SiteRoutes } from '@/utils/routes';
 import type { ScanIssue, ProjectVersion, ScanReviewTarget } from '@/types';
 import { ModalPortal } from '@/components/ui/ModalPortal';
@@ -58,6 +64,17 @@ const WIZARD_STEPS: WizardStep[] = [
     }
 ];
 
+const isIdenticalPriorFinding = (issue: ScanIssue, canDeprioritize: boolean, changedPaths: Set<string>, baselineVersion?: string | null) => canDeprioritize
+    && issue.knownIssue
+    && issue.historicalFileEvidenceIdentical === true
+    && !changedPaths.has(issue.filePath)
+    && !issue.escalated
+    && (issue.reviewCadence || '').toUpperCase() !== 'ALWAYS'
+    && issue.severity !== 'CRITICAL'
+    && (issue.severity !== 'HIGH' || issue.resolved === true
+        && issue.reviewCadence?.toUpperCase() === 'WHEN_CHANGED'
+        && Boolean(baselineVersion) && issue.baselineVersion === baselineVersion);
+
 export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApprove, onReject, setStatus, canDecide = false, canRescan = false }) => {
     const [currentStep, setCurrentStep] = useState(0);
     const [checklist, setChecklist] = useState<Record<string, boolean>>({});
@@ -68,18 +85,91 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
     const [rescanning, setRescanning] = useState(false);
     const [deciding, setDeciding] = useState(false);
 
-    const [inspectorData, setInspectorData] = useState<{ version: string, structure: string[], issues: ScanIssue[], initialFile?: string, initialLine?: number, initialLineEnd?: number } | null>(null);
+    const [inspectorData, setInspectorData] = useState<{ version: string, reviewToken: string, structure: string[], issues: ScanIssue[], initialFile?: string, initialLine?: number, initialLineEnd?: number } | null>(null);
     const [loadingInspector, setLoadingInspector] = useState(false);
 
-    const mod = reviewingProject.mod;
+    const [decisionWritten, setDecisionWritten] = useState(false);
+    const [refreshedReview, setRefreshedReview] = useState<{ source: any; data: any; versionId: string } | null>(null);
+    const [refreshing, setRefreshing] = useState(false);
+    const [refreshError, setRefreshError] = useState('');
+    const refreshGeneration = useRef(0);
+    const inspectionGeneration = useRef(0);
+    useEffect(() => {
+        refreshGeneration.current++;
+        setRefreshing(false); setRefreshError('');
+        setChecklist({}); setCurrentStep(0); setInspectorData(null); setLoadingInspector(false);
+        return () => { refreshGeneration.current++; };
+    }, [reviewingProject]);
+    const review = refreshedReview !== null && refreshedReview.source === reviewingProject ? refreshedReview.data : reviewingProject;
+    const mod = review.mod;
     const isNewProject = mod.status === 'PENDING';
     const projectLink = SiteRoutes.project(mod);
 
-    const pendingVersion = mod.versions.find((v: ProjectVersion) => v.reviewStatus === 'PENDING') || mod.versions[0];
+    const pendingVersion = refreshedReview !== null && refreshedReview.source === reviewingProject
+        ? mod.versions.find((v: ProjectVersion) => v.id === refreshedReview.versionId)
+        : reviewingProject.selectedVersionId
+            ? mod.versions.find((v: ProjectVersion) => v.id === reviewingProject.selectedVersionId)
+            : mod.versions.find((v: ProjectVersion) => v.reviewStatus === 'PENDING') || mod.versions[0];
+    useEffect(() => setDecisionWritten(false), [pendingVersion?.id, pendingVersion?.reviewToken]);
+    const [reasoningIssue, setReasoningIssue] = useState<number | null>(null);
+    useEffect(() => setReasoningIssue(null), [pendingVersion?.id, mod.reviewToken]);
+    const priorSources = mod.versions.filter((v: ProjectVersion) => v.id !== pendingVersion?.id && v.reviewStatus === 'APPROVED');
     const scanResult = pendingVersion?.scanResult;
-    const scanIssues = scanResult?.issues || [];
-    const hasScanIssues = !!scanResult && scanResult.status !== 'CLEAN' && scanResult.status !== 'SCANNING' && scanIssues.length > 0;
+    const scanIssues: ScanIssue[] = scanResult?.issues || [];
+    const [comparison, setComparison] = useState<{ versionId: string; summary: ArtifactChangeSummary } | null>(null);
+    const onCompared = useCallback((summary: ArtifactChangeSummary | null) => {
+        setComparison(summary && pendingVersion?.id ? { versionId: pendingVersion.id, summary } : null);
+    }, [pendingVersion?.id]);
+    const activeComparison = comparison && comparison.versionId === pendingVersion?.id && comparison.summary.reviewToken === mod.reviewToken
+        ? comparison.summary : null;
+    const changedFindingPaths = useMemo(() => new Set(activeComparison?.files.filter(file => file.change === 'ADDED' || file.change === 'MODIFIED')
+        .map(file => file.path) || []), [activeComparison]);
+    const canDeprioritizePriorFindings = activeComparison?.contextComparable === true && activeComparison.contextChanged === false
+        && activeComparison.added === 0 && activeComparison.modified === 0 && activeComparison.removed === 0;
+    const currentEvidence = /^warden-3\.0\.0:[0-9a-f]{64}$/.test(scanResult?.securityEvidence?.policyVersion || '')
+        && /^[0-9a-f]{64}$/.test(scanResult?.securityEvidence?.artifactSha256 || '')
+        && /^[0-9a-f]{64}$/.test(scanResult?.securityEvidence?.contentSha256 || '');
+    const reviewReused = currentEvidence && Boolean(scanResult?.reusedReviewVersion) && scanResult?.scanState === 'COMPLETED'
+        && scanResult?.securityEvidence?.complete === true && scanResult?.status !== 'INFECTED'
+        && scanResult?.verdict !== 'BLOCK' && scanResult?.securityEvidence?.reviewState !== 'NEW_SECURITY_EVIDENCE';
+    const securityCleared = reviewReused || currentEvidence && scanResult?.status === 'CLEAN' && scanResult?.verdict === 'AUTO_APPROVE'
+        && scanResult?.scanState === 'COMPLETED' && scanResult?.securityEvidence?.complete === true
+        && scanResult?.securityEvidence?.clearanceGranted === true
+        && scanResult?.securityEvidence?.reviewState !== 'NEW_SECURITY_EVIDENCE';
+    const serviceReviewStates = ['RATE_LIMITED', 'TIMEOUT', 'UPSTREAM_ERROR', 'INTERRUPTED', 'AUTHENTICATION_ERROR',
+        'DISABLED', 'CLOSED', 'JOURNAL_REQUIRED', 'REQUEST_REJECTED', 'REQUEST_BINDING_ERROR', 'TOOL_REPLAY_REQUIRED'];
+    const serviceAttention = scanResult?.status === 'FAILED' || scanResult?.status === 'SUSPICIOUS'
+        && scanResult.verdict === 'REVIEW' && scanResult.scanState === 'COMPLETED'
+        && scanResult.securityEvidence?.complete === true
+        && serviceReviewStates.includes(scanResult.securityEvidence.reviewState)
+        && scanResult.newIssueCount === 0 && scanResult.escalatedIssueCount === 0;
+    const securitySignals = scanResult?.verdict === 'BLOCK' || scanResult?.status === 'INFECTED'
+        || scanResult?.status === 'FLAGGED' || (scanResult?.newIssueCount || 0) > 0
+        || (scanResult?.escalatedIssueCount || 0) > 0;
+    const serviceOnly = serviceAttention && !securitySignals;
+    const hasScanIssues = !!scanResult && scanResult.status !== 'SCANNING' && !securityCleared;
     const isScanning = scanResult?.status === 'SCANNING';
+
+    const [findingSearch, setFindingSearch] = useState('');
+    const [findingFocus, setFindingFocus] = useState('attention');
+    const [findingType, setFindingType] = useState<string | null>(null);
+    const [findingPage, setFindingPage] = useState(0);
+    const [archiveLimits, setArchiveLimits] = useState<Record<string, number>>({});
+    const [expandedArchives, setExpandedArchives] = useState<Set<string>>(() => new Set());
+    const [expandedRepeatedPrior, setExpandedRepeatedPrior] = useState(false);
+    const [repeatedPriorLimit, setRepeatedPriorLimit] = useState(100);
+    const [expandedVettedHigh, setExpandedVettedHigh] = useState(false);
+    const [vettedHighLimit, setVettedHighLimit] = useState(100);
+    const [expandedIndirectPackages, setExpandedIndirectPackages] = useState<Set<string>>(() => new Set());
+    const [indirectPackageLimits, setIndirectPackageLimits] = useState<Record<string, number>>({});
+    useEffect(() => {
+        setFindingSearch(''); setFindingFocus('attention'); setFindingType(null); setFindingPage(0); setArchiveLimits({}); setExpandedArchives(new Set());
+        setExpandedRepeatedPrior(false); setRepeatedPriorLimit(100); setExpandedVettedHigh(false); setVettedHighLimit(100);
+        setExpandedIndirectPackages(new Set()); setIndirectPackageLimits({});
+    }, [mod.id, mod.reviewToken, pendingVersion?.id, pendingVersion?.reviewToken]);
+    useEffect(() => { setExpandedArchives(new Set()); setExpandedRepeatedPrior(false); setRepeatedPriorLimit(100);
+        setExpandedVettedHigh(false); setVettedHighLimit(100); setExpandedIndirectPackages(new Set()); setIndirectPackageLimits({});
+    }, [findingSearch, findingFocus, findingType]);
 
     const orderedIssues = useMemo(() => {
         const severityRank = (value?: string) => {
@@ -89,7 +179,7 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
             return 1;
         };
 
-        return [...scanIssues].sort((a, b) => {
+        return scanIssues.map((issue: ScanIssue, originalIndex: number) => ({ issue, originalIndex })).sort(({ issue: a }, { issue: b }) => {
             const cadenceDiff = Number((b.reviewCadence || '').toUpperCase() === 'ALWAYS')
                 - Number((a.reviewCadence || '').toUpperCase() === 'ALWAYS');
             if (cadenceDiff !== 0) return cadenceDiff;
@@ -99,15 +189,53 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
             if (escalatedDiff !== 0) return escalatedDiff;
             const newIssueDiff = Number(!b.knownIssue) - Number(!a.knownIssue);
             if (newIssueDiff !== 0) return newIssueDiff;
+            if (severityRank(a.severity) === severityRank(b.severity)) {
+                const changedDiff = Number(changedFindingPaths.has(b.filePath)) - Number(changedFindingPaths.has(a.filePath));
+                if (changedDiff !== 0) return changedDiff;
+            }
             const impactDiff = (b.scoreImpact || 0) - (a.scoreImpact || 0);
             if (impactDiff !== 0) return impactDiff;
             return severityRank(b.severity) - severityRank(a.severity);
         });
-    }, [scanIssues]);
+    }, [scanIssues, changedFindingPaths]);
+    const matchingIssues = useMemo(() => {
+        const search = findingSearch.trim().toLowerCase();
+        return orderedIssues.filter(({ issue }) => {
+            if (findingType !== null && issue.type !== findingType) return false;
+            if (findingFocus === 'attention' && isIdenticalPriorFinding(issue, canDeprioritizePriorFindings, changedFindingPaths, activeComparison?.baselineVersion)) return false;
+            if (findingFocus === 'new' && issue.knownIssue) return false;
+            if (findingFocus === 'seen' && !issue.knownIssue) return false;
+            if (findingFocus === 'always' && (issue.reviewCadence || '').toUpperCase() !== 'ALWAYS') return false;
+            if (findingFocus === 'changed' && !changedFindingPaths.has(issue.filePath)) return false;
+            return !search || [issue.type, issue.filePath, issue.description].some(value => value?.toLowerCase().includes(search));
+        });
+    }, [orderedIssues, findingSearch, findingFocus, findingType, changedFindingPaths, canDeprioritizePriorFindings, activeComparison]);
+    const hiddenHighSeverity = orderedIssues.filter(({ issue }) => ['HIGH', 'CRITICAL'].includes(issue.severity)).length
+        - matchingIssues.filter(({ issue }) => ['HIGH', 'CRITICAL'].includes(issue.severity)).length;
+    const identicalPriorCount = orderedIssues.filter(({ issue }) => isIdenticalPriorFinding(issue, canDeprioritizePriorFindings, changedFindingPaths, activeComparison?.baselineVersion)).length;
+    const changedFindingCount = orderedIssues.filter(({ issue }) => changedFindingPaths.has(issue.filePath)).length;
+    useEffect(() => {
+        if (findingFocus === 'changed' && (!activeComparison?.baselineVersion || changedFindingCount === 0)) {
+            setFindingFocus('attention'); setFindingPage(0);
+        }
+    }, [findingFocus, activeComparison, changedFindingCount]);
+    const rows = useMemo(() => findingRows(matchingIssues, 10,
+        findingFocus === 'attention' && findingType === null && !findingSearch.trim()
+            && activeComparison?.baselineVersion && !canDeprioritizePriorFindings
+            ? issue => !changedFindingPaths.has(issue.filePath) : undefined,
+        activeComparison?.contextComparable ? activeComparison.baselineVersion || undefined : undefined,
+        findingFocus === 'attention' && findingType === null && !findingSearch.trim()),
+    [matchingIssues, findingFocus, findingType, findingSearch, activeComparison, canDeprioritizePriorFindings, changedFindingPaths]);
+    const foldedFindings = matchingIssues.length - rows.length;
+    const findingPages = Math.max(1, Math.ceil(rows.length / 100));
+    const visibleFindingPage = Math.min(findingPage, findingPages - 1);
+    const visibleRows = rows.slice(visibleFindingPage * 100, (visibleFindingPage + 1) * 100);
+
 
     useEffect(() => {
         if (!pendingVersion?.dependencies) return;
 
+        let cancelled = false;
         const deps = pendingVersion.dependencies;
         const fetchMeta = async () => {
             const newMeta = { ...depMeta };
@@ -125,17 +253,51 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
                     newMeta[d.projectId] = { icon: '', title: d.projectTitle || d.projectId };
                 }
             }));
-            setDepMeta(newMeta);
+            if (!cancelled) setDepMeta(newMeta);
         };
         fetchMeta();
-    }, [reviewingProject]);
+        return () => { cancelled = true; };
+    }, [review]);
 
-    const openInspector = async (version: string, issues: ScanIssue[] = [], file?: string, lineStart?: number, lineEnd?: number) => {
+    const refreshEvidence = async () => {
+        if (refreshing || !pendingVersion) return;
+        const generation = ++refreshGeneration.current;
+        const versionId = pendingVersion.id;
+        setRefreshing(true); setRefreshError(''); setDecisionWritten(true);
+        setInspectorData(null); setLoadingInspector(false);
+        try {
+            const data = await adminClient.getReviewDetails(mod.id);
+            if (generation !== refreshGeneration.current) return;
+            const versions = data?.mod?.versions?.filter((version: ProjectVersion) => version.id === versionId);
+            if (data?.mod?.id !== mod.id || data.mod.status !== mod.status || versions?.length !== 1
+                || !versions[0].reviewToken || versions[0].reviewToken === pendingVersion.reviewToken
+                || (isNewProject && (!data.mod.reviewToken || data.mod.reviewToken === mod.reviewToken))
+                || !['PENDING', 'SCHEDULED'].includes(versions[0].reviewStatus)) {
+                throw new Error('The selected review is no longer available or lacks a current snapshot. Return to the queue to inspect its state.');
+            }
+            setRefreshedReview({ source: reviewingProject, data, versionId });
+            setChecklist({}); setCurrentStep(0); setShowScanDetails(false); setDepMeta({});
+            setDecisionWritten(false);
+        } catch (error) {
+            if (generation === refreshGeneration.current)
+                setRefreshError(extractApiErrorMessage(error, 'Could not refresh this review. Decisions remain disabled; retry to load current evidence.'));
+        } finally {
+            if (generation === refreshGeneration.current) setRefreshing(false);
+        }
+    };
+
+    const openInspector = async (version: string, issues: ScanIssue[] = [], file?: string, lineStart?: number, lineEnd?: number, reviewToken = mod.reviewToken) => {
+        const generation = refreshGeneration.current;
+        const inspection = ++inspectionGeneration.current;
+        setInspectorData(null);
         setLoadingInspector(true);
         try {
-            const structure = await adminClient.getStructure(mod.id, version);
+            if (!reviewToken) throw new Error('Refresh this review before inspecting its files.');
+            const structure = await adminClient.getStructure(mod.id, version, reviewToken);
+            if (generation !== refreshGeneration.current || inspection !== inspectionGeneration.current) return;
             setInspectorData({
                 version,
+                reviewToken,
                 structure,
                 issues,
                 initialFile: file,
@@ -143,9 +305,10 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
                 initialLineEnd: lineEnd
             });
         } catch (e) {
+            if (generation !== refreshGeneration.current || inspection !== inspectionGeneration.current) return;
             setStatus({ type: 'error', title: 'Error', msg: extractApiErrorMessage(e, "We could not inspect this version's file structure.") });
         } finally {
-            setLoadingInspector(false);
+            if (generation === refreshGeneration.current && inspection === inspectionGeneration.current) setLoadingInspector(false);
         }
     };
 
@@ -174,12 +337,16 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
             setStatus({ type: 'error', title: 'Permission Required', msg: 'You do not have permission to approve projects or versions.' });
             return;
         }
+        if (decisionWritten || (isNewProject ? !mod.reviewToken : !pendingVersion?.reviewToken)) {
+            setStatus({ type: 'error', title: 'Refresh Required', msg: 'Refresh this review to load its current evidence before deciding.' });
+            return;
+        }
         setDeciding(true);
         try {
             if (isNewProject) {
-                await adminClient.publishProject(mod.id);
+                await adminClient.publishProject(mod.id, mod.reviewToken, pendingVersion?.id);
             } else {
-                await adminClient.approveVersion(mod.id, pendingVersion.id);
+                await adminClient.approveVersion(mod.id, pendingVersion.id, pendingVersion.reviewToken);
             }
             onApprove();
         } catch (e: any) {
@@ -198,11 +365,15 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
             setStatus({ type: 'error', title: 'Permission Required', msg: 'You do not have permission to reject projects or versions.' });
             return;
         }
+        if (decisionWritten || (isNewProject ? !mod.reviewToken : !pendingVersion?.reviewToken)) {
+            setStatus({ type: 'error', title: 'Refresh Required', msg: 'Refresh this review to load its current evidence before deciding.' });
+            return;
+        }
         try {
             if (isNewProject) {
-                await adminClient.rejectProject(mod.id, reason);
+                await adminClient.rejectProject(mod.id, reason, mod.reviewToken);
             } else {
-                await adminClient.rejectVersion(mod.id, pendingVersion.id, reason);
+                await adminClient.rejectVersion(mod.id, pendingVersion.id, reason, pendingVersion.reviewToken);
             }
             onReject(reason);
         } catch (e: any) {
@@ -239,14 +410,17 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
             {inspectorData && (
                 <SourceInspector
                     modId={mod.id}
-                    versionId={pendingVersion.id}
+                    versionId={mod.versions.find((candidate: ProjectVersion) => candidate.versionNumber === inspectorData.version)?.id || ''}
+                    canRescan={canRescan}
+                    key={`${mod.id}:${inspectorData.version}:${inspectorData.reviewToken}`}
                     version={inspectorData.version}
+                    reviewToken={inspectorData.reviewToken}
                     structure={inspectorData.structure}
                     issues={inspectorData.issues}
                     initialFile={inspectorData.initialFile}
                     initialLine={inspectorData.initialLine}
                     initialLineEnd={inspectorData.initialLineEnd}
-                    onClose={() => setInspectorData(null)}
+                    onClose={() => { inspectionGeneration.current++; setInspectorData(null); }}
                 />
             )}
 
@@ -347,8 +521,20 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
                     </div>
 
                     <div className="flex-1 overflow-y-auto p-8">
+                        {pendingVersion && <div className={currentStep === 2 ? 'max-w-3xl mx-auto mb-8' : 'hidden'}>
+                            <ArtifactChanges projectId={mod.id} version={pendingVersion.versionNumber} reviewToken={mod.reviewToken || ''}
+                                autoLoad={scanResult?.scanState === 'COMPLETED' && priorSources.length > 0}
+                                onCompared={onCompared}
+                                onInspect={(version, path, token) => openInspector(version, version === pendingVersion.versionNumber ? scanIssues : [], path, undefined, undefined, token)} />
+                        </div>}
                         {currentStep === 0 && (
                             <div className="max-w-3xl mx-auto space-y-8 animate-in slide-in-from-right-4 duration-300">
+                                {activeComparison?.baselineVersion && <div role="status" className="rounded-2xl border border-indigo-200 bg-indigo-50 p-5 text-sm text-indigo-950 dark:border-indigo-800 dark:bg-indigo-950/30 dark:text-indigo-100">
+                                    <p className="font-bold">Changes since approved version {activeComparison.baselineVersion}</p>
+                                    <p>{activeComparison.added} added, {activeComparison.modified} modified, {activeComparison.removed} removed, {activeComparison.unchanged} unchanged.</p>
+                                    {contextChangeMessage(activeComparison) && <p className="mt-1">{contextChangeMessage(activeComparison)}</p>}
+                                    <p className="mt-1">This comparison helps navigation; related behavior still needs review.</p>
+                                </div>}
                                 <div className="grid grid-cols-2 gap-6">
                                     <div className="p-5 bg-slate-50 dark:bg-white/5 rounded-2xl border border-slate-200 dark:border-white/5">
                                         <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Title</label>
@@ -543,34 +729,70 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
                                             <div>
                                                 <h4 className="font-bold text-blue-600 dark:text-blue-400">Scanner Is Running</h4>
                                                 <p className="text-sm text-blue-700/80 dark:text-blue-300/70 font-medium">
-                                                    Warden is still processing this artifact. Refresh or run a manual rescan shortly.
+                                                    Warden is inspecting this artifact. The result will remain pending until inspection and review finish.
                                                 </p>
                                             </div>
                                         </div>
                                     </div>
                                 )}
 
-                                {hasScanIssues && (
+                                {!scanResult && (
+                                    <div className="p-5 rounded-2xl border border-amber-300 bg-amber-50 dark:bg-amber-950/20">
+                                        <h4 className="font-bold text-amber-800 dark:text-amber-200">Security evidence unavailable</h4>
+                                        <p className="text-sm text-amber-700 dark:text-amber-300">This version has no completed artifact review. Inspect it before approving publication.</p>
+                                    </div>
+                                )}
+
+                                {pendingVersion?.id && <DependencyInspection projectId={mod.id} versionId={pendingVersion.id} reviewToken={mod.reviewToken || ''} />}
+                                {pendingVersion && <FindingDecisions key={`${pendingVersion.id}:${pendingVersion.reviewToken}`}
+                                    projectId={mod.id} versionId={pendingVersion.id} token={pendingVersion.reviewToken}
+                                    issues={scanIssues} canDecide={canDecide} onSaved={() => setDecisionWritten(true)} />}
+                                {decisionWritten && <p role="status" className="text-sm text-amber-700">A finding decision was saved. Refresh the evidence to inspect the updated history before publishing.</p>}
+                                {decisionWritten && <button type="button" disabled={refreshing} onClick={() => void refreshEvidence()} className="text-sm font-bold text-modtale-accent">{refreshing ? 'Refreshing evidence…' : 'Refresh evidence and restart checklist'}</button>}
+                                {refreshError && <p role="alert" className="text-sm text-red-600">{refreshError}</p>}
+                                {serviceAttention && <div role="status" className="rounded-2xl border border-amber-300 p-5 text-sm text-amber-800 dark:text-amber-200">
+                                    <h4 className="font-bold">Review service attention</h4>
+                                    <p>Security review did not complete. Clearance is withheld. Check the failure before requesting another scan; existing findings remain unresolved.</p>
+                                    <p>{scanResult.scanState === 'REMOTE_ORIGIN_UNVERIFIED' ? 'The original review service identity was not recorded. Reconcile the original job before requesting another scan.' : scanResult.scanState === 'REMOTE_CONTEXT_CONFLICT' ? 'The review service rejected the stored request context or service identity. Reconcile the original job before requesting another scan.' : scanResult.scanState === 'REMOTE_ISOLATED' ? 'The local review was isolated. Findings and blocking decisions remain in place. Resolve the original review operation before starting another scan.' : ['REMOTE_BINDING_MISSING', 'REMOTE_BINDING_MISMATCH'].includes(scanResult.scanState || '') ? 'The stored review job is missing or no longer matches this version. Repair review state before retrying.' : scanResult.scanState === 'REMOTE_UNSUPPORTED_CONTEXT' ? 'The current dependencies, runtime metadata or supplemental content cannot be fully reviewed. Resolve the review context before requesting another scan.' : scanResult.scanState === 'REMOTE_EXPIRED' ? 'The review expired.' : scanResult.scanState === 'REMOTE_CANCELLED' ? 'The review was cancelled.' : scanResult.scanState === 'REMOTE_HELD' ? 'The review was held.' : 'The review is unavailable.'}</p>
+                                </div>}
+                                {scanResult?.securityEvidence && (
+                                    <div className="rounded-2xl border border-slate-200 dark:border-white/10 p-5 space-y-3">
+                                        <div className="flex items-center justify-between gap-3">
+                                            <h4 className="font-bold dark:text-white">Artifact evidence</h4>
+                                            <span className="text-xs font-medium text-slate-500 break-all">{scanResult.securityEvidence.policyVersion}</span>
+                                        </div>
+                                        <p className="text-sm text-slate-600 dark:text-slate-300">
+                                            {scanResult.securityEvidence.complete ? 'Archive inspection completed.' : 'Inspection has gaps; clearance is withheld.'}
+                                            {scanResult.reusedReviewVersion ? ` Contents match the review of version ${scanResult.reusedReviewVersion}.` : ''}
+                                        </p>
+                                        <dl className="text-xs space-y-2">
+                                            <div><dt className="text-slate-500">Uploaded artifact SHA-256</dt><dd className="font-mono break-all dark:text-slate-300">{scanResult.securityEvidence.artifactSha256 || 'Unavailable'}</dd></div>
+                                            <div><dt className="text-slate-500">Security review</dt><dd className="dark:text-slate-300">{reviewReused ? `Approved review reused from ${scanResult.reusedReviewVersion}` : scanResult.securityEvidence.clearanceGranted ? 'Clearance granted' : isScanning ? 'Automatic review pending' : 'Manual review required'}</dd></div>
+                                        </dl>
+                                    </div>
+                                )}
+
+                                {hasScanIssues && scanResult && (
                                     <div className="rounded-2xl border border-red-200 dark:border-red-900/50 overflow-hidden">
                                         <div className="flex items-center justify-between p-5 bg-red-50 dark:bg-red-900/10">
                                             <div className="flex items-center gap-3 text-red-700 dark:text-red-400">
                                                 <ShieldAlert className="w-6 h-6" />
                                                 <div>
                                                     <h4 className="font-bold text-lg">
-                                                        {scanResult?.verdict === 'BLOCK' ? 'High-Risk Findings Detected' : 'Manual Security Review Required'}
+                                                        {scanResult?.verdict === 'BLOCK' ? 'High-Risk Findings Detected' : serviceOnly ? 'Review Service Diagnostics' : 'Manual Security Review Required'}
                                                     </h4>
                                                     <p className="text-xs opacity-80 font-medium">
                                                         Status: {scanResult.status}
                                                         {scanResult.verdict ? ` • Verdict: ${scanResult.verdict}` : ''}
-                                                        {scanResult.riskLevel ? ` • Risk: ${scanResult.riskLevel}` : ''}
-                                                        {` • Score: ${scanResult.riskScore}`}
-                                                        {scanResult.confidenceScore ? ` • Confidence: ${scanResult.confidenceScore}%` : ''}
+                                                        {!serviceOnly && scanResult.riskLevel ? ` • Risk: ${scanResult.riskLevel}` : ''}
+                                                        {!serviceOnly ? ` • Score: ${scanResult.riskScore}` : ''}
+                                                        {!serviceOnly && scanResult.confidenceScore ? ` • Confidence: ${scanResult.confidenceScore}%` : ''}
                                                     </p>
                                                     <p className="text-xs opacity-80 font-medium">
                                                         New: {scanResult.newIssueCount || 0} • Known: {scanResult.knownIssueCount || 0} • Escalated: {scanResult.escalatedIssueCount || 0}
                                                     </p>
                                                     <p className="text-xs opacity-80 font-medium">
-                                                        {scanResult.scanState ? `State: ${scanResult.scanState}` : 'State: COMPLETED'}
+                                                        {scanResult.scanState ? `State: ${scanResult.scanState}` : 'State: unavailable'}
                                                         {scanResult.scanAttempt ? ` • Attempt ${scanResult.scanAttempt}` : ''}
                                                         {scanResult.summary?.recoverableErrors ? ` • Recoverable Errors ${scanResult.summary.recoverableErrors}` : ''}
                                                     </p>
@@ -598,6 +820,8 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
                                                     </button>
                                                 )}
                                                 <button
+                                                    aria-label={showScanDetails ? "Hide findings" : "Show findings"}
+                                                    aria-expanded={showScanDetails}
                                                     onClick={() => setShowScanDetails(!showScanDetails)}
                                                     className="p-2 hover:bg-white/20 rounded-lg transition-colors text-red-600 dark:text-red-400"
                                                 >
@@ -618,8 +842,50 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
 
                                         {showScanDetails && (
                                             <div className="p-4 bg-white dark:bg-black/20 space-y-2 border-t border-red-200 dark:border-red-900/50">
-                                                {orderedIssues.map((issue: ScanIssue, idx: number) => (
-                                                    <div key={idx} className="flex items-center justify-between text-sm bg-slate-50 dark:bg-white/5 p-3 rounded-xl border border-slate-200 dark:border-white/5">
+                                                {orderedIssues.length === 0 && <p className="text-sm text-slate-600 dark:text-slate-300">No heuristic findings were emitted. Review the evidence and reviewer notes before deciding.</p>}
+                                                {orderedIssues.length > 0 && <div className="space-y-2 pb-3">
+                                                    <FindingGroups key={JSON.stringify([mod.id, mod.reviewToken, pendingVersion.id, pendingVersion.reviewToken])}
+                                                        issues={scanIssues} selected={findingType} onSelect={type => { setFindingType(type); setFindingPage(0); }} />
+                                                    <div className="flex flex-wrap gap-3">
+                                                        <input aria-label="Search findings" placeholder="Search finding, file or description…" value={findingSearch}
+                                                            onChange={event => { setFindingSearch(event.target.value); setFindingPage(0); }}
+                                                            className="min-w-0 rounded-lg border border-slate-300 dark:border-slate-700 bg-transparent px-3 py-2 text-sm dark:text-white" />
+                                                        <select aria-label="Finding focus" value={findingFocus}
+                                                            onChange={event => { setFindingFocus(event.target.value); setFindingPage(0); }}
+                                                            className="rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-sm dark:text-white">
+                                                            <option value="attention">Review focus</option><option value="all">All findings</option><option value="new">Not previously seen</option>
+                                                            <option value="seen">Previously seen</option><option value="always">Always review</option>
+                                                            {activeComparison?.baselineVersion && changedFindingCount > 0 && <option value="changed">Changed files</option>}
+                                                        </select>
+                                                    </div>
+                                                    <p className="text-xs text-slate-600 dark:text-slate-300" role="status">
+                                                        {foldedFindings > 0
+                                                            ? <>Showing {rows.length ? visibleFindingPage * 100 + 1 : 0}–{Math.min((visibleFindingPage + 1) * 100, rows.length)} of {rows.length} review rows covering {matchingIssues.length} matching findings ({orderedIssues.length} total).</>
+                                                            : <>Showing {matchingIssues.length ? visibleFindingPage * 100 + 1 : 0}–{Math.min((visibleFindingPage + 1) * 100, matchingIssues.length)} of {matchingIssues.length} matching findings ({orderedIssues.length} total).</>}
+                                                        {' '}Filters only change this view; previously seen findings may still require review.
+                                                    </p>
+                                                    {findingFocus === 'attention' && findingType === null && !findingSearch.trim() && identicalPriorCount > 0 &&
+                                                        <p className="text-xs text-slate-600 dark:text-slate-300">
+                                                            {identicalPriorCount} previously seen findings with identical file evidence are outside this view. Changes elsewhere may still affect them.{' '}
+                                                            <button type="button" className="font-bold text-indigo-600 dark:text-indigo-300" onClick={() => { setFindingFocus('all'); setFindingPage(0); }}>Show all findings</button>
+                                                        </p>}
+                                                    {activeComparison?.baselineVersion && changedFindingCount > 0 && findingFocus !== 'changed' &&
+                                                        <p className="text-xs text-slate-600 dark:text-slate-300">
+                                                            {changedFindingCount} {changedFindingCount === 1 ? 'finding is' : 'findings are'} in added or modified files.{' '}
+                                                            <button type="button" className="font-bold text-indigo-600 dark:text-indigo-300" onClick={() => { setFindingFocus('changed'); setFindingPage(0); }}>Show changed-file findings</button>
+                                                        </p>}
+                                                    {hiddenHighSeverity > 0 && <p className="text-xs font-semibold text-amber-700 dark:text-amber-300">{hiddenHighSeverity} high or critical findings are outside these filters.</p>}
+                                                    {matchingIssues.length === 0 && <p className="text-sm text-slate-600 dark:text-slate-300">No findings match these filters.</p>}
+                                                    {findingPages > 1 && <nav aria-label="Finding pages" className="flex items-center gap-3 text-sm dark:text-slate-200">
+                                                        <button type="button" disabled={visibleFindingPage === 0} onClick={() => setFindingPage(visibleFindingPage - 1)}>Previous findings</button>
+                                                        <span>Page {visibleFindingPage + 1} of {findingPages}</span>
+                                                        <button type="button" disabled={visibleFindingPage + 1 >= findingPages} onClick={() => setFindingPage(visibleFindingPage + 1)}>Next findings</button>
+                                                    </nav>}
+                                                </div>}
+                                                {visibleRows.map(row => {
+                                                    const renderFinding = ({ issue, originalIndex }: { issue: ScanIssue; originalIndex: number }) => (
+                                                    <div key={originalIndex} className="text-sm bg-slate-50 dark:bg-white/5 p-3 rounded-xl border border-slate-200 dark:border-white/5">
+                                                        <div className="flex flex-wrap items-center justify-between gap-2">
                                                         <div className="flex-1 min-w-0 pr-4">
                                                             <div className="flex items-center gap-2 mb-1">
                                                                 <span className={`font-black text-[10px] px-1.5 py-0.5 rounded uppercase tracking-wide
@@ -641,7 +907,7 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
                                                                     <span className="text-[10px] font-black px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 uppercase">Suppressed</span>
                                                                 )}
                                                                 {issue.knownIssue && !issue.escalated && (
-                                                                    <span className="text-[10px] font-black px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 uppercase">Known</span>
+                                                                    <span className="text-[10px] font-black px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 uppercase">Previously seen</span>
                                                                 )}
                                                                 {!issue.knownIssue && (
                                                                     <span className="text-[10px] font-black px-1.5 py-0.5 rounded bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-200 uppercase">New</span>
@@ -655,31 +921,128 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
                                                                 {typeof issue.scoreImpact === 'number' && <span className="bg-slate-200 dark:bg-slate-700 px-1.5 rounded">Impact {issue.scoreImpact}</span>}
                                                             </div>
                                                             <p className="text-xs text-slate-600 dark:text-slate-400 leading-snug">{issue.description}</p>
+                                                            {issue.historicalFileEvidenceIdentical && <p className="text-xs text-slate-500 mt-1">Same finding and file as approved version {issue.baselineVersion}. Changes elsewhere still require review.</p>}
                                                         </div>
+                                                        {priorSources.length > 0 && <button type="button"
+                                                            aria-label={`Earlier reasoning for finding ${originalIndex + 1}`}
+                                                            aria-expanded={reasoningIssue === originalIndex}
+                                                            onClick={() => setReasoningIssue(value => value === originalIndex ? null : originalIndex)}
+                                                            className="shrink-0 text-xs font-bold text-indigo-600 dark:text-indigo-300 px-3 py-2">
+                                                            {reasoningIssue === originalIndex ? 'Hide earlier reasoning' : 'Earlier reasoning'}
+                                                        </button>}
                                                         <button
                                                             onClick={() => openInspector(pendingVersion.versionNumber, scanResult.issues, issue.filePath, issue.lineStart, issue.lineEnd)}
                                                             className="shrink-0 flex items-center gap-1.5 text-xs font-bold bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 px-3 py-2 rounded-lg transition-colors"
                                                         >
                                                             <Eye className="w-3.5 h-3.5" /> Inspect
                                                         </button>
+                                                        </div>
+                                                        {reasoningIssue === originalIndex && <PriorFindingReasoning
+                                                            key={`${pendingVersion.id}:${mod.reviewToken}:${originalIndex}`}
+                                                            projectId={mod.id} versionId={pendingVersion.id} token={mod.reviewToken || ''}
+                                                            issues={scanIssues} issueIndex={originalIndex} sources={priorSources} autoLoad
+                                                            onInspectSource={(version, path, lineStart) => openInspector(version, [], path, lineStart, lineStart)}
+                                                            sourceVersionId={priorSources.filter((v: ProjectVersion) => v.versionNumber === issue.baselineVersion).length === 1
+                                                                ? priorSources.find((v: ProjectVersion) => v.versionNumber === issue.baselineVersion)?.id : undefined} />}
                                                     </div>
-                                                ))}
+                                                    );
+                                                    if (row.kind === 'finding') return renderFinding(row.finding);
+                                                    if (row.kind === 'repeated-prior') return <section key="repeated-prior" aria-label="Repeated prior findings"
+                                                        className="rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-white/5 p-3">
+                                                        <button type="button" aria-expanded={expandedRepeatedPrior} className="text-left text-sm font-semibold dark:text-slate-100"
+                                                            onClick={() => setExpandedRepeatedPrior(value => !value)}>
+                                                            {row.findings.length} previously seen findings with identical file evidence
+                                                        </button>
+                                                        <p className="mt-2 text-xs text-slate-600 dark:text-slate-300">These findings remain open because files or review context changed. Their unchanged files can still be affected by changed callers or dependencies. This grouping grants no acceptance.</p>
+                                                        {expandedRepeatedPrior && <>
+                                                            <div className="mt-3 space-y-2">{row.findings.slice(0, repeatedPriorLimit).map(renderFinding)}</div>
+                                                            {row.findings.length > repeatedPriorLimit && <button type="button" className="mt-3 text-sm font-semibold text-indigo-600 dark:text-indigo-300"
+                                                                onClick={() => setRepeatedPriorLimit(value => value + 100)}>
+                                                                Show more previously seen findings ({row.findings.length - repeatedPriorLimit} remaining)
+                                                            </button>}
+                                                        </>}
+                                                    </section>;
+                                                    if (row.kind === 'vetted-high') return <section key="vetted-high" aria-label="Vetted high findings requiring review"
+                                                        className="rounded-xl border border-orange-400 dark:border-orange-700 bg-orange-50 dark:bg-orange-950/20 p-3">
+                                                        <button type="button" aria-expanded={expandedVettedHigh} className="text-left text-sm font-semibold text-orange-900 dark:text-orange-200"
+                                                            onClick={() => setExpandedVettedHigh(value => !value)}>
+                                                            {row.findings.length} previously resolved HIGH findings require review
+                                                        </button>
+                                                        <p className="mt-2 text-xs text-orange-800 dark:text-orange-200">Their file evidence matches the approved version, but changes elsewhere may affect callers or dependencies. This group stays in review focus and grants no acceptance.</p>
+                                                        {expandedVettedHigh && <>
+                                                            <div className="mt-3 space-y-2">{row.findings.slice(0, vettedHighLimit).map(renderFinding)}</div>
+                                                            {row.findings.length > vettedHighLimit && <button type="button" className="mt-3 text-sm font-semibold text-indigo-600 dark:text-indigo-300"
+                                                                onClick={() => setVettedHighLimit(value => value + 100)}>
+                                                                Show more HIGH findings ({row.findings.length - vettedHighLimit} remaining)
+                                                            </button>}
+                                                        </>}
+                                                    </section>;
+                                                    if (row.kind === 'indirect-package') {
+                                                        const shown = indirectPackageLimits[row.packagePath] || 100;
+                                                        const expanded = expandedIndirectPackages.has(row.packagePath);
+                                                        const newCount = row.findings.filter(({ issue }) => !issue.knownIssue).length;
+                                                        return <section key={`indirect:${row.packagePath}`} aria-label={`Indirect invocation findings: ${row.packagePath}`}
+                                                            className="rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-white/5 p-3">
+                                                            <button type="button" aria-expanded={expanded} className="text-left text-sm font-semibold dark:text-slate-100 break-all"
+                                                                onClick={() => setExpandedIndirectPackages(previous => {
+                                                                    const next = new Set(previous);
+                                                                    if (next.has(row.packagePath)) next.delete(row.packagePath); else next.add(row.packagePath);
+                                                                    return next;
+                                                                })}>
+                                                                {row.findings.length} indirect invocation findings under {row.packagePath}
+                                                                <span className="ml-2 text-xs font-normal text-slate-600 dark:text-slate-300">{newCount} new</span>
+                                                            </button>
+                                                            <p className="mt-2 text-xs text-slate-600 dark:text-slate-300">Targets remain unresolved. This grouping changes no finding or decision; inspect each call and its context as needed.</p>
+                                                            {expanded && <>
+                                                                <div className="mt-3 space-y-2">{row.findings.slice(0, shown).map(renderFinding)}</div>
+                                                                {row.findings.length > shown && <button type="button" className="mt-3 text-sm font-semibold text-indigo-600 dark:text-indigo-300"
+                                                                    onClick={() => setIndirectPackageLimits(value => ({ ...value, [row.packagePath]: shown + 100 }))}>
+                                                                    Show more indirect calls in {row.packagePath} ({row.findings.length - shown} remaining)
+                                                                </button>}
+                                                            </>}
+                                                        </section>;
+                                                    }
+                                                    const shown = archiveLimits[row.archive] || 100;
+                                                    const high = row.findings.filter(({ issue }) => issue.severity === 'HIGH' || issue.severity === 'CRITICAL').length;
+                                                    const always = row.findings.filter(({ issue }) => issue.reviewCadence?.toUpperCase() === 'ALWAYS').length;
+                                                    const expanded = expandedArchives.has(row.archive);
+                                                    return <section key={`archive:${row.archive}`} aria-label={`Nested archive findings: ${row.archive}`}
+                                                        className="rounded-xl border border-amber-300 dark:border-amber-700 bg-amber-50/50 dark:bg-amber-950/10 p-3">
+                                                        <button type="button" aria-expanded={expanded} className="text-left text-sm font-semibold dark:text-slate-100 break-all"
+                                                            onClick={() => setExpandedArchives(previous => {
+                                                                const next = new Set(previous);
+                                                                if (next.has(row.archive)) next.delete(row.archive); else next.add(row.archive);
+                                                                return next;
+                                                            })}>
+                                                            {row.findings.length} findings in nested archive {row.archive}
+                                                            <span className="ml-2 text-xs font-normal text-amber-800 dark:text-amber-200">{high} high/critical · {always} always-review</span>
+                                                        </button>
+                                                        <p className="mt-2 text-xs text-amber-800 dark:text-amber-200">This grouping does not verify the archive or accept any finding. Inspect its code, native files, and callers as needed.</p>
+                                                        {expanded && <>
+                                                            <div className="mt-3 space-y-2">{row.findings.slice(0, shown).map(renderFinding)}</div>
+                                                            {row.findings.length > shown && <button type="button" className="mt-3 text-sm font-semibold text-indigo-600 dark:text-indigo-300"
+                                                                onClick={() => setArchiveLimits(value => ({ ...value, [row.archive]: shown + 100 }))}>
+                                                                Show more findings in {row.archive} ({row.findings.length - shown} remaining)
+                                                            </button>}
+                                                        </>}
+                                                    </section>;
+                                                })}
                                             </div>
                                         )}
                                     </div>
                                 )}
 
-                                {!hasScanIssues && !isScanning && (
+                                {securityCleared && !isScanning && (
                                     <div className="p-5 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl flex items-center justify-between">
                                         <div className="flex items-center gap-4">
                                             <Check className="w-6 h-6 text-emerald-500" />
                                             <div>
-                                                <h4 className="font-bold text-emerald-500">Automated Checks Passed</h4>
+                                                <h4 className="font-bold text-emerald-500">Artifact Review Completed</h4>
                                                 <p className="text-sm text-emerald-600/80 dark:text-emerald-500/70 font-medium">
-                                                    Warden did not surface actionable security findings for this scan.
+                                                    {reviewReused ? `Previously approved contents and context match version ${scanResult?.reusedReviewVersion}.` : 'Inspection and security review completed with no unresolved concerns.'}
                                                 </p>
                                                 <p className="text-xs text-emerald-700/80 dark:text-emerald-400/80 font-medium">
-                                                    {scanResult?.scanState ? `State: ${scanResult.scanState}` : 'State: COMPLETED'}
+                                                    {scanResult?.scanState ? `State: ${scanResult.scanState}` : 'State: unavailable'}
                                                     {scanResult?.scanAttempt ? ` • Attempt ${scanResult.scanAttempt}` : ''}
                                                 </p>
                                             </div>
@@ -838,8 +1201,8 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
                             <div className="max-w-3xl mx-auto space-y-8 animate-in slide-in-from-right-4 duration-300">
                                 <div className="p-8 bg-white dark:bg-white/5 rounded-3xl border border-slate-200 dark:border-white/10 flex items-center gap-8">
                                     <div className="w-24 h-24 bg-slate-100 dark:bg-white/10 rounded-2xl flex items-center justify-center overflow-hidden shrink-0">
-                                        {reviewingProject.authorStats?.avatarUrl ? (
-                                            <img src={reviewingProject.authorStats.avatarUrl} className="w-full h-full object-cover" />
+                                        {review.authorStats?.avatarUrl ? (
+                                            <img src={review.authorStats.avatarUrl} className="w-full h-full object-cover" />
                                         ) : (
                                             <UserIcon className="w-10 h-10 text-slate-400" />
                                         )}
@@ -854,11 +1217,11 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
                                         </div>
                                         <div>
                                             <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Joined</label>
-                                            <p className="font-mono text-sm dark:text-slate-300 mt-2">{reviewingProject.authorStats?.accountAge}</p>
+                                            <p className="font-mono text-sm dark:text-slate-300 mt-2">{review.authorStats?.accountAge}</p>
                                         </div>
                                         <div className="col-span-2">
                                             <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Total Projects</label>
-                                            <p className="font-black text-2xl text-modtale-accent mt-1">{reviewingProject.authorStats?.totalProjects}</p>
+                                            <p className="font-black text-2xl text-modtale-accent mt-1">{review.authorStats?.totalProjects}</p>
                                         </div>
                                     </div>
                                 </div>
@@ -885,13 +1248,13 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
                                 </h2>
                                 <p className="text-slate-500 dark:text-slate-400 font-medium mb-10 text-lg leading-relaxed">
                                     You are about to approve <strong>v{pendingVersion.versionNumber}</strong>.
-                                    {isNewProject ? " This will make the project publicly visible." : " This update will be pushed to users immediately."}
+                                    {isNewProject ? (pendingVersion ? ` This will publish the project and version ${pendingVersion.versionNumber}.` : " This will make the project publicly visible.") : " This update will be pushed to users immediately."}
                                 </p>
 
                                 <div className="flex flex-col gap-4">
                                     <button
                                         onClick={handleVersionApprove}
-                                        disabled={!canDecide || deciding || isScanning}
+                                        disabled={!canDecide || decisionWritten || deciding || isScanning}
                                         className="w-full py-4 bg-emerald-500 hover:bg-emerald-600 text-white rounded-2xl font-black text-lg shadow-xl shadow-emerald-500/20 transition-all transform hover:scale-[1.02] active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
                                     >
                                         {deciding ? 'Publishing...' : 'Approve & Publish'}
@@ -913,7 +1276,7 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
                         <div className="flex gap-4">
                             <button
                                 onClick={() => setShowRejectPanel(true)}
-                                disabled={!canDecide}
+                                disabled={!canDecide || decisionWritten}
                                 className="px-6 py-3 bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white rounded-xl font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-red-500/10 disabled:hover:text-red-500"
                             >
                                 Reject...

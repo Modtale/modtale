@@ -1,6 +1,8 @@
 package net.modtale.controller.project;
 
 import java.time.Instant;
+import java.security.MessageDigest;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.Optional;
 import net.modtale.config.properties.AppFrontendProperties;
@@ -181,6 +183,7 @@ class VersionControllerTest {
         User currentUser = user("user-1");
         Project project = project("project-1", "Sky Tools", ProjectClassification.MODPACK);
         ProjectVersion version = version("version-1", "1.0.0");
+        project.setVersions(List.of(version));
         version.setDependencies(List.of(new ProjectDependency("dep-1", "Dependency One", "2.0.0")));
 
         when(downloadTokenService.validateAndConsume("token")).thenReturn(
@@ -214,7 +217,9 @@ class VersionControllerTest {
     void downloadWithTokenStripsGeneratedPrefixFromStoredFilenames() throws Exception {
         Project project = project("project-1", "Sky Tools", ProjectClassification.DATA);
         ProjectVersion version = version("version-1", "1.0.0");
+        project.setVersions(List.of(version));
         version.setFileUrl("https://cdn.modtale.net/files/123456789012345678901234567890123456-actual.jar");
+        version.setHash(sha256(new byte[]{1, 2, 3, 4}));
 
         when(downloadTokenService.validateAndConsume("token")).thenReturn(
                 new DownloadTokenService.DownloadToken("project-1", "1.0.0", null, null, Instant.now().plusSeconds(60))
@@ -222,7 +227,8 @@ class VersionControllerTest {
         when(projectService.getRawProjectById("project-1")).thenReturn(project);
         when(accessControlService.canReadProject(project, null)).thenReturn(true);
         when(projectVersionAccessService.requireByVersionNumber(eq(project), eq("1.0.0"), eq((String) null), any())).thenReturn(version);
-        when(storageService.download(version.getFileUrl())).thenReturn(new byte[]{1, 2, 3, 4});
+        when(storageService.downloadBounded(version.getFileUrl(), StorageService.MAX_REVIEW_ARTIFACT_BYTES))
+                .thenReturn(new byte[]{1, 2, 3, 4});
         when(accountService.getCurrentUser((Authentication) isNull())).thenReturn(null);
         when(analyticsEligibilityService.shouldCountProjectEngagement(project, null)).thenReturn(true);
 
@@ -238,15 +244,17 @@ class VersionControllerTest {
         ByteArrayResource body = assertInstanceOf(ByteArrayResource.class, response.getBody());
         assertArrayEquals(new byte[]{1, 2, 3, 4}, body.getByteArray());
 
-        verify(storageService).download(version.getFileUrl());
+        verify(storageService).downloadBounded(version.getFileUrl(), StorageService.MAX_REVIEW_ARTIFACT_BYTES);
         verify(trackingService).logDownload("project-1", "version-1", "Ada", false, "203.0.113.5", false);
     }
 
     @Test
-    void authorizedDirectDownloadsRedirectWithoutProxyingFileBytes() throws Exception {
+    void authorizedDownloadsVerifyBytesBeforeDelivery() throws Exception {
         Project project = project("project-1", "Sky Tools", ProjectClassification.DATA);
         ProjectVersion version = version("version-1", "1.0.0");
+        project.setVersions(List.of(version));
         version.setFileUrl("https://cdn.modtale.net/files/123456789012345678901234567890123456-actual.jar");
+        version.setHash(sha256(new byte[]{1, 2, 3}));
 
         when(downloadTokenService.validateAndConsume("token")).thenReturn(
                 new DownloadTokenService.DownloadToken("project-1", "1.0.0", null, null, Instant.now().plusSeconds(60))
@@ -254,8 +262,8 @@ class VersionControllerTest {
         when(projectService.getRawProjectById("project-1")).thenReturn(project);
         when(accessControlService.canReadProject(project, null)).thenReturn(true);
         when(projectVersionAccessService.requireByVersionNumber(eq(project), eq("1.0.0"), eq((String) null), any())).thenReturn(version);
-        java.net.URI signed = java.net.URI.create("https://account.r2.cloudflarestorage.com/bucket/files/actual.jar?signature=test");
-        when(storageService.directDownloadUri(version.getFileUrl(), "actual.jar")).thenReturn(signed);
+        when(storageService.downloadBounded(version.getFileUrl(), StorageService.MAX_REVIEW_ARTIFACT_BYTES))
+                .thenReturn(new byte[]{1, 2, 3});
         when(accountService.getCurrentUser((Authentication) isNull())).thenReturn(null);
         when(analyticsEligibilityService.shouldCountProjectEngagement(project, null)).thenReturn(true);
 
@@ -265,12 +273,8 @@ class VersionControllerTest {
 
         var response = controller.downloadWithToken("token", null, request);
 
-        assertEquals(302, response.getStatusCode().value());
-        assertEquals(signed, response.getHeaders().getLocation());
-        assertEquals("no-store", response.getHeaders().getCacheControl());
-        assertEquals("no-referrer", response.getHeaders().getFirst("Referrer-Policy"));
-        org.junit.jupiter.api.Assertions.assertNull(response.getBody());
-        verify(storageService, never()).download(anyString());
+        assertEquals(200, response.getStatusCode().value());
+        assertArrayEquals(new byte[]{1, 2, 3}, assertInstanceOf(ByteArrayResource.class, response.getBody()).getByteArray());
         verify(trackingService).logDownload("project-1", "version-1", "Ada", false, "203.0.113.5", false);
     }
 
@@ -279,6 +283,7 @@ class VersionControllerTest {
         User currentUser = user("user-1");
         Project project = project("project-1", "Sky Tools", ProjectClassification.DATA);
         ProjectVersion version = version("version-1", "1.0.0");
+        project.setVersions(List.of(version));
         version.setDependencies(List.of(
                 new ProjectDependency("dep-a", "Dependency A", "1.0.0"),
                 new ProjectDependency("dep-b", "Dependency B", "2.0.0"),
@@ -320,7 +325,9 @@ class VersionControllerTest {
         User currentUser = user("author-1");
         Project project = project("project-1", "Sky Tools", ProjectClassification.DATA);
         ProjectVersion version = version("version-1", "1.0.0");
+        project.setVersions(List.of(version));
         version.setFileUrl("https://cdn.modtale.net/files/actual.jar");
+        version.setHash(sha256(new byte[]{1, 2, 3}));
 
         when(downloadTokenService.validateAndConsume("token")).thenReturn(
                 new DownloadTokenService.DownloadToken("project-1", "1.0.0", null, null, Instant.now().plusSeconds(60))
@@ -329,7 +336,8 @@ class VersionControllerTest {
         when(accessControlService.canReadProject(project, currentUser)).thenReturn(true);
         when(projectVersionAccessService.requireByVersionNumber(eq(project), eq("1.0.0"), eq((String) null), any())).thenReturn(version);
         when(accountService.getCurrentUser((Authentication) isNull())).thenReturn(currentUser);
-        when(storageService.download(version.getFileUrl())).thenReturn(new byte[]{1, 2, 3});
+        when(storageService.downloadBounded(version.getFileUrl(), StorageService.MAX_REVIEW_ARTIFACT_BYTES))
+                .thenReturn(new byte[]{1, 2, 3});
         when(analyticsEligibilityService.shouldCountProjectEngagement(project, currentUser)).thenReturn(false);
 
         MockHttpServletRequest request = new MockHttpServletRequest("GET", "/download/token");
@@ -355,7 +363,16 @@ class VersionControllerTest {
         ProjectVersion version = new ProjectVersion();
         version.setId(id);
         version.setVersionNumber(versionNumber);
+        version.setReviewStatus(ProjectVersion.ReviewStatus.APPROVED);
         return version;
+    }
+
+    private static String sha256(byte[] bytes) {
+        try {
+            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));
+        } catch (java.security.NoSuchAlgorithmException impossible) {
+            throw new IllegalStateException(impossible);
+        }
     }
 
     private static User user(String id) {

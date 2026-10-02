@@ -1,5 +1,6 @@
 package net.modtale.service.storage;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import java.io.ByteArrayInputStream;
@@ -25,7 +26,9 @@ import net.modtale.exception.StorageUploadException;
 import net.modtale.model.project.Project;
 import net.modtale.model.project.ProjectDependency;
 import net.modtale.model.project.ProjectVersion;
-import net.modtale.repository.project.ProjectRepository;
+import net.modtale.service.admin.review.ProjectReviewPersistence;
+import net.modtale.service.admin.review.ProjectReviewSnapshot;
+import net.modtale.service.admin.review.VersionReviewSnapshot;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -39,26 +42,73 @@ final class ModpackArchiveService {
     private static final String MANIFEST = "manifest.json";
     private static final String LOCKFILE = "modtale.lock.json";
 
-    private final ProjectRepository projectRepository;
+    private final ProjectReviewPersistence reviewPersistence;
     private final DownloadArchiveSupport archiveSupport;
 
-    ModpackArchiveService(ProjectRepository projectRepository, DownloadArchiveSupport archiveSupport) {
-        this.projectRepository = projectRepository;
+    ModpackArchiveService(ProjectReviewPersistence reviewPersistence, DownloadArchiveSupport archiveSupport) {
+        this.reviewPersistence = reviewPersistence;
         this.archiveSupport = archiveSupport;
     }
 
     byte[] generateModpackZip(Project pack, ProjectVersion version) throws IOException {
-        byte[] cachedArchive = downloadCachedArchive(pack, version);
+        return generateModpackZip(pack, version, null, null);
+    }
+
+    byte[] generateModpackZip(Project pack, ProjectVersion version, String requiredCacheBinding,
+            List<String> requiredDependencyBindings) throws IOException {
+        String expectedCacheBinding = cacheBinding(pack, version);
+        String projectToken = ProjectReviewSnapshot.token(pack);
+        String versionToken = VersionReviewSnapshot.token(version);
+        List<String> dependencyBindings = currentDependencyBindings(version);
+        if (requiredCacheBinding != null && (!requiredCacheBinding.equals(expectedCacheBinding)
+                || !dependencyBindings.equals(requiredDependencyBindings))) {
+            throw new IOException("The modpack inputs no longer match the requested approval bindings.");
+        }
+        byte[] cachedArchive = downloadCachedArchive(pack, version, dependencyBindings, expectedCacheBinding);
         if (cachedArchive != null) {
+            requireUnchangedDependencies(version, dependencyBindings);
             return cachedArchive;
         }
 
         byte[] zipBytes = buildArchive(pack, version);
-        cacheArchive(pack, version, zipBytes);
+        JsonNode lock = ModpackArchiveValidator.validatedLockfile(zipBytes,
+                version.getModpackConfigs() != null && !version.getModpackConfigs().isEmpty());
+        if (!expectedCacheBinding.equals(lock.path("cacheBinding").asText())
+                || !cachedDependencyBindingsMatch(lock, dependencyBindings)) {
+            throw new IOException("The generated modpack does not match its captured approval bindings.");
+        }
+        requireUnchangedDependencies(version, dependencyBindings);
+        cacheArchive(pack, version, zipBytes, projectToken, versionToken);
+        requireUnchangedDependencies(version, dependencyBindings);
         return zipBytes;
     }
 
-    private byte[] downloadCachedArchive(Project pack, ProjectVersion version) {
+    private void requireUnchangedDependencies(ProjectVersion version, List<String> expected) throws IOException {
+        if (!expected.equals(currentDependencyBindings(version))) {
+            throw new IOException("A bundled Modtale dependency changed while the modpack was being prepared.");
+        }
+    }
+
+    private List<String> currentDependencyBindings(ProjectVersion version) throws IOException {
+        if (version.getDependencies() == null) {
+            return List.of();
+        }
+        List<String> bindings = new ArrayList<>();
+        for (ProjectDependency dependency : version.getDependencies()) {
+            if (dependency.isExternal()) {
+                continue;
+            }
+            DownloadArchiveSupport.ResolvedDependency resolved = archiveSupport.resolveDependency(dependency);
+            if (resolved == null || trimToNull(resolved.version().getFileUrl()) == null) {
+                throw new IOException("Cannot resolve bundled Modtale dependency "
+                        + dependencyLabel(dependency) + " at version " + dependency.getVersionNumber() + ".");
+            }
+            bindings.add(VersionReviewSnapshot.token(resolved.version()));
+        }
+        return bindings;
+    }
+
+    private byte[] downloadCachedArchive(Project pack, ProjectVersion version, List<String> dependencyBindings, String expectedCacheBinding) {
         if (version.getFileUrl() == null) {
             return null;
         }
@@ -67,8 +117,14 @@ final class ModpackArchiveService {
             byte[] cachedArchive = archiveSupport.download(version.getFileUrl());
             if (cachedArchive != null && cachedArchive.length > 0) {
                 try {
-                    ModpackArchiveValidator.validate(cachedArchive, version.getModpackConfigs() != null && !version.getModpackConfigs().isEmpty());
-                    return cachedArchive;
+                    JsonNode lock = ModpackArchiveValidator.validatedLockfile(cachedArchive,
+                            version.getModpackConfigs() != null && !version.getModpackConfigs().isEmpty());
+                    if (expectedCacheBinding.equals(lock.path("cacheBinding").asText())
+                            && cachedDependencyBindingsMatch(lock, dependencyBindings)) return cachedArchive;
+                    logger.warn("Cached modpack archive has stale package inputs for project={} version={}. Rebuilding archive.",
+                            pack.getId(), version.getVersionNumber());
+                    version.setFileUrl(null);
+                    return null;
                 } catch (IOException ex) {
                     logger.warn("Cached modpack archive failed format or integrity validation for project={} version={}. Rebuilding archive.",
                             pack.getId(), version.getVersionNumber(), ex);
@@ -86,6 +142,20 @@ final class ModpackArchiveService {
             version.setFileUrl(null);
             return null;
         }
+    }
+
+    private boolean cachedDependencyBindingsMatch(JsonNode lock, List<String> expected) {
+        List<String> actual = new ArrayList<>();
+        for (JsonNode entry : lock.path("entries")) {
+            if (!"MODTALE".equals(entry.path("source").asText())
+                    && "BUNDLED".equals(entry.path("distribution").asText())) return false;
+            if ("MODTALE".equals(entry.path("source").asText())) {
+                String binding = entry.path("reviewBinding").asText();
+                if (!binding.matches("[a-f0-9]{64}")) return false;
+                actual.add(binding);
+            }
+        }
+        return actual.equals(expected);
     }
 
     private byte[] buildArchive(Project pack, ProjectVersion version) throws IOException {
@@ -112,9 +182,7 @@ final class ModpackArchiveService {
                 writeBinaryEntry(zip, override.path(), override.bytes());
             }
         }
-        byte[] archive = output.toByteArray();
-        ModpackArchiveValidator.validate(archive);
-        return archive;
+        return output.toByteArray();
     }
 
     private List<ModpackOverrideArchive.OverrideFile> prepareOverrides(ProjectVersion version) throws IOException {
@@ -122,7 +190,7 @@ final class ModpackArchiveService {
         if (overrideFileUrl == null) return List.of();
         byte[] archive;
         try {
-            archive = archiveSupport.download(overrideFileUrl);
+            archive = ApprovedArtifactBytes.requireExact(version, archiveSupport.downloadBounded(overrideFileUrl));
         } catch (StorageDownloadException ex) {
             throw new IOException("Cannot download the modpack override bundle.", ex);
         }
@@ -146,7 +214,7 @@ final class ModpackArchiveService {
         List<PreparedDependency> prepared = new ArrayList<>();
         for (ProjectDependency dependency : version.getDependencies()) {
             prepared.add(dependency.isExternal()
-                    ? prepareExternalDependency(dependency, archiveKeys)
+                    ? prepareExternalDependency(dependency)
                     : prepareModtaleDependency(dependency, archiveKeys));
         }
         return prepared;
@@ -162,11 +230,15 @@ final class ModpackArchiveService {
                     + dependencyLabel(dependency) + " at version " + dependency.getVersionNumber() + ".");
         }
 
+        String reviewBinding = VersionReviewSnapshot.token(resolved.version());
         byte[] bytes;
         try {
-            bytes = archiveSupport.download(resolved.version().getFileUrl());
+            bytes = archiveSupport.downloadApproved(resolved.version());
         } catch (StorageDownloadException ex) {
             throw new IOException("Cannot download bundled Modtale dependency " + dependencyLabel(dependency) + ".", ex);
+        }
+        if (!reviewBinding.equals(VersionReviewSnapshot.token(resolved.version()))) {
+            throw new IOException("A bundled Modtale dependency changed while the modpack was being prepared.");
         }
         if (bytes == null || bytes.length == 0) {
             throw new IOException("Bundled Modtale dependency " + dependencyLabel(dependency) + " is empty.");
@@ -174,33 +246,11 @@ final class ModpackArchiveService {
 
         String filename = archiveSupport.extractOriginalFilename(resolved.version().getFileUrl());
         String path = uniqueArchiveEntryName(archiveKeys, sanitizeArchiveFilename(filename));
-        return PreparedDependency.bundled(dependency, path, bytes);
+        return PreparedDependency.bundled(dependency, path, bytes, reviewBinding);
     }
 
-    private PreparedDependency prepareExternalDependency(
-            ProjectDependency dependency,
-            Set<String> archiveKeys
-    ) {
-        if (dependency.getSource() == ProjectDependency.Source.CURSEFORGE) {
-            return PreparedDependency.reference(dependency);
-        }
-
-        String cachedFileUrl = trimToNull(dependency.getCachedFileUrl());
-        if (cachedFileUrl == null) {
-            return PreparedDependency.reference(dependency);
-        }
-        try {
-            byte[] bytes = archiveSupport.download(cachedFileUrl);
-            if (bytes == null || bytes.length == 0) {
-                return PreparedDependency.reference(dependency);
-            }
-            String path = uniqueArchiveEntryName(archiveKeys, externalFilename(dependency));
-            return PreparedDependency.bundled(dependency, path, bytes);
-        } catch (StorageDownloadException ex) {
-            logger.warn("Unable to include cached external dependency {} from {} in generated modpack archive.",
-                    dependency.getProjectTitle(), cachedFileUrl, ex);
-            return PreparedDependency.reference(dependency);
-        }
+    private PreparedDependency prepareExternalDependency(ProjectDependency dependency) {
+        return PreparedDependency.reference(dependency);
     }
 
     private Map<String, Object> legacyManifest(Project pack, ProjectVersion version) {
@@ -252,6 +302,7 @@ final class ModpackArchiveService {
     ) {
         Map<String, Object> lock = new LinkedHashMap<>();
         lock.put("format", "modtale-lock");
+        lock.put("cacheBinding", cacheBinding(pack, version));
         boolean hasConfigOwners = version.getModpackConfigs() != null && !version.getModpackConfigs().isEmpty();
         lock.put("lockVersion", hasConfigOwners ? 2 : 1);
         lock.put("game", "hytale");
@@ -267,6 +318,7 @@ final class ModpackArchiveService {
                 item.put("path", prepared.path());
                 item.put("size", prepared.bytes().length);
                 item.put("hashes", Map.of("sha256", sha256(prepared.bytes())));
+                if (!dependency.isExternal()) item.put("reviewBinding", prepared.reviewBinding());
             } else {
                 putIfPresent(item, "url", dependency.getExternalUrl());
                 String externalFileUrl = trimToNull(dependency.getExternalFileUrl());
@@ -340,6 +392,21 @@ final class ModpackArchiveService {
         return identity;
     }
 
+    static String cacheBinding(Project pack, ProjectVersion version) {
+        Map<String, Object> inputs = new LinkedHashMap<>();
+        inputs.put("schema", 3);
+        inputs.put("projectId", pack.getId());
+        inputs.put("projectTitle", pack.getTitle());
+        inputs.put("projectSlug", pack.getSlug());
+        inputs.put("projectClassification", pack.getClassification());
+        inputs.put("versionSnapshot", VersionReviewSnapshot.modpackArchiveToken(version));
+        try {
+            return sha256(OBJECT_MAPPER.writeValueAsBytes(inputs));
+        } catch (IOException ex) {
+            throw new IllegalStateException("Could not bind modpack cache inputs.", ex);
+        }
+    }
+
     private Map<String, Object> baseDependency(ProjectDependency dependency) {
         Map<String, Object> item = new LinkedHashMap<>();
         item.put("id", nullToEmpty(dependency.getProjectId()));
@@ -374,24 +441,6 @@ final class ModpackArchiveService {
             counter++;
         }
         return candidate;
-    }
-
-    private String externalFilename(ProjectDependency dependency) {
-        String filename = trimToNull(dependency.getExternalFileName());
-        if (filename == null && trimToNull(dependency.getCachedFileUrl()) != null) {
-            filename = archiveSupport.extractOriginalFilename(dependency.getCachedFileUrl());
-        }
-        if (filename != null) {
-            return sanitizeArchiveFilename(filename);
-        }
-
-        String title = dependency.getProjectTitle() == null ? dependency.getProjectId() : dependency.getProjectTitle();
-        String version = dependency.getVersionNumber() == null ? "latest" : dependency.getVersionNumber();
-        String base = (title + "-" + version)
-                .replaceAll("[^A-Za-z0-9._-]+", "-")
-                .replaceAll("-+", "-")
-                .replaceAll("(^-|-$)", "");
-        return (base.isBlank() ? "external-dependency" : base) + ".jar";
     }
 
     private String sanitizeArchiveFilename(String filename) {
@@ -430,7 +479,7 @@ final class ModpackArchiveService {
         return null;
     }
 
-    private String sha256(byte[] bytes) {
+    private static String sha256(byte[] bytes) {
         try {
             return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));
         } catch (NoSuchAlgorithmException ex) {
@@ -438,7 +487,7 @@ final class ModpackArchiveService {
         }
     }
 
-    private void cacheArchive(Project pack, ProjectVersion version, byte[] zipBytes) {
+    private void cacheArchive(Project pack, ProjectVersion version, byte[] zipBytes, String projectToken, String versionToken) {
         try {
             String fileName = (pack.getSlug() != null && !pack.getSlug().isEmpty() ? pack.getSlug() : pack.getId())
                     + "-"
@@ -449,8 +498,9 @@ final class ModpackArchiveService {
                     "modpacks"
             );
 
+            if (!reviewPersistence.cacheModpackArchive(pack.getId(), projectToken, version.getId(), versionToken, uploadPath))
+                throw ProjectReviewSnapshot.conflict();
             version.setFileUrl(uploadPath);
-            projectRepository.save(pack);
         } catch (StorageUploadException ex) {
             logger.warn("Generated modpack archive could not be cached for project={} version={}",
                     pack.getId(), version.getVersionNumber(), ex);
@@ -480,13 +530,13 @@ final class ModpackArchiveService {
         return value.trim();
     }
 
-    private record PreparedDependency(ProjectDependency dependency, String path, byte[] bytes) {
-        private static PreparedDependency bundled(ProjectDependency dependency, String path, byte[] bytes) {
-            return new PreparedDependency(dependency, path, bytes);
+    private record PreparedDependency(ProjectDependency dependency, String path, byte[] bytes, String reviewBinding) {
+        private static PreparedDependency bundled(ProjectDependency dependency, String path, byte[] bytes, String reviewBinding) {
+            return new PreparedDependency(dependency, path, bytes, reviewBinding);
         }
 
         private static PreparedDependency reference(ProjectDependency dependency) {
-            return new PreparedDependency(dependency, null, null);
+            return new PreparedDependency(dependency, null, null, null);
         }
     }
 }

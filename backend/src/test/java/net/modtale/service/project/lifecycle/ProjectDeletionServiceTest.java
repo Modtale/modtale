@@ -27,6 +27,8 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.*;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -36,6 +38,8 @@ import static org.mockito.Mockito.when;
 class ProjectDeletionServiceTest {
 
     private ProjectDeletionService service;
+    private net.modtale.service.admin.review.ProjectReviewPersistence reviewPersistence;
+    private java.util.Map<String, Project> projects;
     private ProjectRepository projectRepository;
     private ProjectService projectService;
     private TrackingService trackingService;
@@ -46,6 +50,12 @@ class ProjectDeletionServiceTest {
     @BeforeEach
     void setUp() {
         projectRepository = mock(ProjectRepository.class);
+        projects = new java.util.HashMap<>();
+        reviewPersistence = mock(net.modtale.service.admin.review.ProjectReviewPersistence.class);
+        when(reviewPersistence.capture(anyString(), anyString())).thenAnswer(invocation ->
+                new net.modtale.service.admin.review.ProjectReviewPersistence.Snapshot(new org.bson.Document(), projects.get(invocation.getArgument(0))));
+        when(reviewPersistence.applyDeletionState(any(), anyBoolean())).thenReturn(true);
+        when(reviewPersistence.deleteProject(any())).thenReturn(true);
         projectService = mock(ProjectService.class);
         trackingService = mock(TrackingService.class);
         scoringService = mock(ScoringService.class);
@@ -58,7 +68,8 @@ class ProjectDeletionServiceTest {
                 trackingService,
                 scoringService,
                 projectArtifactDeletionService,
-                mongoTemplate
+                mongoTemplate,
+                reviewPersistence
         );
     }
 
@@ -70,7 +81,7 @@ class ProjectDeletionServiceTest {
 
         assertEquals(ProjectStatus.DELETED, project.getStatus());
         assertNotNull(project.getDeletedAt());
-        verify(projectRepository).save(project);
+        verify(reviewPersistence).applyDeletionState(any(), eq(false));
         verify(projectService).evictProjectCache(project);
         verify(trackingService).logDeletedProject("project-1");
     }
@@ -93,7 +104,6 @@ class ProjectDeletionServiceTest {
         project.setDeletedAt(LocalDateTime.now());
 
         when(projectRepository.findByDependency("project-1")).thenReturn(List.of(editableProject("dependent-1", ProjectClassification.DATA, ProjectStatus.PUBLISHED)));
-        when(projectRepository.save(project)).thenReturn(project);
 
         service.hardDelete(project);
 
@@ -114,7 +124,7 @@ class ProjectDeletionServiceTest {
         verify(storageService).deleteOwnedProjectMedia(eq("project-1"), eq("https://cdn.modtale.net/banner.png"), any());
         verify(storageService).deleteOwnedProjectMedia(eq("project-1"), eq("https://cdn.modtale.net/one.png"), any());
         verify(storageService).deleteOwnedProjectMedia(eq("project-1"), eq("https://cdn.modtale.net/two.png"), any());
-        verify(projectRepository).save(project);
+        verify(reviewPersistence).applyDeletionState(any(), eq(true));
         verify(projectService).evictProjectCache(project);
         verify(projectRepository, never()).delete(project);
         verify(trackingService, never()).deleteProjectAnalytics("project-1");
@@ -150,17 +160,43 @@ class ProjectDeletionServiceTest {
         verify(storageService).deleteOwnedProjectMedia(eq("project-1"), eq("https://cdn.modtale.net/banner.png"), any());
         verify(storageService).deleteOwnedProjectMedia(eq("project-1"), eq("https://cdn.modtale.net/one.png"), any());
         verify(mongoTemplate, times(2)).updateMulti(any(Query.class), any(Update.class), eq(net.modtale.model.user.User.class));
-        verify(projectRepository).delete(project);
+        verify(reviewPersistence).deleteProject(argThat(snapshot -> "project-1".equals(snapshot.project().getId())));
         verify(projectService).evictProjectCache(project);
 
         verify(trackingService).deleteProjectAnalytics("dep-1");
-        verify(projectRepository).delete(orphan);
+        verify(reviewPersistence).deleteProject(argThat(snapshot -> "dep-1".equals(snapshot.project().getId())));
         verify(projectService).evictProjectCache(orphan);
     }
 
-    private static Project editableProject(String id, ProjectClassification classification, ProjectStatus status) {
+    @Test void failedHardDeleteCannotTouchStorageAnalyticsOrUserRecords() {
+        var project = editableProject("project-1", ProjectClassification.DATA, ProjectStatus.DELETED);
+        project.setImageUrl("images/example.png");
+        when(reviewPersistence.deleteProject(any())).thenReturn(false);
+        assertThrows(org.springframework.web.server.ResponseStatusException.class, () -> service.hardDelete(project));
+        verifyNoInteractions(storageService, trackingService, mongoTemplate);
+        verify(projectService, never()).evictProjectCache(any());
+    }
+    @Test void failedDependencyScrubCannotDeleteMediaOrEvictCurrentState() {
+        var project = editableProject("project-1", ProjectClassification.DATA, ProjectStatus.DELETED);
+        project.setImageUrl("images/example.png");
+        when(projectRepository.findByDependency("project-1")).thenReturn(List.of(new Project()));
+        when(reviewPersistence.applyDeletionState(any(), eq(true))).thenReturn(false);
+        assertThrows(org.springframework.web.server.ResponseStatusException.class, () -> service.hardDelete(project));
+        verifyNoInteractions(storageService, trackingService, mongoTemplate);
+        verify(projectService, never()).evictProjectCache(any());
+    }
+    @Test void failedSoftDeleteDoesNotAnnounceRemoval() {
+        var project = editableProject("project-1", ProjectClassification.DATA, ProjectStatus.PUBLISHED);
+        when(reviewPersistence.applyDeletionState(any(), eq(false))).thenReturn(false);
+        assertThrows(org.springframework.web.server.ResponseStatusException.class, () -> service.softDelete(project));
+        verifyNoInteractions(storageService, trackingService);
+        verify(projectService, never()).evictProjectCache(any());
+    }
+
+    private Project editableProject(String id, ProjectClassification classification, ProjectStatus status) {
         Project project = new Project();
         project.setId(id);
+        projects.put(id, project);
         project.setSlug("sky-tools");
         project.setTitle("Sky Tools");
         project.setClassification(classification);

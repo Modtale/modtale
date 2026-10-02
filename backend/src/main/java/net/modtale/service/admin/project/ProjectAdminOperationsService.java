@@ -25,8 +25,8 @@ public class ProjectAdminOperationsService {
         return projectAdminQueryService.getProjectById(id);
     }
 
-    public void updateRawProject(String adminId, String id, Project updatedProject) {
-        projectAdminQueryService.updateRawProject(adminId, id, updatedProject);
+    public void updateRawProject(String adminId, String id, java.util.Map<String, Object> metadata, String token) {
+        projectAdminQueryService.updateRawProject(adminId, id, metadata, token);
     }
 
     public void deleteProject(net.modtale.model.user.User adminUser, String id, String reason) {

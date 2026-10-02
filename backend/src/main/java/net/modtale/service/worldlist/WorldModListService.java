@@ -146,12 +146,27 @@ public class WorldModListService {
             return;
         }
         for (WorldModList.Item item : list.getMods()) {
+            if (item.getSource() == ProjectDependency.Source.CURSEFORGE) continue;
             Project project = projectFor(item);
             if (project == null || !accessControlService.isPubliclyReadable(project)) {
+                if (item.getSource() == ProjectDependency.Source.MODTALE || !value(item.getProjectId()).isBlank()) {
+                    item.setFileUrl("");
+                    item.setDownloadable(false);
+                    item.setUnavailableReason("Project is not public on Modtale.");
+                }
                 continue;
             }
+            ProjectVersion version = value(item.getVersionNumber()).isBlank()
+                    ? versionFor(project, null, list.getGameVersion())
+                    : versionAccessService.findByVersionNumber(project, item.getVersionNumber(), list.getGameVersion());
+            if (!isApproved(version)) version = null;
             applyProjectMetadata(item, project);
             item.setSource(ProjectDependency.Source.MODTALE);
+            if (version != null) item.setVersionNumber(version.getVersionNumber());
+            item.setFileUrl(version == null ? "" : value(version.getFileUrl()));
+            boolean downloadable = version != null && version.getFileUrl() != null && !version.getFileUrl().isBlank();
+            item.setDownloadable(downloadable);
+            item.setUnavailableReason(downloadable ? null : "No downloadable public version could be resolved.");
         }
     }
 

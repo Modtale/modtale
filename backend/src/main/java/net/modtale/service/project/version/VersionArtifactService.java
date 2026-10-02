@@ -53,8 +53,8 @@ public class VersionArtifactService {
         String fileHash = null;
         Long curseForgeFingerprint = null;
         if (file != null) {
+            fileHash = calculateSha256(file);
             if (!isModpack) {
-                fileHash = calculateSha256(file);
                 try {
                     curseForgeFingerprint = CurseForgeFingerprint.calculate(file);
                 } catch (java.io.IOException ex) {

@@ -1,0 +1,604 @@
+import { loadPriorFindingReasoning } from '@/modules/admin/api/findingReviews';
+vi.mock('@/modules/admin/api/findingReviews', () => ({ loadPriorFindingReasoning: vi.fn() }));
+import { act } from 'react';
+import { createRoot, type Root } from 'react-dom/client';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { Review } from '@/modules/admin/views/Review';
+vi.mock('@/modules/admin/views/FindingDecisions', () => ({ FindingDecisions: ({ onSaved }: any) => <button onClick={onSaved}>Save finding reasoning</button> }));
+vi.mock('@/components/ui/ModalPortal', () => ({ ModalPortal: ({ children }: any) => children }));
+vi.mock('@/modules/admin/api/adminClient', () => ({ adminClient: { publishProject: vi.fn().mockResolvedValue(null), getReviewDetails: vi.fn(), getStructure: vi.fn(), getArtifactChanges: vi.fn(), getFileWindow: vi.fn() } }));
+import { adminClient } from '@/modules/admin/api/adminClient';
+
+const clear = { status: 'CLEAN', verdict: 'AUTO_APPROVE', scanState: 'COMPLETED', issues: [],
+    securityEvidence: { complete: true, clearanceGranted: true, policyVersion: 'warden-3.0.0:' + 'c'.repeat(64), artifactSha256: 'a'.repeat(64), contentSha256: 'b'.repeat(64), entryHashes: {} } };
+describe('Review security clearance status', () => {
+    let container: HTMLDivElement; let root: Root;
+    beforeEach(() => { container = document.createElement('div'); document.body.appendChild(container); root = createRoot(container); });
+    afterEach(async () => { await act(async () => root.unmount()); container.remove(); });
+    async function render(scanResult: any, decision = false, token?: string, steps?: number, sources: any[] = []) {
+        const project = { mod: { id: 'project', slug: 'project', title: 'Example', status: decision ? 'PENDING' : 'PUBLISHED', reviewToken: token, classification: 'PLUGIN', tags: [],
+            versions: [{ id: 'version', versionNumber: '1.0', reviewStatus: 'PENDING', reviewToken: 'old-version', scanResult }, ...sources] } };
+        await act(async () => root.render(<Review reviewingProject={project} onClose={vi.fn()} onApprove={vi.fn()} onReject={vi.fn()} setStatus={vi.fn()} canDecide={decision} />));
+        for (let step = 0; step < (steps ?? (decision ? 4 : 2)); step++) {
+            await act(async () => container.querySelectorAll<HTMLInputElement>('input[type=checkbox]').forEach(input => input.click()));
+            const next = [...container.querySelectorAll('button')].find(button => button.textContent?.includes('Next Step'));
+            expect(next?.disabled).toBe(false);
+            await act(async () => next!.click());
+        }
+    }
+    it('keeps the queue-selected version when a pending sibling appears first', async () => {
+        const project = refreshed();
+        await act(async () => root.render(<Review reviewingProject={{...project, selectedVersionId: 'version'}} onClose={vi.fn()} onApprove={vi.fn()} onReject={vi.fn()} setStatus={vi.fn()} canDecide={true} />));
+        vi.mocked(adminClient.publishProject).mockClear();
+        for (let step=0; step<4; step++) {
+            await act(async () => container.querySelectorAll<HTMLInputElement>('input[type=checkbox]').forEach(input => input.click()));
+            await click('Next Step');
+        }
+        await click('Approve & Publish');
+        expect(adminClient.publishProject).toHaveBeenCalledWith('project', 'fresh-project', 'version');
+    });
+    it('requires refreshed evidence before publishing after a finding decision changes the snapshot', async () => {
+        vi.mocked(adminClient.publishProject).mockClear();
+        await render(clear, true, 'project-snapshot', 2);
+        const save = [...container.querySelectorAll('button')].find(b => b.textContent === 'Save finding reasoning');
+        expect(save).toBeTruthy(); await act(async () => save!.click());
+        for (let step = 0; step < 2; step++) {
+            await act(async () => container.querySelectorAll<HTMLInputElement>('input[type=checkbox]').forEach(input => input.click()));
+            const next = [...container.querySelectorAll('button')].find(b => b.textContent?.includes('Next Step'));
+            await act(async () => next!.click());
+        }
+        const approve = [...container.querySelectorAll('button')].find(b => b.textContent?.includes('Approve & Publish'));
+        expect(approve?.disabled).toBe(true);
+        expect(adminClient.publishProject).not.toHaveBeenCalled();
+    });
+    function button(text: string) { return [...container.querySelectorAll('button')].find(b => b.textContent?.includes(text))!; }
+    async function click(text: string) { await act(async () => button(text).click()); }
+    const refreshed = () => ({ mod: { id: 'project', slug: 'project', title: 'Updated project', status: 'PENDING', reviewToken: 'fresh-project', classification: 'PLUGIN', tags: [],
+        versions: [{ id: 'sibling', versionNumber: '2.0', reviewStatus: 'PENDING', reviewToken: 'sibling-token', scanResult: clear },
+            { id: 'version', versionNumber: '1.0', reviewStatus: 'PENDING', reviewToken: 'fresh-version', scanResult: clear }] } });
+    it('refreshes in place, resets checks and publishes the same inspected version with the new token', async () => {
+        vi.mocked(adminClient.publishProject).mockClear();
+        vi.mocked(adminClient.getReviewDetails).mockResolvedValue(refreshed());
+        await render(clear, true, 'old-project', 2);
+        await click('Save finding reasoning'); await click('Refresh evidence and restart checklist');
+        expect(adminClient.getReviewDetails).toHaveBeenCalledWith('project');
+        expect(button('Next Step').disabled).toBe(true);
+        for (let step = 0; step < 4; step++) {
+            await act(async () => container.querySelectorAll<HTMLInputElement>('input[type=checkbox]').forEach(input => input.click()));
+            await click('Next Step');
+        }
+        await click('Approve & Publish');
+        expect(adminClient.publishProject).toHaveBeenCalledWith('project', 'fresh-project', 'version');
+    });
+    it.each(['missing', 'approved', 'token', 'project', 'stale'])('keeps decisions disabled when refresh cannot validate the selected review: %s', async kind => {
+        const data = refreshed();
+        if (kind === 'missing') data.mod.versions.pop();
+        if (kind === 'approved') data.mod.versions[1].reviewStatus = 'APPROVED';
+        if (kind === 'token') data.mod.versions[1].reviewToken = '';
+        if (kind === 'project') data.mod.id = 'another-project';
+        if (kind === 'stale') data.mod.versions[1].reviewToken = 'old-version';
+        vi.mocked(adminClient.getReviewDetails).mockResolvedValue(data);
+        await render(clear, true, 'old-project', 2);
+        await click('Save finding reasoning'); await click('Refresh evidence and restart checklist');
+        expect(container.querySelector('[role=alert]')).toBeTruthy();
+        expect(button('Refresh evidence and restart checklist').disabled).toBe(false);
+        expect(container.textContent).toContain('Refresh the evidence');
+    });
+    it('keeps the review held on a failed refresh and permits retry', async () => {
+        vi.mocked(adminClient.getReviewDetails).mockRejectedValueOnce(new Error('Unavailable')).mockResolvedValueOnce(refreshed());
+        await render(clear, true, 'old-project', 2);
+        await click('Save finding reasoning'); await click('Refresh evidence and restart checklist');
+        expect(container.querySelector('[role=alert]')).toBeTruthy();
+        await click('Refresh evidence and restart checklist');
+        expect(container.querySelector('[role=alert]')).toBeNull();
+        expect(button('Next Step').disabled).toBe(true);
+    });
+    it('ignores a late refresh response after a different review is opened', async () => {
+        let finish!: (value: any) => void;
+        vi.mocked(adminClient.getReviewDetails).mockReturnValue(new Promise(resolve => { finish = resolve; }));
+        await render(clear, true, 'old-project', 2);
+        await click('Save finding reasoning'); await click('Refresh evidence and restart checklist');
+        const other = refreshed(); other.mod.id = 'other'; other.mod.title = 'Different review';
+        await act(async () => root.render(<Review reviewingProject={other} onClose={vi.fn()} onApprove={vi.fn()} onReject={vi.fn()} setStatus={vi.fn()} canDecide />));
+        await act(async () => finish(refreshed()));
+        expect(container.textContent).not.toContain('Updated project');
+        expect(container.textContent).toContain('Different review');
+    });
+    it('publishes exactly the inspected version with the project snapshot', async () => {
+        vi.mocked(adminClient.publishProject).mockClear();
+        await render(clear, true, 'project-snapshot');
+        const approve = [...container.querySelectorAll('button')].find(button => button.textContent?.includes('Approve & Publish'));
+        await act(async () => approve!.click());
+        expect(adminClient.publishProject).toHaveBeenCalledWith('project', 'project-snapshot', 'version');
+    });
+    it('requires refreshing a project review that has no snapshot', async () => {
+        vi.mocked(adminClient.publishProject).mockClear();
+        await render(clear, true);
+        const approve = [...container.querySelectorAll('button')].find(button => button.textContent?.includes('Approve & Publish'));
+        await act(async () => approve!.click());
+        expect(adminClient.publishProject).not.toHaveBeenCalled();
+    });
+    it.each([undefined, { status: 'CLEAN', issues: [] }, { ...clear, verdict: 'REVIEW' },
+        { ...clear, scanState: 'INCOMPLETE' }, { ...clear, securityEvidence: { complete: true, clearanceGranted: false } }])
+    ('does not show completed clearance for missing or insufficient evidence %#', async scan => {
+        await render(scan);
+        expect(container.textContent).not.toContain('Artifact Review Completed');
+    });
+    it('shows precisely reused approval but holds fresh adverse evidence', async () => {
+        const reused = { ...clear, status: 'SUSPICIOUS', verdict: 'REVIEW', reusedReviewVersion: '0.9',
+            securityEvidence: { ...clear.securityEvidence, clearanceGranted: false, reviewState: 'POLICY_REVIEW' } };
+        await render(reused);
+        expect(container.textContent).toContain('Previously approved contents and context match version 0.9.');
+        await act(async () => root.unmount()); root = createRoot(container);
+        await render({ ...reused, securityEvidence: { ...reused.securityEvidence, reviewState: 'NEW_SECURITY_EVIDENCE' } });
+        expect(container.textContent).not.toContain('Artifact Review Completed');
+    });
+    it('holds results whose policy identity is obsolete', async () => {
+        await render({ ...clear, securityEvidence: { ...clear.securityEvidence, policyVersion: 'warden-3.0.0' } });
+        expect(container.textContent).not.toContain('Artifact Review Completed');
+    });
+    it('labels an exhausted provider failure as diagnostics while withholding clearance', async () => {
+        await render({ ...clear, status: 'SUSPICIOUS', verdict: 'REVIEW', riskScore: 75,
+            newIssueCount: 0, knownIssueCount: 7, escalatedIssueCount: 0,
+            securityEvidence: { ...clear.securityEvidence, clearanceGranted: false, reviewState: 'RATE_LIMITED' } });
+        expect(container.textContent).toContain('Review service attention');
+        expect(container.textContent).toContain('Review Service Diagnostics');
+        expect(container.textContent).toContain('Clearance is withheld');
+        expect(container.textContent).not.toContain('Manual Security Review Required');
+        expect(container.textContent).not.toContain('Score: 75');
+        expect(container.textContent).not.toContain('Artifact Review Completed');
+    });
+    it('keeps new findings visible as security review when the service also fails', async () => {
+        await render({ ...clear, status: 'FAILED', verdict: 'REVIEW', riskScore: 75,
+            newIssueCount: 2, knownIssueCount: 7, escalatedIssueCount: 0,
+            securityEvidence: { ...clear.securityEvidence, complete: false, clearanceGranted: false, reviewState: 'TIMEOUT' } });
+        expect(container.textContent).toContain('Review service attention');
+        expect(container.textContent).toContain('Manual Security Review Required');
+        expect(container.textContent).toContain('Score: 75');
+        expect(container.textContent).not.toContain('Artifact Review Completed');
+    });
+    it.each([true, false, undefined])('distinguishes identical local evidence without claiming clearance: %s', async identical => {
+        await render({ ...clear, status: 'SUSPICIOUS', verdict: 'REVIEW',
+            issues: [{ type: 'Network', severity: 'LOW', description: 'connect', filePath: 'Mod.class',
+                lineStart: 9, lineEnd: 11, knownIssue: true, baselineVersion: '0.9',
+                historicalFileEvidenceIdentical: identical }] });
+        const show = container.querySelector<HTMLButtonElement>('button[aria-label="Show findings"]');
+        if (show) await act(async () => show.click());
+        await focusFindings('all');
+        expect(container.textContent?.includes('Same finding and file as approved version 0.9.')).toBe(identical === true);
+        if (identical) expect(container.textContent).toContain('Changes elsewhere still require review.');
+        expect(container.textContent).not.toContain('Artifact Review Completed');
+        expect([...container.querySelectorAll('button')].some(button => button.textContent?.includes('Inspect'))).toBe(true);
+    });
+    it('shows completion for explicit completed clearance' , async () => {
+        await render(clear); expect(container.textContent).toContain('Artifact Review Completed');
+    });
+    it('carries the opened project token from a removed-file comparison into source inspection', async () => {
+        vi.mocked(adminClient.getArtifactChanges).mockResolvedValue({ reviewToken: 'snapshot', baselineVersion: '0.9',
+            contextComparable: true, contextChanged: false, contextChanges: [], added: 0, modified: 0, removed: 1, unchanged: 0,
+            files: [{ path: 'removed.txt', change: 'REMOVED' }] });
+        vi.mocked(adminClient.getStructure).mockResolvedValue(['removed.txt']);
+        vi.mocked(adminClient.getFileWindow).mockResolvedValue({identity:'a'.repeat(64),content:'Previously approved file contents',format:'TEXT_RESOURCE',start:0,end:33,totalCharacters:33,firstLine:1,lineMatched:true,representationComplete:true,gaps:[]});
+        await render(clear, true, 'snapshot', 2, [{ id: 'baseline', versionNumber: '0.9', reviewStatus: 'APPROVED' }]);
+        await click('removed.txt');
+        expect(adminClient.getArtifactChanges).toHaveBeenCalledExactlyOnceWith('project', '1.0', 'snapshot');
+        expect(adminClient.getStructure).toHaveBeenLastCalledWith('project', '0.9', 'snapshot');
+        expect(adminClient.getFileWindow).toHaveBeenLastCalledWith('project', '0.9', 'removed.txt', 'snapshot', 0, undefined, 0);
+        expect(container.textContent).toContain('Previously approved file contents');
+    });
+    it('shows the authenticated update comparison when review opens and reuses it in Files', async () => {
+        vi.mocked(adminClient.getArtifactChanges).mockResolvedValue({ reviewToken: 'snapshot', baselineVersion: '0.9',
+            contextComparable: true, contextChanged: false, contextChanges: [], added: 1, modified: 0, removed: 0, unchanged: 1,
+            files: [{ path: 'New.class', change: 'ADDED' }, { path: 'Prior.class', change: 'UNCHANGED' }] });
+        await render(clear, true, 'snapshot', 0, [{ id: 'baseline', versionNumber: '0.9', reviewStatus: 'APPROVED' }]);
+        expect(adminClient.getArtifactChanges).toHaveBeenCalledExactlyOnceWith('project', '1.0', 'snapshot');
+        expect(container.textContent).toContain('Changes since approved version 0.9');
+        expect(container.textContent).toContain('1 added, 0 modified, 0 removed, 1 unchanged.');
+        expect(container.textContent).toContain('related behavior still needs review');
+        for (let step = 0; step < 2; step++) {
+            await act(async () => container.querySelectorAll<HTMLInputElement>('input[type=checkbox]').forEach(input => input.click()));
+            await click('Next Step');
+        }
+        expect(container.textContent).toContain('New.class');
+        expect(adminClient.getArtifactChanges).toHaveBeenCalledTimes(1);
+    });
+    it('uses the authenticated file comparison to focus changed-file findings without clearing older evidence', async () => {
+        vi.mocked(adminClient.getArtifactChanges).mockResolvedValue({ reviewToken: 'snapshot', baselineVersion: '0.9',
+            contextComparable: true, contextChanged: false, contextChanges: [], added: 0, modified: 1, removed: 0, unchanged: 1,
+            files: [{ path: 'Changed.class', change: 'MODIFIED' }, { path: 'Prior.class', change: 'UNCHANGED' }] });
+        const issues = [
+            { type: 'Network', severity: 'LOW', description: 'Earlier occurrence', filePath: 'Prior.class', lineStart: 1, knownIssue: true },
+            { type: 'Network', severity: 'LOW', description: 'Changed occurrence', filePath: 'Changed.class', lineStart: 2, knownIssue: true },
+            { type: 'RuntimeExec', severity: 'HIGH', description: 'High prior occurrence', filePath: 'Prior.class', lineStart: 3, knownIssue: true }
+        ];
+        await render({ ...clear, status: 'SUSPICIOUS', verdict: 'REVIEW', issues }, true, 'snapshot', 2,
+            [{ id: 'baseline', versionNumber: '0.9', reviewStatus: 'APPROVED' }]);
+        await showFindings();
+        const reasoning = container.querySelectorAll<HTMLButtonElement>('button[aria-label^="Earlier reasoning for finding"]');
+        expect(reasoning[0].getAttribute('aria-label')).toBe('Earlier reasoning for finding 3');
+        expect(reasoning[1].getAttribute('aria-label')).toBe('Earlier reasoning for finding 2');
+        expect(container.textContent).toContain('1 finding is in added or modified files');
+        await click('Show changed-file findings');
+        expect(container.textContent).toContain('Changed occurrence');
+        expect(container.textContent).not.toContain('Earlier occurrence');
+        expect(container.textContent).toContain('1 high or critical findings are outside these filters');
+        expect(container.textContent).not.toContain('Artifact Review Completed');
+        await focusFindings('all');
+        expect(container.textContent).toContain('Earlier occurrence');
+        expect(container.textContent).toContain('High prior occurrence');
+        await focusFindings('changed');
+        vi.mocked(adminClient.getArtifactChanges).mockRejectedValueOnce(new Error('Comparison unavailable'));
+        await click('Refresh comparison');
+        expect(container.querySelector<HTMLSelectElement>('select[aria-label="Finding focus"]')?.value).toBe('attention');
+        expect(container.textContent).toContain('Earlier occurrence');
+        expect(container.textContent).toContain('Comparison unavailable');
+    });
+    it('keeps prior findings in review focus when any file changed, including findings in unchanged files', async () => {
+        vi.mocked(adminClient.getArtifactChanges).mockResolvedValue({ reviewToken: 'snapshot', baselineVersion: '0.9',
+            contextComparable: true, contextChanged: false, contextChanges: [], added: 0, modified: 1, removed: 0, unchanged: 1,
+            files: [{ path: 'Changed.class', change: 'MODIFIED' }, { path: 'Prior.class', change: 'UNCHANGED' }] });
+        const issues = [
+            { type: 'Network', severity: 'LOW', description: 'Changed repeated finding', filePath: 'Changed.class', lineStart: 1,
+                knownIssue: true, historicalFileEvidenceIdentical: true, reviewCadence: 'WHEN_CHANGED' },
+            { type: 'Network', severity: 'LOW', description: 'Unchanged repeated finding', filePath: 'Prior.class', lineStart: 2,
+                knownIssue: true, historicalFileEvidenceIdentical: true, reviewCadence: 'WHEN_CHANGED' }
+        ];
+        await render({ ...clear, status: 'SUSPICIOUS', verdict: 'REVIEW', issues }, true, 'snapshot', 2,
+            [{ id: 'baseline', versionNumber: '0.9', reviewStatus: 'APPROVED' }]);
+        await showFindings();
+        expect(container.textContent).toContain('Changed repeated finding');
+        expect(container.textContent).toContain('Unchanged repeated finding');
+        expect(container.textContent).not.toContain('previously seen findings with identical file evidence are outside this view');
+        expect(container.textContent).not.toContain('Artifact Review Completed');
+    });
+    it('keeps prior findings in focus when comparison context changes or cannot be verified', async () => {
+        const issue = { type: 'Network', severity: 'LOW', description: 'Context-dependent prior finding',
+            filePath: 'Prior.class', lineStart: 1, knownIssue: true, historicalFileEvidenceIdentical: true,
+            reviewCadence: 'WHEN_CHANGED' };
+        vi.mocked(adminClient.getArtifactChanges).mockResolvedValue({ reviewToken: 'snapshot', baselineVersion: '0.9',
+            contextComparable: true, contextChanged: true, contextChanges: ['GAME_VERSIONS'], added: 0, modified: 0, removed: 0, unchanged: 1,
+            files: [{ path: 'Prior.class', change: 'UNCHANGED' }] });
+        await render({ ...clear, status: 'SUSPICIOUS', verdict: 'REVIEW', issues: [issue] }, true, 'snapshot', 2,
+            [{ id: 'baseline', versionNumber: '0.9', reviewStatus: 'APPROVED' }]);
+        await showFindings();
+        expect(container.textContent).toContain('Context-dependent prior finding');
+        vi.mocked(adminClient.getArtifactChanges).mockRejectedValueOnce(new Error('Comparison unavailable'));
+        await click('Refresh comparison');
+        expect(container.textContent).toContain('Context-dependent prior finding');
+        expect(container.textContent).toContain('Comparison unavailable');
+    });
+    it('folds repeated unchanged-file evidence on changed updates without folding urgent or changed findings', async () => {
+        vi.mocked(adminClient.getArtifactChanges).mockResolvedValue({ reviewToken: 'snapshot', baselineVersion: '0.9',
+            contextComparable: true, contextChanged: false, contextChanges: [], added: 0, modified: 1, removed: 0, unchanged: 120,
+            files: [{ path: 'Changed.class', change: 'MODIFIED' }] });
+        const prior = Array.from({ length: 120 }, (_, index) => ({ type: 'Network', severity: 'LOW',
+            description: `Earlier occurrence ${index}`, filePath: `Prior${index}.class`, lineStart: 1,
+            knownIssue: true, historicalFileEvidenceIdentical: true, baselineVersion: '0.9' }));
+        const changed = { ...prior[0], description: 'Changed-file occurrence', filePath: 'Changed.class' };
+        const high = { ...prior[1], description: 'High unchanged occurrence', severity: 'HIGH' };
+        const always = { ...prior[2], description: 'Always-review occurrence', reviewCadence: 'ALWAYS' };
+        const issues = [...prior, changed, high, always];
+        await render({ ...clear, status: 'SUSPICIOUS', verdict: 'REVIEW', issues }, true, 'snapshot', 2,
+            [{ id: 'baseline', versionNumber: '0.9', reviewStatus: 'APPROVED' }]);
+        await showFindings();
+        const group = container.querySelector<HTMLElement>('section[aria-label="Repeated prior findings"]');
+        expect(group).toBeTruthy();
+        expect(group?.textContent).toContain('120 previously seen findings with identical file evidence');
+        expect(group?.textContent).toContain('changed callers or dependencies');
+        expect(container.textContent).toContain('4 review rows covering 123 matching findings');
+        expect(container.textContent).toContain('Changed-file occurrence');
+        expect(container.textContent).toContain('High unchanged occurrence');
+        expect(container.textContent).toContain('Always-review occurrence');
+        expect(container.textContent).not.toContain('Earlier occurrence 119');
+        await act(async () => group!.querySelector('button')!.click());
+        expect(group?.textContent).toContain('Earlier occurrence 0');
+        expect(group?.textContent).toContain('Show more previously seen findings (20 remaining)');
+        await act(async () => [...group!.querySelectorAll('button')]
+            .find(button => button.textContent?.includes('Show more previously seen findings'))!.click());
+        expect(group?.textContent).toContain('Earlier occurrence 119');
+        await searchFindings('Earlier occurrence 119');
+        expect(container.querySelector('section[aria-label="Repeated prior findings"]')).toBeNull();
+        expect(container.textContent).toContain('Earlier occurrence 119');
+        expect(container.textContent).not.toContain('Artifact Review Completed');
+    });
+    it('groups only resolved HIGH repeats from the verified approved baseline on changed updates', async () => {
+        vi.mocked(adminClient.getArtifactChanges).mockResolvedValue({ reviewToken: 'snapshot', baselineVersion: '0.9',
+            contextComparable: true, contextChanged: true, contextChanges: ['DEPENDENCIES'], added: 0, modified: 1, removed: 0, unchanged: 16,
+            files: [{ path: 'Changed.class', change: 'MODIFIED' }] });
+        const prior = { type: 'VulnerableDependency', severity: 'HIGH', filePath: 'Library.class', lineStart: 1,
+            knownIssue: true, historicalFileEvidenceIdentical: true, resolved: true, reviewCadence: 'WHEN_CHANGED', baselineVersion: '0.9' };
+        const vetted = Array.from({ length: 12 }, (_, index) => ({ ...prior, filePath: `Library${index}.class`, description: `Vetted high ${index}` }));
+        const exceptions = [
+            { ...prior, description: 'Changed high', filePath: 'Changed.class' },
+            { ...prior, description: 'Unresolved high', resolved: false },
+            { ...prior, description: 'Other baseline high', baselineVersion: '0.8' },
+            { ...prior, description: 'Escalated high', escalated: true },
+            { ...prior, description: 'Critical prior', severity: 'CRITICAL' },
+            { ...prior, description: 'Always review high', reviewCadence: 'ALWAYS' }
+        ];
+        await render({ ...clear, status: 'SUSPICIOUS', verdict: 'REVIEW', issues: [...vetted, ...exceptions] }, true, 'snapshot', 2,
+            [{ id: 'baseline', versionNumber: '0.9', reviewStatus: 'APPROVED' }]);
+        await showFindings();
+        const group = container.querySelector<HTMLElement>('section[aria-label="Vetted high findings requiring review"]');
+        expect(group?.textContent).toContain('12 previously resolved HIGH findings require review');
+        expect(container.textContent).toContain('7 review rows covering 18 matching findings');
+        for (const issue of exceptions) expect(container.textContent).toContain(issue.description);
+        expect(container.textContent).not.toContain('Vetted high 11');
+        await act(async () => group!.querySelector('button')!.click());
+        expect(group?.textContent).toContain('Vetted high 11');
+        await searchFindings('Vetted high 11');
+        expect(container.querySelector('section[aria-label="Vetted high findings requiring review"]')).toBeNull();
+        expect(container.textContent).toContain('Vetted high 11');
+        expect(container.textContent).not.toContain('Artifact Review Completed');
+        vi.mocked(adminClient.getArtifactChanges).mockResolvedValueOnce({ reviewToken: 'snapshot', baselineVersion: '0.9',
+            contextComparable: false, contextChanged: true, contextChanges: [], added: 0, modified: 1, removed: 0, unchanged: 16,
+            files: [{ path: 'Changed.class', change: 'MODIFIED' }] });
+        await searchFindings('');
+        await click('Refresh comparison');
+        expect(container.querySelector('section[aria-label="Vetted high findings requiring review"]')).toBeNull();
+        expect(container.textContent).toContain('Vetted high 11');
+    });
+    it('keeps the latest selected comparison file when structure responses arrive out of order', async () => {
+        vi.mocked(adminClient.getArtifactChanges).mockResolvedValue({ reviewToken: 'snapshot', baselineVersion: '0.9',
+            contextComparable: true, contextChanged: false, contextChanges: [], added: 1, modified: 0, removed: 1, unchanged: 0,
+            files: [{ path: 'old.txt', change: 'REMOVED' }, { path: 'new.txt', change: 'ADDED' }] });
+        let stale!: (value: string[]) => void;
+        vi.mocked(adminClient.getStructure).mockReturnValueOnce(new Promise(done => { stale = done; }))
+            .mockResolvedValueOnce(['new.txt']);
+        vi.mocked(adminClient.getFileWindow).mockResolvedValue({identity:'a'.repeat(64),content:'Current selection contents',format:'TEXT_RESOURCE',start:0,end:26,totalCharacters:26,firstLine:1,lineMatched:true,representationComplete:true,gaps:[]});
+        await render(clear, true, 'snapshot', 2, [{ id: 'baseline', versionNumber: '0.9', reviewStatus: 'APPROVED' }]);
+        await click('old.txt'); await click('new.txt');
+        await act(async () => stale(['old.txt']));
+        expect(adminClient.getFileWindow).toHaveBeenLastCalledWith('project', '1.0', 'new.txt', 'snapshot', 0, undefined, 0);
+        expect(container.querySelector('code')?.textContent).toBe('Current selection contents');
+    });
+    const earlierSources = [{ id: 'older', versionNumber: '0.8', reviewStatus: 'APPROVED' }, { id: 'baseline', versionNumber: '0.9', reviewStatus: 'APPROVED' }];
+    const twoFindings = { ...clear, status: 'SUSPICIOUS', verdict: 'REVIEW', issues: [
+        { type: 'Network', severity: 'LOW', description: 'first original occurrence', filePath: 'Same.class', lineStart: 9, lineEnd: 9, baselineVersion: '0.9' },
+        { type: 'Network', severity: 'HIGH', description: 'second original occurrence', filePath: 'Same.class', lineStart: 9, lineEnd: 9, baselineVersion: '0.9' }
+    ] };
+    const earlierResponse = (rationale: string) => ({ reviewToken: 'snapshot', sourceVersionId: 'baseline', sourceVersion: '0.9', assessedAt: Date.now(), reviewReasons: ['Current review required'], omitted: 0,
+        decisions: [{ id: 'reasoning', actorId: 'reviewer', createdAt: 1, expiresAt: 2, disposition: 'ACCEPT' as const, scope: 'WHOLE_ARTIFACT', rationale,
+            finding: { path: 'Same.class', description: 'prior', lineStart: 9 }, revokedDecisionId: null }] });
+    it('opens prior reasoning in one click using the original occurrence index after sorting', async () => {
+        vi.mocked(loadPriorFindingReasoning).mockReset().mockResolvedValue(earlierResponse('Exact second occurrence reasoning'));
+        vi.mocked(adminClient.getStructure).mockResolvedValue(['Same.class']);
+        vi.mocked(adminClient.getFileWindow).mockResolvedValue({identity:'a'.repeat(64),content:'Approved source evidence',format:'ASM_CLASS',start:0,end:24,totalCharacters:24,firstLine:1,lineMatched:true,representationComplete:true,gaps:[]});
+        await render(twoFindings, true, 'snapshot', 2, earlierSources);
+        const show = container.querySelector<HTMLButtonElement>('button[aria-label="Show findings"]');
+        if (show) await act(async () => show.click());
+        const buttons = container.querySelectorAll<HTMLButtonElement>('button[aria-label^="Earlier reasoning for finding"]');
+        expect(buttons[0].getAttribute('aria-label')).toBe('Earlier reasoning for finding 2');
+        expect(loadPriorFindingReasoning).not.toHaveBeenCalled();
+        await act(async () => buttons[0].click());
+        expect(loadPriorFindingReasoning).toHaveBeenCalledExactlyOnceWith('project', 'version', 'baseline', 1, 'snapshot');
+        expect(container.querySelector('select[aria-label="Earlier reasoning finding"]')).toBeNull();
+        expect(container.textContent).toContain('Exact second occurrence reasoning');
+        expect(container.textContent).toContain('No current acceptance is granted');
+        await act(async () => [...container.querySelectorAll<HTMLButtonElement>('button')]
+            .find(button => button.textContent?.includes('Inspect accepted file'))!.click());
+        expect(adminClient.getStructure).toHaveBeenLastCalledWith('project', '0.9', 'snapshot');
+        expect(adminClient.getFileWindow).toHaveBeenLastCalledWith('project', '0.9', 'Same.class', 'snapshot', 0, undefined, 9);
+    });
+    it('folds repeated nested-library findings while retaining every occurrence and the mod finding', async () => {
+        const archive = 'META-INF/jars/lwjgl-nanovg-3.3.3.jar';
+        const native = Array.from({ length: 275 }, (_, index) => ({ type: 'NativeMethod', severity: 'HIGH',
+            description: `native entry ${index}`, filePath: `${archive}!/org/lwjgl/nanovg/Native${index}.class`,
+            lineStart: -1, lineEnd: -1, reviewCadence: 'ALWAYS' }));
+        const own = { type: 'OutboundNetwork', severity: 'HIGH', description: 'Mod network behavior',
+            filePath: 'com/example/ExampleMod.class', lineStart: 12, lineEnd: 12, scoreImpact: 40 };
+        await render({ ...clear, status: 'SUSPICIOUS', verdict: 'REVIEW', issues: [own, ...native] }, true, 'snapshot', 2);
+        const show = container.querySelector<HTMLButtonElement>('button[aria-label="Show findings"]');
+        if (show) await act(async () => show.click());
+        expect(container.textContent).toContain(`275 findings in nested archive ${archive}`);
+        expect(container.textContent).toContain('275 always-review');
+        expect(container.textContent).toContain('Mod network behavior');
+        expect(container.querySelectorAll('button').length).toBeLessThan(100);
+        const summary = [...container.querySelectorAll<HTMLButtonElement>('button')]
+            .find(value => value.textContent?.includes(`275 findings in nested archive ${archive}`))!;
+        await act(async () => summary.click());
+        expect(container.querySelectorAll<HTMLButtonElement>('button').length).toBeGreaterThan(100);
+        for (let remaining = 175; remaining > 0; remaining -= 100) {
+            const more = [...container.querySelectorAll<HTMLButtonElement>('button')]
+                .find(value => value.textContent?.includes('Show more findings in'));
+            expect(more).toBeTruthy();
+            await act(async () => more!.click());
+        }
+        expect(container.textContent).toContain('native entry 274');
+        expect(container.textContent).toContain('This grouping does not verify the archive');
+        await searchFindings('native entry 274');
+        expect(container.textContent).not.toContain(`275 findings in nested archive ${archive}`);
+        expect(container.textContent).toContain('Showing 1–1 of 1 matching findings (276 total)');
+        expect(container.textContent).toContain('native entry 274');
+    });
+    it('folds repeated medium indirect calls without hiding higher-priority calls or search results', async () => {
+        const repeated = Array.from({ length: 120 }, (_, index) => ({ type: 'IndirectInvocation', severity: 'MEDIUM',
+            description: `indirect call ${index}`, filePath: `org/h2/engine/Caller${index}.class`, lineStart: index + 1, lineEnd: index + 1,
+            reviewCadence: 'WHEN_CHANGED' }));
+        const high = { ...repeated[0], severity: 'HIGH', description: 'high indirect call' };
+        const always = { ...repeated[0], reviewCadence: 'ALWAYS', description: 'always indirect call' };
+        const escalated = { ...repeated[0], escalated: true, description: 'escalated indirect call' };
+        const ownReflection = Array.from({ length: 12 }, (_, index) => ({ ...repeated[0],
+            description: `own reflection ${index}`, filePath: `dev/hytalemodding/plugin/Own${index}.class` }));
+        const own = { type: 'OutboundNetwork', severity: 'HIGH', description: 'Mod network behavior',
+            filePath: 'com/example/ExampleMod.class', lineStart: 12, lineEnd: 12 };
+        await render({ ...clear, status: 'SUSPICIOUS', verdict: 'REVIEW', issues: [own, high, always, escalated, ...ownReflection, ...repeated] }, true, 'snapshot', 2);
+        const show = container.querySelector<HTMLButtonElement>('button[aria-label="Show findings"]');
+        if (show) await act(async () => show.click());
+        const group = container.querySelector<HTMLElement>('section[aria-label="Indirect invocation findings: org/h2"]');
+        expect(group?.textContent).toContain('120 indirect invocation findings under org/h2');
+        expect(group?.textContent).toContain('120 new');
+        expect(container.textContent).toContain('17 review rows covering 136 matching findings');
+        expect(container.querySelector('section[aria-label="Indirect invocation findings: dev/hytalemodding"]')).toBeNull();
+        expect(container.textContent).toContain('own reflection 11');
+        for (const detail of ['high indirect call', 'always indirect call', 'escalated indirect call', 'Mod network behavior'])
+            expect(container.textContent).toContain(detail);
+        expect(container.textContent).not.toContain('indirect call 119');
+        await act(async () => group!.querySelector('button')!.click());
+        expect(group?.textContent).toContain('indirect call 99');
+        expect(group?.textContent).toContain('Show more indirect calls in org/h2 (20 remaining)');
+        await act(async () => [...group!.querySelectorAll<HTMLButtonElement>('button')]
+            .find(button => button.textContent?.includes('Show more indirect calls'))!.click());
+        expect(group?.textContent).toContain('indirect call 119');
+        await searchFindings('indirect call 119');
+        expect(container.querySelector('section[aria-label="Indirect invocation findings: org/h2"]')).toBeNull();
+        expect(container.textContent).toContain('Showing 1–1 of 1 matching findings (136 total)');
+        expect(container.textContent).toContain('indirect call 119');
+    });
+    it('does not attach a late rationale to a different selected occurrence', async () => {
+        let resolve!: (value: ReturnType<typeof earlierResponse>) => void;
+        vi.mocked(loadPriorFindingReasoning).mockReset().mockReturnValueOnce(new Promise(done => { resolve = done; }))
+            .mockResolvedValueOnce(earlierResponse('Current occurrence reasoning'));
+        await render(twoFindings, true, 'snapshot', 2, earlierSources);
+        const show = container.querySelector<HTMLButtonElement>('button[aria-label="Show findings"]');
+        if (show) await act(async () => show.click());
+        await act(async () => container.querySelector<HTMLButtonElement>('button[aria-label="Earlier reasoning for finding 2"]')!.click());
+        await act(async () => container.querySelector<HTMLButtonElement>('button[aria-label="Earlier reasoning for finding 1"]')!.click());
+        await act(async () => resolve(earlierResponse('Stale occurrence reasoning')));
+        expect(loadPriorFindingReasoning).toHaveBeenLastCalledWith('project', 'version', 'baseline', 0, 'snapshot');
+        expect(container.querySelectorAll('section[aria-label="Earlier finding reasoning"]')).toHaveLength(1);
+        expect(container.textContent).toContain('Current occurrence reasoning');expect(container.textContent).not.toContain('Stale occurrence reasoning');
+    });
+    async function searchFindings(value: string) {
+        const input = container.querySelector<HTMLInputElement>('input[aria-label="Search findings"]')!;
+        await act(async () => {
+            Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, value);
+            input.dispatchEvent(new Event('input', { bubbles: true }));
+        });
+    }
+    async function focusFindings(value: string) {
+        const select = container.querySelector<HTMLSelectElement>('select[aria-label="Finding focus"]')!;
+        await act(async () => { select.value = value; select.dispatchEvent(new Event('change', { bubbles: true })); });
+    }
+    async function showFindings() {
+        const show = container.querySelector<HTMLButtonElement>('button[aria-label="Show findings"]');
+        if (show) await act(async () => show.click());
+    }
+    it('bounds rendered findings and preserves original IDs through pages and search', async () => {
+        const issues = Array.from({ length: 250 }, (_, index) => ({ type: 'Network', severity: 'LOW',
+            description: `Occurrence ${index}`, filePath: `Mod${index}.class`, lineStart: index + 1, lineEnd: index + 1, baselineVersion: '0.9' }));
+        vi.mocked(loadPriorFindingReasoning).mockReset().mockResolvedValue(earlierResponse('Last occurrence reasoning'));
+        await render({ ...twoFindings, issues }, true, 'snapshot', 2, earlierSources); await showFindings();
+        expect(container.querySelectorAll('button[aria-label^="Earlier reasoning for finding"]')).toHaveLength(100);
+        expect(container.textContent).toContain('Showing 1–100 of 250 matching findings (250 total)');
+        await click('Next findings');
+        expect(container.querySelector('button[aria-label="Earlier reasoning for finding 101"]')).toBeTruthy();
+        expect(container.querySelector('button[aria-label="Earlier reasoning for finding 1"]')).toBeNull();
+        await searchFindings('Mod249.class');
+        expect(container.querySelectorAll('button[aria-label^="Earlier reasoning for finding"]')).toHaveLength(1);
+        expect(container.textContent).toContain('Showing 1–1 of 1 matching findings (250 total)');
+        await act(async () => container.querySelector<HTMLButtonElement>('button[aria-label="Earlier reasoning for finding 250"]')!.click());
+        expect(loadPriorFindingReasoning).toHaveBeenCalledExactlyOnceWith('project', 'version', 'baseline', 249, 'snapshot');
+    });
+    it('focuses on new and always-review findings while keeping prior evidence available', async () => {
+        const issues = [{ ...twoFindings.issues[0], description: 'Fresh occurrence', knownIssue: false },
+            { ...twoFindings.issues[1], description: 'Seen sensitive occurrence', knownIssue: true, reviewCadence: 'ALWAYS' }];
+        await render({ ...twoFindings, issues }, true, 'snapshot', 2, earlierSources); await showFindings();
+        expect(container.textContent).toContain('Fresh occurrence'); expect(container.textContent).toContain('Seen sensitive occurrence');
+        await focusFindings('seen');
+        expect(container.textContent).not.toContain('Fresh occurrence'); expect(container.textContent).toContain('Seen sensitive occurrence');
+        expect(container.textContent).toContain('previously seen findings may still require review');
+        await focusFindings('always');
+        expect(container.querySelectorAll('button[aria-label^="Earlier reasoning for finding"]')).toHaveLength(1);
+        await focusFindings('new');
+        expect(container.textContent).toContain('Fresh occurrence'); expect(container.textContent).not.toContain('Seen sensitive occurrence');
+        await focusFindings('all');
+        expect(container.querySelectorAll('button[aria-label^="Earlier reasoning for finding"]')).toHaveLength(2);
+    });
+    it('keeps escalated and high-severity prior findings in the attention view', async () => {
+        vi.mocked(adminClient.getArtifactChanges).mockResolvedValue({ reviewToken: 'snapshot', baselineVersion: '0.9',
+            contextComparable: true, contextChanged: false, contextChanges: [], added: 0, modified: 0, removed: 0, unchanged: 1,
+            files: [{ path: 'Same.class', change: 'UNCHANGED' }] });
+        const issues = [
+            { ...twoFindings.issues[0], description: 'Routine prior library', severity: 'LOW', knownIssue: true, historicalFileEvidenceIdentical: true, escalated: false, reviewCadence: 'WHEN_CHANGED' },
+            { ...twoFindings.issues[0], description: 'Changed prior library', severity: 'LOW', knownIssue: true, historicalFileEvidenceIdentical: false, escalated: false, reviewCadence: 'WHEN_CHANGED' },
+            { ...twoFindings.issues[0], description: 'Escalated prior library', severity: 'LOW', knownIssue: true, historicalFileEvidenceIdentical: true, escalated: true, reviewCadence: 'WHEN_CHANGED' },
+            { ...twoFindings.issues[1], description: 'High prior capability', severity: 'HIGH', knownIssue: true, historicalFileEvidenceIdentical: true, escalated: false, reviewCadence: 'WHEN_CHANGED' }
+        ];
+        await render({ ...twoFindings, issues }, true, 'snapshot', 2, earlierSources); await showFindings();
+        expect(container.textContent).not.toContain('Routine prior library');
+        expect(container.textContent).toContain('Changed prior library');
+        expect(container.textContent).toContain('Escalated prior library');
+        expect(container.textContent).toContain('High prior capability');
+        expect(container.textContent).toContain('Showing 1–3 of 3 matching findings (4 total)');
+        expect(container.textContent).toContain('1 previously seen findings with identical file evidence are outside this view');
+        await click('Show all findings');
+        expect(container.textContent).toContain('Routine prior library');
+        expect(container.textContent).toContain('Showing 1–4 of 4 matching findings (4 total)');
+    });
+    it('deprioritizes only resolved high-severity repeats from the exact approved baseline', async () => {
+        vi.mocked(adminClient.getArtifactChanges).mockResolvedValue({ reviewToken: 'snapshot', baselineVersion: '0.9',
+            contextComparable: true, contextChanged: false, contextChanges: [], added: 0, modified: 0, removed: 0, unchanged: 1,
+            files: [{ path: 'Library.class', change: 'UNCHANGED' }] });
+        const prior = { ...twoFindings.issues[0], type: 'VulnerableDependency', severity: 'HIGH', filePath: 'Library.class',
+            knownIssue: true, historicalFileEvidenceIdentical: true, escalated: false, reviewCadence: 'WHEN_CHANGED', baselineVersion: '0.9' };
+        const issues = [
+            { ...prior, description: 'Vetted dependency', resolved: true },
+            { ...prior, description: 'Unresolved dependency', resolved: false },
+            { ...prior, description: 'Other baseline', resolved: true, baselineVersion: '0.8' },
+            { ...prior, description: 'Always review', resolved: true, reviewCadence: 'ALWAYS' },
+            { ...prior, description: 'Critical finding', resolved: true, severity: 'CRITICAL' }
+        ];
+        await render({ ...twoFindings, issues }, true, 'snapshot', 2, earlierSources); await showFindings();
+        expect(container.textContent).not.toContain('Vetted dependency');
+        for (const description of ['Unresolved dependency', 'Other baseline', 'Always review', 'Critical finding'])
+            expect(container.textContent).toContain(description);
+        expect(container.textContent).toContain('1 high or critical findings are outside these filters');
+        await click('Show all findings');
+        expect(container.textContent).toContain('Vetted dependency');
+        await focusFindings('attention');
+        vi.mocked(adminClient.getArtifactChanges).mockResolvedValueOnce({ reviewToken: 'snapshot', baselineVersion: '0.9',
+            contextComparable: true, contextChanged: true, contextChanges: ['DEPENDENCIES'], added: 0, modified: 0, removed: 0, unchanged: 1,
+            files: [{ path: 'Library.class', change: 'UNCHANGED' }] });
+        await click('Refresh comparison');
+        expect(container.textContent).toContain('Vetted dependency');
+        expect(container.textContent).not.toContain('Artifact Review Completed');
+    });
+    it('distinguishes empty filters from no evidence and resets them for a new snapshot', async () => {
+        await render(twoFindings, true, 'snapshot', 2, earlierSources); await showFindings();
+        await searchFindings('not-present'); await focusFindings('seen');
+        expect(container.textContent).toContain('No findings match these filters');
+        expect(container.textContent).not.toContain('No heuristic findings were emitted');
+        await render(twoFindings, true, 'fresh-snapshot', 2, earlierSources);
+        expect(container.querySelector<HTMLInputElement>('input[aria-label="Search findings"]')?.value).toBe('');
+        expect(container.querySelector<HTMLSelectElement>('select[aria-label="Finding focus"]')?.value).toBe('attention');
+        expect(container.querySelectorAll('button[aria-label^="Earlier reasoning for finding"]')).toHaveLength(2);
+    });
+
+    it('filters repeated types without losing original reasoning indices or hiding the scan summary', async () => {
+        vi.mocked(adminClient.getArtifactChanges).mockResolvedValue({ reviewToken: 'snapshot', baselineVersion: '0.9',
+            contextComparable: true, contextChanged: false, contextChanges: [], added: 0, modified: 0, removed: 0, unchanged: 121,
+            files: [] });
+        const issues = [
+            ...Array.from({ length: 120 }, (_, index) => ({ ...twoFindings.issues[0], type: 'BytecodeManipulator', severity: 'LOW', filePath: `Library${index}.class`, knownIssue: true, historicalFileEvidenceIdentical: true })),
+            { ...twoFindings.issues[1], type: 'RuntimeExec', severity: 'HIGH', filePath: 'Runner.class', knownIssue: false, reviewCadence: 'ALWAYS' }
+        ];
+        vi.mocked(loadPriorFindingReasoning).mockReset().mockResolvedValue(earlierResponse('Execution evidence'));
+        await render({ ...twoFindings, issues }, true, 'snapshot', 2, earlierSources); await showFindings();
+        expect(container.textContent).toContain('Finding groups (2 types)');
+        expect(container.textContent).toContain('Showing 1–1 of 1 matching findings (121 total)');
+        expect(container.textContent).toContain('120 previously seen findings with identical file evidence are outside this view');
+        const show = async (type: string) => act(async () => container.querySelector<HTMLButtonElement>(`button[aria-label="Show ${type} findings"]`)!.click());
+        await show('BytecodeManipulator');
+        expect(container.textContent).toContain('No findings match these filters');
+        await focusFindings('all');
+        expect(container.textContent).toContain('Showing 1–100 of 120 matching findings (121 total)');
+        expect(container.textContent).toContain('1 high or critical findings are outside these filters');
+        await click('Next findings');
+        await show('RuntimeExec');
+        expect(container.textContent).toContain('Showing 1–1 of 1 matching findings (121 total)');
+        expect(container.textContent).not.toContain('high or critical findings are outside these filters');
+        await act(async () => container.querySelector<HTMLButtonElement>('button[aria-label="Earlier reasoning for finding 121"]')!.click());
+        expect(loadPriorFindingReasoning).toHaveBeenCalledExactlyOnceWith('project', 'version', 'baseline', 120, 'snapshot');
+        await searchFindings('Library');
+        expect(container.textContent).toContain('No findings match these filters');
+        await click('Show all types');
+        expect(container.textContent).toContain('Showing 1–100 of 120 matching findings (121 total)');
+        await show('RuntimeExec');
+        await render({ ...twoFindings, issues }, true, 'fresh-snapshot', 2, earlierSources);
+        expect(container.textContent).not.toContain('Selected type:');
+        expect(container.textContent).toContain('Showing 1–100 of 121 matching findings (121 total)');
+        expect(container.textContent).toContain('This comparison no longer matches the opened review');
+    });
+
+});

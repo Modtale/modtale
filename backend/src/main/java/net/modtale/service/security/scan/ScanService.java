@@ -47,4 +47,9 @@ public class ScanService {
                 expectedAttempt
         );
     }
+    public void enqueueBackgroundScan(String projectId, String versionId, String filePath, String originalFilename,
+            boolean isManualRescan, int expectedAttempt, String requestId) {
+        scanExecutionService.enqueueBackgroundScan(projectId, versionId, filePath, originalFilename, isManualRescan, expectedAttempt, requestId);
+    }
+
 }

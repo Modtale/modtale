@@ -24,7 +24,7 @@ class SecurityIssueEvaluationServiceTest {
     }
 
     @Test
-    void fingerprintNormalizesCasePathsLineBucketsAndVolatileDescriptionValues() {
+    void fingerprintPreservesChangedPathsAndSecurityRelevantDescriptionValues() {
         ScanResult.ScanIssue first = issue(
                 "Dangerous Call",
                 "Runtime/Reflection",
@@ -46,8 +46,8 @@ class SecurityIssueEvaluationServiceTest {
                 70
         );
 
-        assertEquals(service.fingerprint(first), service.fingerprint(second));
-        assertEquals(service.looseFingerprint(first), service.looseFingerprint(second));
+        assertFalse(service.fingerprint(first).equals(service.fingerprint(second)));
+        assertFalse(service.looseFingerprint(first).equals(service.looseFingerprint(second)));
         assertTrue(service.fingerprint(first).startsWith("si:"));
         assertTrue(service.looseFingerprint(first).startsWith("sl:"));
     }
@@ -107,7 +107,7 @@ class SecurityIssueEvaluationServiceTest {
         assertEquals(0, stats.escalatedIssueCount());
         assertTrue(stats.knownOnly());
         assertTrue(knownIssue.isKnownIssue());
-        assertTrue(knownIssue.isResolved());
+        assertFalse(knownIssue.isResolved());
         assertFalse(knownIssue.isEscalated());
         assertEquals("1.0.0", knownIssue.getBaselineVersion());
         assertEquals(5, knownIssue.getBaselineScoreImpact());

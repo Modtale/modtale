@@ -142,7 +142,7 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
 
     const handleDownloadClick = useCallback((ver: any) => {
         const gameVersion = Array.isArray(ver.gameVersions) && ver.gameVersions.length > 0 ? ver.gameVersions[0] : '';
-        onDownload(ver.fileUrl, ver.versionNumber, gameVersion, ver.dependencies, ver.channel);
+        onDownload(ver.fileName || ver.fileUrl || '', ver.versionNumber, gameVersion, ver.dependencies, ver.channel);
     }, [onDownload]);
 
     if (!show && !isInline) return null;

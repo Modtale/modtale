@@ -16,14 +16,17 @@ import net.modtale.model.project.Project;
 import net.modtale.model.project.ProjectClassification;
 import net.modtale.model.project.ProjectDependency;
 import net.modtale.model.project.ProjectVersion;
+import net.modtale.model.project.ProjectStatus;
 import net.modtale.model.user.User;
 import net.modtale.service.analytics.AnalyticsEligibilityService;
 import net.modtale.service.analytics.TrackingService;
+import net.modtale.service.admin.review.VersionReviewSnapshot;
 import net.modtale.service.project.access.ProjectVersionAccessService;
 import net.modtale.service.project.query.ProjectService;
 import net.modtale.service.security.access.AccessControlService;
 import net.modtale.service.storage.DownloadService;
 import net.modtale.service.storage.DownloadTokenService;
+import net.modtale.service.storage.ApprovedArtifactBytes;
 import net.modtale.service.storage.StorageService;
 import org.springframework.stereotype.Service;
 
@@ -141,29 +144,26 @@ public class VersionDownloadOrchestrationService {
         ProjectVersion targetVersion = getVersionOrThrow(project, downloadToken.getVersion(), downloadToken.getGameVersion(),
                 "We couldn't find the version requested by this download link.");
         ensureDownloadable(project, targetVersion, launcherClient);
-
-        trackDownload(project, targetVersion.getId(), context);
+        DownloadBinding binding = bindDownload(project, targetVersion);
 
         if (project.getClassification() == ProjectClassification.MODPACK) {
+            byte[] zipData = downloadService.generateModpackZip(project, targetVersion, context.currentUser());
+            requireCurrentDownload(binding, project, targetVersion, context);
+            trackDownload(project, targetVersion.getId(), context);
             if (targetVersion.getDependencies() != null) {
                 targetVersion.getDependencies().stream()
                         .forEach(dep -> trackDependencyDownload(dep, context));
             }
-            byte[] zipData = downloadService.generateModpackZip(project, targetVersion, context.currentUser());
             String filename = buildModpackFilename(project, targetVersion);
-            java.net.URI directUri = targetVersion.getFileUrl() == null ? null
-                    : storageService.directDownloadUri(targetVersion.getFileUrl(), filename);
-            return directUri == null ? new VersionDownloadPayload(filename, zipData)
-                    : new VersionDownloadPayload(filename, null, directUri);
+            return new VersionDownloadPayload(filename, zipData);
         }
 
         String filename = extractFilename(targetVersion.getFileUrl());
-        java.net.URI directUri = storageService.directDownloadUri(targetVersion.getFileUrl(), filename);
-        if (directUri != null) {
-            return new VersionDownloadPayload(filename, null, directUri);
-        }
-        byte[] data = storageService.download(targetVersion.getFileUrl());
-        return new VersionDownloadPayload(extractFilename(targetVersion.getFileUrl()), data);
+        byte[] data = ApprovedArtifactBytes.requireExact(targetVersion,
+                storageService.downloadBounded(targetVersion.getFileUrl(), StorageService.MAX_REVIEW_ARTIFACT_BYTES));
+        requireCurrentDownload(binding, project, targetVersion, context);
+        trackDownload(project, targetVersion.getId(), context);
+        return new VersionDownloadPayload(filename, data);
     }
 
     public VersionDownloadPayload downloadBundle(
@@ -195,10 +195,13 @@ public class VersionDownloadOrchestrationService {
         ProjectVersion targetVersion = getVersionOrThrow(project, downloadToken.getVersion(), downloadToken.getGameVersion(),
                 "We couldn't find the version requested by this bundle download link.");
         ensureDownloadable(project, targetVersion, launcherClient);
+        DownloadBinding binding = bindDownload(project, targetVersion);
 
         List<String> selectedDependencies = downloadToken.getSelectedDependencies();
         requireNonModpackBundle(project);
         ensureBundleDownloadable(targetVersion, selectedDependencies, launcherClient, new HashSet<>());
+        byte[] zipData = downloadService.generateBundleZip(project, targetVersion, selectedDependencies, context.currentUser());
+        requireCurrentDownload(binding, project, targetVersion, context);
         trackDownload(project, targetVersion.getId(), context);
         if (targetVersion.getDependencies() != null) {
             targetVersion.getDependencies().forEach(dep -> {
@@ -214,7 +217,6 @@ public class VersionDownloadOrchestrationService {
             });
         }
 
-        byte[] zipData = downloadService.generateBundleZip(project, targetVersion, selectedDependencies, context.currentUser());
         return new VersionDownloadPayload(sanitizeProjectName(project.getTitle()) + "-UNZIP-ME.zip", zipData);
     }
 
@@ -279,12 +281,54 @@ public class VersionDownloadOrchestrationService {
     }
 
     private void ensureReadable(Project project, User currentUser) {
-        if (!accessControlService.canReadProject(project, currentUser)) {
+        if (project.getDeletedAt() != null || project.getStatus() == ProjectStatus.DELETED
+                || !accessControlService.canReadProject(project, currentUser)) {
             throw new ResourceNotFoundException("We couldn't find the project for this download link.");
         }
     }
 
+    private DownloadBinding bindDownload(Project project, ProjectVersion version) throws IOException {
+        if (project.getId() == null || project.getId().isBlank()
+                || version.getId() == null || version.getId().isBlank()) {
+            throw new IOException("The approved download identity cannot be verified.");
+        }
+        return new DownloadBinding(project.getId(), version.getId(), project.getClassification(),
+                downloadSnapshot(project.getClassification(), version));
+    }
+
+    private void requireCurrentDownload(DownloadBinding binding, Project preparedProject,
+            ProjectVersion preparedVersion, DownloadContext context) throws IOException {
+        if (!binding.projectId().equals(preparedProject.getId())
+                || preparedProject.getClassification() != binding.classification()
+                || !binding.versionSnapshot().equals(downloadSnapshot(binding.classification(), preparedVersion))) {
+            throw new IOException("The approved version changed while the download was being prepared.");
+        }
+        Project current = getRawProjectOrThrow(binding.projectId(),
+                "We couldn't find the project for this download link.");
+        ensureReadable(current, context.currentUser());
+        List<ProjectVersion> matches = current.getVersions() == null ? List.of()
+                : current.getVersions().stream().filter(version -> version != null
+                        && binding.versionId().equals(version.getId())).limit(2).toList();
+        if (matches.size() != 1) {
+            throw new VersionNotFoundException("We couldn't find the requested version for that project.");
+        }
+        ProjectVersion version = matches.getFirst();
+        ensureDownloadable(current, version, context.launcherClient());
+        if (current.getClassification() != binding.classification()
+                || !binding.versionSnapshot().equals(downloadSnapshot(binding.classification(), version))) {
+            throw new IOException("The approved version changed while the download was being prepared.");
+        }
+    }
+
+    private String downloadSnapshot(ProjectClassification classification, ProjectVersion version) {
+        return classification == ProjectClassification.MODPACK
+                ? VersionReviewSnapshot.modpackArchiveToken(version) : VersionReviewSnapshot.token(version);
+    }
+
     private void ensureDownloadable(Project project, ProjectVersion version, boolean launcherClient) {
+        if (version == null || version.getReviewStatus() != ProjectVersion.ReviewStatus.APPROVED) {
+            throw new VersionNotFoundException("We couldn't find the requested version for that project.");
+        }
         if (!launcherClient && project.getClassification() == ProjectClassification.MODPACK
                 && version.getDependencies() != null
                 && version.getDependencies().stream()
@@ -363,5 +407,9 @@ public class VersionDownloadOrchestrationService {
     }
 
     private record DownloadContext(boolean apiRequest, String clientIp, User currentUser, boolean launcherClient) {
+    }
+
+    private record DownloadBinding(String projectId, String versionId, ProjectClassification classification,
+            String versionSnapshot) {
     }
 }

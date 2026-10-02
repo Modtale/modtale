@@ -17,17 +17,51 @@ describe('adminClient', () => {
     beforeEach(() => {
         vi.clearAllMocks();
     });
+    it('binds bounded inspection requests to source identity and the opened review', async () => {
+        mockedApi.get.mockResolvedValue({ data: {} } as any);
+        await adminClient.getFileWindow('project', '1.0', 'nested.jar!/A.class', 'snapshot', 32000, 'identity');
+        expect(mockedApi.get).toHaveBeenCalledWith('/admin/projects/project/versions/1.0/file-window', {
+            params: { path: 'nested.jar!/A.class', offset: 32000, characters: 32000, sourceLine: 0, identity: 'identity' },
+            headers: { 'If-Match': 'snapshot' }
+        });
+    });
+
+    it('binds metadata repairs to their inspected snapshot', async () => {
+        mockedApi.put.mockResolvedValue({ data: null } as any);
+        await adminClient.updateProjectRaw('project', { title: 'Repair' }, 'snapshot');
+        expect(mockedApi.put).toHaveBeenCalledWith('/admin/projects/project/raw', { title: 'Repair' },
+            { headers: { 'If-Match': 'snapshot' } });
+    });
+
+    it('binds project decisions to the reviewed project and selected version', async () => {
+        mockedApi.post.mockResolvedValue({ data: null } as any);
+        await adminClient.publishProject('project', 'snapshot', 'selected');
+        expect(mockedApi.post).toHaveBeenCalledWith('/admin/projects/project/publish', null,
+            { headers: { 'If-Match': 'snapshot' }, params: { versionId: 'selected' } });
+        await adminClient.rejectProject('project', 'reason', 'snapshot');
+        expect(mockedApi.post).toHaveBeenCalledWith('/admin/projects/project/reject', { reason: 'reason' },
+            { headers: { 'If-Match': 'snapshot' } });
+    });
 
     it('passes file paths as query params when loading admin file content', async () => {
         mockedApi.get.mockResolvedValue({ data: 'contents' } as any);
 
-        await adminClient.getFileContent('project-1', '1.0.0', 'mods/sky.txt');
+        await adminClient.getFileContent('project-1', '1.0.0', 'mods/sky.txt', 'snapshot');
 
         expect(mockedApi.get).toHaveBeenCalledWith('/admin/projects/project-1/versions/1.0.0/file', {
-            params: { path: 'mods/sky.txt' }
+            params: { path: 'mods/sky.txt' }, headers: { 'If-Match': 'snapshot' }
         });
     });
 
+    it('binds review decisions to the evidence token that was opened', async () => {
+        mockedApi.post.mockResolvedValue({ data: null } as any);
+        await adminClient.approveVersion('project', 'version', 'snapshot-token');
+        expect(mockedApi.post).toHaveBeenLastCalledWith('/admin/projects/project/versions/version/approve', null,
+            { headers: { 'If-Match': 'snapshot-token' } });
+        await adminClient.rejectVersion('project', 'version', 'reason', 'snapshot-token');
+        expect(mockedApi.post).toHaveBeenLastCalledWith('/admin/projects/project/versions/version/reject', { reason: 'reason' },
+            { headers: { 'If-Match': 'snapshot-token' } });
+    });
     it('posts restore actions with a null body and status query param', async () => {
         mockedApi.post.mockResolvedValue({ data: { restored: true } } as any);
 
@@ -65,5 +99,12 @@ describe('adminClient', () => {
         await adminClient.deleteProject('project-1', 'spam');
 
         expect(mockedApi.delete).toHaveBeenCalledWith('/admin/projects/project-1', { params: { reason: 'spam' } });
+    });
+    it('binds comparison and structure to the opened project review', async () => {
+        mockedApi.get.mockResolvedValue({ data: [] } as any);
+        await adminClient.getArtifactChanges('project', '2.0', 'snapshot');
+        expect(mockedApi.get).toHaveBeenLastCalledWith('/admin/projects/project/versions/2.0/changes', { headers: { 'If-Match': 'snapshot' } });
+        await adminClient.getStructure('project', '1.0', 'snapshot');
+        expect(mockedApi.get).toHaveBeenLastCalledWith('/admin/projects/project/versions/1.0/structure', { headers: { 'If-Match': 'snapshot' } });
     });
 });

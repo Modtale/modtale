@@ -10,7 +10,8 @@ import net.modtale.model.project.Project;
 import net.modtale.model.project.ProjectStatus;
 import net.modtale.model.project.ProjectVersion;
 import net.modtale.model.user.User;
-import net.modtale.repository.project.ProjectRepository;
+import net.modtale.service.admin.review.ProjectReviewPersistence;
+import net.modtale.service.admin.review.ProjectReviewSnapshot;
 import net.modtale.service.project.access.ProjectAccessService;
 import net.modtale.service.project.access.ProjectMutationGuard;
 import net.modtale.service.project.access.ProjectVersionAccessService;
@@ -25,7 +26,9 @@ import org.springframework.web.multipart.MultipartFile;
 @Service
 public class VersionService {
 
-    private final ProjectRepository projectRepository;
+    private final ProjectReviewPersistence reviewPersistence;
+    @org.springframework.beans.factory.annotation.Autowired(required=false)
+    private net.modtale.service.admin.review.ProjectMutationOwnerAccess retainedMutations;
     private final ProjectService projectService;
     private final ProjectAccessService projectAccessService;
     private final ProjectMutationGuard projectMutationGuard;
@@ -37,7 +40,7 @@ public class VersionService {
     private final VersionUpdateCommandHandler versionUpdateCommandHandler;
 
     public VersionService(
-            ProjectRepository projectRepository,
+            ProjectReviewPersistence reviewPersistence,
             ProjectService projectService,
             ProjectAccessService projectAccessService,
             ProjectMutationGuard projectMutationGuard,
@@ -48,7 +51,7 @@ public class VersionService {
             VersionCreationCommandHandler versionCreationCommandHandler,
             VersionUpdateCommandHandler versionUpdateCommandHandler
     ) {
-        this.projectRepository = projectRepository;
+        this.reviewPersistence = reviewPersistence;
         this.projectService = projectService;
         this.projectAccessService = projectAccessService;
         this.projectMutationGuard = projectMutationGuard;
@@ -75,10 +78,20 @@ public class VersionService {
     }
 
     public Optional<ProjectVersion> getVersionByHash(String hash) {
-        Query query = new Query(Criteria.where("versions.hash").is(hash));
-        query.fields().include("versions.$");
+        if (hash == null || hash.isBlank()) return Optional.empty();
+        Criteria publicVersion = Criteria.where("hash").is(hash)
+                .and("reviewStatus").is(ProjectVersion.ReviewStatus.APPROVED);
+        Query query = new Query(Criteria.where("status")
+                .in(ProjectStatus.PUBLISHED, ProjectStatus.UNLISTED, ProjectStatus.ARCHIVED)
+                .and("deletedAt").is(null).and("versions").elemMatch(publicVersion));
+        query.fields().include("status").elemMatch("versions", publicVersion);
         Project project = mongoTemplate.findOne(query, Project.class);
-        return project != null && !project.getVersions().isEmpty() ? Optional.of(project.getVersions().get(0)) : Optional.empty();
+        if (project == null || project.getVersions() == null || project.getVersions().isEmpty()) return Optional.empty();
+        ProjectVersion version = project.getVersions().getFirst();
+        return (project.getStatus() == ProjectStatus.PUBLISHED || project.getStatus() == ProjectStatus.UNLISTED
+                || project.getStatus() == ProjectStatus.ARCHIVED)
+                && version.getReviewStatus() == ProjectVersion.ReviewStatus.APPROVED && hash.equals(version.getHash())
+                ? Optional.of(version) : Optional.empty();
     }
 
     public void updateVersion(
@@ -119,6 +132,8 @@ public class VersionService {
         Project project = projectAccessService.requireVersionPermission(id, user, "VERSION_DELETE",
                 "You do not have permission to delete this version.");
         projectMutationGuard.ensureEditable(project);
+        var snapshot = reviewPersistence.capture(project.getId(), ProjectReviewSnapshot.token(project));
+        project = snapshot.project();
         if (project.getStatus() != ProjectStatus.DRAFT
                 && project.getStatus() != ProjectStatus.PRIVATE
                 && project.getVersions().size() <= 1) {
@@ -127,10 +142,22 @@ public class VersionService {
 
         ProjectVersion version = projectVersionAccessService.requireById(project, versionId,
                 () -> new VersionNotFoundException("We couldn't find that project version."));
-        projectDeletionService.deleteVersionFile(version);
+        if (retainedMutations != null) {
+            var outcome=retainedMutations.removeVersion(snapshot.raw(),versionId);
+            if (!"APPLIED".equals(outcome.state())) throw ProjectReviewSnapshot.conflict();
+            project.getVersions().removeIf(existing -> existing.getId().equals(versionId));
+            projectService.evictProjectCache(project);
+            // Historical artifact references remain retained; visible deletion does not authorize storage cleanup.
+            return;
+        }
+        if (version.getRetainedRemoteReview()!=null || version.getVersionMutation()!=null || version.getReviewReplacement()!=null
+                || version.getReviewIsolation()!=null || version.getReplacementSecurityHold()!=null
+                || version.getScanResult()!=null && version.getScanResult().getRemoteReview()!=null)
+            throw new net.modtale.exception.InvalidVersionRequestException("Retained review history must be available before removing this version.");
         project.getVersions().removeIf(existing -> existing.getId().equals(versionId));
-        projectRepository.save(project);
+        if (!reviewPersistence.applyVersionList(snapshot)) throw ProjectReviewSnapshot.conflict();
         projectService.evictProjectCache(project);
+        projectDeletionService.deleteVersionFile(version);
     }
 
 }

@@ -1,12 +1,16 @@
 package net.modtale.service.project.version;
 
+import java.io.IOException;
+import java.security.MessageDigest;
 import java.time.Instant;
+import java.util.HexFormat;
 import java.util.List;
 import net.modtale.config.properties.AppFrontendProperties;
 import net.modtale.exception.InvalidDownloadTokenException;
 import net.modtale.exception.InvalidVersionRequestException;
 import net.modtale.exception.ResourceNotFoundException;
 import net.modtale.exception.UnauthorizedException;
+import net.modtale.exception.VersionNotFoundException;
 import net.modtale.model.dto.response.project.BundleDownloadUrlResponse;
 import net.modtale.model.dto.response.project.DownloadUrlResponse;
 import net.modtale.model.project.Project;
@@ -76,6 +80,7 @@ class VersionDownloadOrchestrationServiceTest {
         user.setId("user-1");
         Project project = project("project-1", "Sky Tools", ProjectClassification.PLUGIN);
         ProjectVersion version = version("version-1", "1.0.0", "files/mod.jar");
+        project.setVersions(List.of(version));
 
         when(projectService.getProjectById("project-1", user)).thenReturn(project);
         when(projectVersionAccessService.requireByVersionNumber(org.mockito.Mockito.eq(project), org.mockito.Mockito.eq("1.0.0"), org.mockito.Mockito.eq("1.21.0"), org.mockito.Mockito.any()))
@@ -107,6 +112,7 @@ class VersionDownloadOrchestrationServiceTest {
         user.setId("user-1");
         Project pack = project("pack-1", "Sky Pack", ProjectClassification.MODPACK);
         ProjectVersion version = version("version-1", "1.0.0", "modpacks/pack.zip");
+        pack.setVersions(List.of(version));
         version.setDependencies(List.of(ProjectDependency.curseForge(
                 "1450386", "Simple Compost", "1.0.0",
                 "https://www.curseforge.com/hytale/mods/simple-compost",
@@ -138,6 +144,7 @@ class VersionDownloadOrchestrationServiceTest {
         user.setId("user-1");
         Project pack = project("pack-1", "Sky Pack", ProjectClassification.PLUGIN);
         ProjectVersion version = version("version-1", "1.0.0", "modpacks/pack.zip");
+        pack.setVersions(List.of(version));
         version.setDependencies(List.of(ProjectDependency.curseForge(
                 "1450386", "Simple Compost", "1.0.0",
                 "https://www.curseforge.com/hytale/mods/simple-compost",
@@ -189,6 +196,7 @@ class VersionDownloadOrchestrationServiceTest {
         User user = new User();
         Project pack = project("pack-1", "Sky Pack", ProjectClassification.MODPACK);
         ProjectVersion version = version("version-1", "1.0.0", "modpacks/pack.zip");
+        pack.setVersions(List.of(version));
         version.setDependencies(List.of(ProjectDependency.curseForge(
                 "1450386", "Simple Compost", "1.0.0",
                 "https://www.curseforge.com/hytale/mods/simple-compost",
@@ -221,6 +229,7 @@ class VersionDownloadOrchestrationServiceTest {
         User user = new User();
         Project project = project("project-1", "Sky Tools", ProjectClassification.PLUGIN);
         ProjectVersion version = version("version-1", "1.0.0", "files/123456789012345678901234567890123456-sky-tools.jar");
+        project.setVersions(List.of(version));
         DownloadTokenService.DownloadToken token = token("project-1", "1.0.0", "1.21.0", null);
 
         when(downloadTokenService.validateAndConsume("token")).thenReturn(token);
@@ -229,7 +238,9 @@ class VersionDownloadOrchestrationServiceTest {
         when(projectVersionAccessService.requireByVersionNumber(org.mockito.Mockito.eq(project), org.mockito.Mockito.eq("1.0.0"), org.mockito.Mockito.eq("1.21.0"), org.mockito.Mockito.any()))
                 .thenReturn(version);
         when(analyticsEligibilityService.shouldCountProjectEngagement(project, user)).thenReturn(true);
-        when(storageService.download(version.getFileUrl())).thenReturn(new byte[]{1, 2, 3});
+        version.setHash(sha256(new byte[]{1, 2, 3}));
+        when(storageService.downloadBounded(version.getFileUrl(), StorageService.MAX_REVIEW_ARTIFACT_BYTES))
+                .thenReturn(new byte[]{1, 2, 3});
 
         VersionDownloadPayload payload = service.downloadVersion(
                 "token",
@@ -245,12 +256,32 @@ class VersionDownloadOrchestrationServiceTest {
         verify(trackingService).logDownload("project-1", "version-1", "author-name", false, "203.0.113.1", false);
     }
 
+    @Test
+    void changedStorageBytesCannotBeDeliveredOrCounted() throws Exception {
+        User user = new User();
+        Project project = project("project-1", "Sky Tools", ProjectClassification.PLUGIN);
+        ProjectVersion version = version("version-1", "1.0.0", "files/mod.jar");
+        project.setVersions(List.of(version));
+        version.setHash(sha256(new byte[]{1, 2, 3}));
+        when(downloadTokenService.validateAndConsume("token")).thenReturn(token("project-1", "1.0.0", null, null));
+        when(projectService.getRawProjectById("project-1")).thenReturn(project);
+        when(accessControlService.canReadProject(project, user)).thenReturn(true);
+        when(projectVersionAccessService.requireByVersionNumber(org.mockito.Mockito.eq(project), org.mockito.Mockito.eq("1.0.0"),
+                org.mockito.Mockito.isNull(), org.mockito.Mockito.any())).thenReturn(version);
+        when(storageService.downloadBounded(version.getFileUrl(), StorageService.MAX_REVIEW_ARTIFACT_BYTES))
+                .thenReturn(new byte[]{4, 5, 6});
+
+        assertThrows(IOException.class, () -> service.downloadVersion("token", false, null, null, null, user));
+        org.mockito.Mockito.verifyNoInteractions(trackingService);
+    }
+
     @ParameterizedTest
     @ValueSource(booleans = {false, true})
     void downloadVersionGeneratesModpackZipAndTracksDependencies(boolean launcher) throws Exception {
         User user = new User();
         Project pack = project("pack-1", "Sky Pack!", ProjectClassification.MODPACK);
         ProjectVersion version = version("version-1", "1.0.0", "modpacks/pack.zip");
+        pack.setVersions(List.of(version));
         version.setDependencies(List.of(new ProjectDependency("dep-1", "Dependency", "2.0.0")));
         Project dependencyProject = project("dep-1", "Dependency", ProjectClassification.PLUGIN);
 
@@ -278,6 +309,7 @@ class VersionDownloadOrchestrationServiceTest {
         User user = new User();
         Project project = project("project-1", "Sky Tools", ProjectClassification.PLUGIN);
         ProjectVersion version = version("version-1", "1.0.0", "files/mod.jar");
+        project.setVersions(List.of(version));
         version.setDependencies(List.of(
                 new ProjectDependency("dep-1", "Dependency One", "1.0.0"),
                 new ProjectDependency("dep-2", "Dependency Two", "1.0.0"),
@@ -338,6 +370,25 @@ class VersionDownloadOrchestrationServiceTest {
         assertThrows(UnauthorizedException.class, () -> service.downloadVersion("token", false, null, null, null, user));
     }
 
+    @Test
+    void withdrawnVersionCannotIssueOrRedeemAnExistingDownloadToken() throws Exception {
+        Project project = project("project-1", "Sky Tools", ProjectClassification.PLUGIN);
+        ProjectVersion version = version("version-1", "1.0.0", "files/mod.jar");
+        project.setVersions(List.of(version));
+        version.setReviewStatus(ProjectVersion.ReviewStatus.PENDING);
+        when(projectService.getProjectById("project-1", null)).thenReturn(project);
+        when(projectService.getRawProjectById("project-1")).thenReturn(project);
+        when(accessControlService.canReadProject(project, null)).thenReturn(true);
+        when(projectVersionAccessService.requireByVersionNumber(org.mockito.Mockito.eq(project), org.mockito.Mockito.eq("1.0.0"),
+                org.mockito.Mockito.isNull(), org.mockito.Mockito.any())).thenReturn(version);
+        when(downloadTokenService.validateAndConsume("old-token")).thenReturn(token("project-1", "1.0.0", null, null));
+
+        assertThrows(VersionNotFoundException.class, () -> service.createDownloadUrl("project-1", "1.0.0", null, null));
+        assertThrows(VersionNotFoundException.class, () -> service.downloadVersion("old-token", false, null, null, null, null));
+        assertThrows(VersionNotFoundException.class, () -> service.downloadBundle("old-token", false, null, null, null, null));
+        verify(storageService, never()).download("files/mod.jar");
+    }
+
     private static DownloadTokenService.DownloadToken token(
             String projectId,
             String version,
@@ -367,6 +418,11 @@ class VersionDownloadOrchestrationServiceTest {
         version.setId(id);
         version.setVersionNumber(versionNumber);
         version.setFileUrl(fileUrl);
+        version.setReviewStatus(ProjectVersion.ReviewStatus.APPROVED);
         return version;
+    }
+
+    private static String sha256(byte[] bytes) throws Exception {
+        return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));
     }
 }

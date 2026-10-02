@@ -1,0 +1,8 @@
+// Keep large persisted fixtures isolated from other suites' retained test state.
+allprojects {
+    tasks.withType(Test).configureEach {
+        maxHeapSize = '2g'
+        maxParallelForks = 1
+        forkEvery = 1
+    }
+}
