@@ -9,6 +9,9 @@ from urllib.parse import urlsplit
 
 
 def read_secret(name):
+    if os.environ.get('MODTALE_SECRET_BUNDLES_ENABLED', 'false') == 'true':
+        from secret_bundle_ci import read_bundle_value
+        return read_bundle_value('branch-preview', os.environ['MODTALE_SECRET_BUNDLE_VERSION'], name)
     return subprocess.check_output([
         'gcloud', 'secrets', 'versions', 'access', 'latest',
         '--project', os.environ['PROJECT_ID'], '--secret', name,
@@ -46,6 +49,12 @@ def main():
     target_bucket = os.environ['R2_BUCKET_NAME']
     if source_bucket == target_bucket or source_bucket == 'modtale-binaries' or not target_bucket.startswith('modtale-branch-'):
         raise ValueError('Fixture sync requires a sanitized source and an isolated branch target')
+    lifecycle = lambda: None
+    if os.environ.get('MODTALE_SECRET_BUNDLES_ENABLED', 'false') == 'true':
+        from secret_bundle_ci import BundleCI
+        from secret_bundle_transport import create_transport
+        lifecycle = BundleCI(create_transport()).lifecycle
+        lifecycle()
     source = credentials('SEEDING_SOURCE_R2_')
     target = credentials('R2_')
     missing = missing_keys(keys(source, source_bucket), keys(target, target_bucket))
@@ -61,6 +70,7 @@ def main():
                     '--cache-control', metadata.get('CacheControl', 'public, max-age=31536000, immutable')]
             if metadata.get('ContentDisposition'):
                 args += ['--content-disposition', metadata['ContentDisposition']]
+            lifecycle()
             aws(target, *args)
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:

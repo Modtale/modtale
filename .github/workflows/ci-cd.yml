@@ -23,12 +23,16 @@ on:
 env:
   PROJECT_ID: gen-lang-client-0244308719
   REGION: us-central1
+  MODTALE_SECRET_BUNDLE_LOCK_GROUP: modtale-secret-bundle-mutations-v1
+  GH_TOKEN: ${{ github.token }}
+  GITHUB_TOKEN: ${{ github.token }}
 
 jobs:
   deploy:
     concurrency:
-      group: modtale-deploy-${{ github.ref }}
+      group: modtale-secret-bundle-mutations-v1
       cancel-in-progress: false
+      queue: max
     if: github.repository == 'Modtale/modtale' && github.event_name == 'push' && github.event.deleted != true
     runs-on: ubuntu-latest
     environment: ${{ github.ref_name == 'main' && 'production' || github.ref_name == 'develop' && 'develop' || 'branch-preview' }}
@@ -54,6 +58,22 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      - name: Resolve environment-specific bundle settings
+        env:
+          BUNDLE_SETTINGS_ENVIRONMENT: ${{ github.ref_name == 'main' && 'production' || github.ref_name == 'develop' && 'develop' || 'branch-preview' }}
+          BUNDLE_SETTINGS_PRODUCTION_ENABLED: ${{ vars.MODTALE_PRODUCTION_SECRET_BUNDLES_ENABLED }}
+          BUNDLE_SETTINGS_PRODUCTION_VERSION: ${{ vars.MODTALE_PRODUCTION_SECRET_BUNDLE_VERSION }}
+          BUNDLE_SETTINGS_PRODUCTION_NEW_SERVICE_APPROVED: ${{ vars.MODTALE_PRODUCTION_NEW_SERVICE_APPROVED }}
+          BUNDLE_SETTINGS_PRODUCTION_CREDENTIAL_PROVISION_APPROVED: ${{ vars.MODTALE_PRODUCTION_CREDENTIAL_PROVISION_APPROVED }}
+          BUNDLE_SETTINGS_DEVELOP_ENABLED: ${{ vars.MODTALE_DEVELOP_SECRET_BUNDLES_ENABLED }}
+          BUNDLE_SETTINGS_DEVELOP_VERSION: ${{ vars.MODTALE_DEVELOP_SECRET_BUNDLE_VERSION }}
+          BUNDLE_SETTINGS_DEVELOP_NEW_SERVICE_APPROVED: ${{ vars.MODTALE_DEVELOP_NEW_SERVICE_APPROVED }}
+          BUNDLE_SETTINGS_DEVELOP_CREDENTIAL_PROVISION_APPROVED: ${{ vars.MODTALE_DEVELOP_CREDENTIAL_PROVISION_APPROVED }}
+          BUNDLE_SETTINGS_BRANCH_PREVIEW_ENABLED: ${{ vars.MODTALE_BRANCH_PREVIEW_SECRET_BUNDLES_ENABLED }}
+          BUNDLE_SETTINGS_BRANCH_PREVIEW_NEW_SERVICE_APPROVED: ${{ vars.MODTALE_BRANCH_PREVIEW_NEW_SERVICE_APPROVED }}
+          BUNDLE_SETTINGS_BRANCH_PREVIEW_CREDENTIAL_PROVISION_APPROVED: ${{ vars.MODTALE_BRANCH_PREVIEW_CREDENTIAL_PROVISION_APPROVED }}
+        run: python3 .github/scripts/secret_bundle_ci.py resolve-settings
 
       - name: Resolve last successful deployment
         id: previous_deploy
@@ -206,8 +226,17 @@ jobs:
         with:
           install_components: 'beta'
 
+      - name: Guard existing backend secret mode
+        run: python3 .github/scripts/secret_bundle_ci.py validate-mode
+
+      - name: Prepare pinned bundle configuration
+        if: env.MODTALE_SECRET_BUNDLES_ENABLED == 'true'
+        run: |
+          command -v aws >/dev/null || { sudo apt-get update && sudo apt-get install -y awscli; }
+          python3 .github/scripts/secret_bundle_ci.py prepare
+
       - name: Ensure Branch R2 Bucket
-        if: env.ENV_TYPE == 'preview'
+        if: env.ENV_TYPE == 'preview' && env.MODTALE_SECRET_BUNDLES_ENABLED != 'true'
         run: |
           set -euo pipefail
 
@@ -457,7 +486,7 @@ jobs:
           : "${RUNTIME_SERVICE_ACCOUNT:?Set the GitHub environment runtime service account variable for this environment.}"
 
           WARDEN_URL_VALUE=""
-          if [ "${{ env.ENV_TYPE }}" = "prod" ] || [ "${{ env.ENV_TYPE }}" = "dev" ]; then
+          if [ "$MODTALE_SECRET_BUNDLES_ENABLED" != "true" ] && { [ "${{ env.ENV_TYPE }}" = "prod" ] || [ "${{ env.ENV_TYPE }}" = "dev" ]; }; then
             WARDEN_URL_VALUE="$(
               gcloud secrets versions access latest \
                 --project "$PROJECT_ID" \
@@ -506,10 +535,18 @@ jobs:
           R2_SECRET_KEY_SECRET_VERSION="${R2_SECRET_KEY_SECRET_VERSION:-latest}"
           R2_ENDPOINT_SECRET_VERSION="${R2_ENDPOINT_SECRET_VERSION:-latest}"
 
-          ARGS+=("--update-secrets" "MONGODB_URI=${{ env.MONGODB_SECRET_NAME }}:latest")
-          ARGS+=("--update-secrets" "R2_ACCESS_KEY=${{ env.R2_ACCESS_KEY_SECRET_NAME }}:$R2_ACCESS_KEY_SECRET_VERSION")
-          ARGS+=("--update-secrets" "R2_SECRET_KEY=${{ env.R2_SECRET_KEY_SECRET_NAME }}:$R2_SECRET_KEY_SECRET_VERSION")
-          ARGS+=("--update-secrets" "R2_ENDPOINT=${{ env.R2_ENDPOINT_SECRET_NAME }}:$R2_ENDPOINT_SECRET_VERSION")
+          if [ "$MODTALE_SECRET_BUNDLES_ENABLED" != "true" ]; then
+            ARGS+=("--update-secrets" "MONGODB_URI=${{ env.MONGODB_SECRET_NAME }}:latest")
+          fi
+          if [ "$MODTALE_SECRET_BUNDLES_ENABLED" != "true" ]; then
+            ARGS+=("--update-secrets" "R2_ACCESS_KEY=${{ env.R2_ACCESS_KEY_SECRET_NAME }}:$R2_ACCESS_KEY_SECRET_VERSION")
+          fi
+          if [ "$MODTALE_SECRET_BUNDLES_ENABLED" != "true" ]; then
+            ARGS+=("--update-secrets" "R2_SECRET_KEY=${{ env.R2_SECRET_KEY_SECRET_NAME }}:$R2_SECRET_KEY_SECRET_VERSION")
+          fi
+          if [ "$MODTALE_SECRET_BUNDLES_ENABLED" != "true" ]; then
+            ARGS+=("--update-secrets" "R2_ENDPOINT=${{ env.R2_ENDPOINT_SECRET_NAME }}:$R2_ENDPOINT_SECRET_VERSION")
+          fi
 
           if [ "${{ env.ENV_TYPE }}" = "prod" ]; then
             # Keep one production instance warm to prevent user-facing cold starts.
@@ -518,28 +555,72 @@ jobs:
             ARGS+=("--min-instances" "1")
             ARGS+=("--max-instances" "10")
             ARGS+=("--cpu-throttling")
-            ARGS+=("--update-env-vars" "WARDEN_URL=$WARDEN_URL_VALUE")
-            ARGS+=("--update-secrets" "SMTP_HOST=SMTP_HOST:latest")
-            ARGS+=("--update-secrets" "SMTP_USERNAME=SMTP_USERNAME:latest")
-            ARGS+=("--update-secrets" "SMTP_PASSWORD=SMTP_PASSWORD:latest")
-            ARGS+=("--update-secrets" "PRE_AUTH_SECRET=PRE_AUTH_SECRET:latest")
-            ARGS+=("--update-secrets" "GITHUB_CLIENT_ID=GITHUB_CLIENT_ID:latest")
-            ARGS+=("--update-secrets" "GITHUB_CLIENT_SECRET=GITHUB_CLIENT_SECRET:latest")
-            ARGS+=("--update-secrets" "GOOGLE_CLIENT_ID=GOOGLE_CLIENT_ID:latest")
-            ARGS+=("--update-secrets" "GOOGLE_CLIENT_SECRET=GOOGLE_CLIENT_SECRET:latest")
-            ARGS+=("--update-secrets" "GITLAB_CLIENT_ID=GITLAB_CLIENT_ID:latest")
-            ARGS+=("--update-secrets" "GITLAB_CLIENT_SECRET=GITLAB_CLIENT_SECRET:latest")
-            ARGS+=("--update-secrets" "DISCORD_CLIENT_ID=DISCORD_CLIENT_ID:latest")
-            ARGS+=("--update-secrets" "DISCORD_CLIENT_SECRET=DISCORD_CLIENT_SECRET:latest")
-            ARGS+=("--update-secrets" "TWITTER_CLIENT_ID=TWITTER_CLIENT_ID:latest")
-            ARGS+=("--update-secrets" "TWITTER_CLIENT_SECRET=TWITTER_CLIENT_SECRET:latest")
-            ARGS+=("--update-secrets" "BLUESKY_CLIENT_ID=BLUESKY_CLIENT_ID:latest")
-            ARGS+=("--update-secrets" "WARDEN_API_KEY=${{ env.WARDEN_SECRET_NAME }}:latest")
-            ARGS+=("--update-secrets" "WEBHOOK_URL=WEBHOOK_URL:latest")
-            ARGS+=("--update-secrets" "HYTALEMODDING_KEY=HYTALEMODDING_KEY:latest")
-            ARGS+=("--update-secrets" "WIKI_API_KEY=WIKI_API_KEY:latest")
-            ARGS+=("--update-secrets" "DISCORD_WEBHOOK_URL=DISCORD_WEBHOOK_URL:latest")
-            ARGS+=("--update-secrets" "ADMIN_DISCORD_WEBHOOK_URL=ADMIN_DISCORD_WEBHOOK_URL:latest")
+            if [ "$MODTALE_SECRET_BUNDLES_ENABLED" != "true" ]; then
+              ARGS+=("--update-env-vars" "WARDEN_URL=$WARDEN_URL_VALUE")
+            fi
+            if [ "$MODTALE_SECRET_BUNDLES_ENABLED" != "true" ]; then
+              ARGS+=("--update-secrets" "SMTP_HOST=SMTP_HOST:latest")
+            fi
+            if [ "$MODTALE_SECRET_BUNDLES_ENABLED" != "true" ]; then
+              ARGS+=("--update-secrets" "SMTP_USERNAME=SMTP_USERNAME:latest")
+            fi
+            if [ "$MODTALE_SECRET_BUNDLES_ENABLED" != "true" ]; then
+              ARGS+=("--update-secrets" "SMTP_PASSWORD=SMTP_PASSWORD:latest")
+            fi
+            if [ "$MODTALE_SECRET_BUNDLES_ENABLED" != "true" ]; then
+              ARGS+=("--update-secrets" "PRE_AUTH_SECRET=PRE_AUTH_SECRET:latest")
+            fi
+            if [ "$MODTALE_SECRET_BUNDLES_ENABLED" != "true" ]; then
+              ARGS+=("--update-secrets" "GITHUB_CLIENT_ID=GITHUB_CLIENT_ID:latest")
+            fi
+            if [ "$MODTALE_SECRET_BUNDLES_ENABLED" != "true" ]; then
+              ARGS+=("--update-secrets" "GITHUB_CLIENT_SECRET=GITHUB_CLIENT_SECRET:latest")
+            fi
+            if [ "$MODTALE_SECRET_BUNDLES_ENABLED" != "true" ]; then
+              ARGS+=("--update-secrets" "GOOGLE_CLIENT_ID=GOOGLE_CLIENT_ID:latest")
+            fi
+            if [ "$MODTALE_SECRET_BUNDLES_ENABLED" != "true" ]; then
+              ARGS+=("--update-secrets" "GOOGLE_CLIENT_SECRET=GOOGLE_CLIENT_SECRET:latest")
+            fi
+            if [ "$MODTALE_SECRET_BUNDLES_ENABLED" != "true" ]; then
+              ARGS+=("--update-secrets" "GITLAB_CLIENT_ID=GITLAB_CLIENT_ID:latest")
+            fi
+            if [ "$MODTALE_SECRET_BUNDLES_ENABLED" != "true" ]; then
+              ARGS+=("--update-secrets" "GITLAB_CLIENT_SECRET=GITLAB_CLIENT_SECRET:latest")
+            fi
+            if [ "$MODTALE_SECRET_BUNDLES_ENABLED" != "true" ]; then
+              ARGS+=("--update-secrets" "DISCORD_CLIENT_ID=DISCORD_CLIENT_ID:latest")
+            fi
+            if [ "$MODTALE_SECRET_BUNDLES_ENABLED" != "true" ]; then
+              ARGS+=("--update-secrets" "DISCORD_CLIENT_SECRET=DISCORD_CLIENT_SECRET:latest")
+            fi
+            if [ "$MODTALE_SECRET_BUNDLES_ENABLED" != "true" ]; then
+              ARGS+=("--update-secrets" "TWITTER_CLIENT_ID=TWITTER_CLIENT_ID:latest")
+            fi
+            if [ "$MODTALE_SECRET_BUNDLES_ENABLED" != "true" ]; then
+              ARGS+=("--update-secrets" "TWITTER_CLIENT_SECRET=TWITTER_CLIENT_SECRET:latest")
+            fi
+            if [ "$MODTALE_SECRET_BUNDLES_ENABLED" != "true" ]; then
+              ARGS+=("--update-secrets" "BLUESKY_CLIENT_ID=BLUESKY_CLIENT_ID:latest")
+            fi
+            if [ "$MODTALE_SECRET_BUNDLES_ENABLED" != "true" ]; then
+              ARGS+=("--update-secrets" "WARDEN_API_KEY=${{ env.WARDEN_SECRET_NAME }}:latest")
+            fi
+            if [ "$MODTALE_SECRET_BUNDLES_ENABLED" != "true" ]; then
+              ARGS+=("--update-secrets" "WEBHOOK_URL=WEBHOOK_URL:latest")
+            fi
+            if [ "$MODTALE_SECRET_BUNDLES_ENABLED" != "true" ]; then
+              ARGS+=("--update-secrets" "HYTALEMODDING_KEY=HYTALEMODDING_KEY:latest")
+            fi
+            if [ "$MODTALE_SECRET_BUNDLES_ENABLED" != "true" ]; then
+              ARGS+=("--update-secrets" "WIKI_API_KEY=WIKI_API_KEY:latest")
+            fi
+            if [ "$MODTALE_SECRET_BUNDLES_ENABLED" != "true" ]; then
+              ARGS+=("--update-secrets" "DISCORD_WEBHOOK_URL=DISCORD_WEBHOOK_URL:latest")
+            fi
+            if [ "$MODTALE_SECRET_BUNDLES_ENABLED" != "true" ]; then
+              ARGS+=("--update-secrets" "ADMIN_DISCORD_WEBHOOK_URL=ADMIN_DISCORD_WEBHOOK_URL:latest")
+            fi
             # Status monitoring has been retired.
             ARGS+=("--remove-secrets" "STATUS_DISCORD_WEBHOOK_URL")
           elif [ "${{ env.ENV_TYPE }}" = "dev" ]; then
@@ -548,24 +629,60 @@ jobs:
             ARGS+=("--min-instances" "0")
             ARGS+=("--max-instances" "3")
             ARGS+=("--cpu-throttling")
-            ARGS+=("--update-env-vars" "WARDEN_URL=$WARDEN_URL_VALUE")
-            ARGS+=("--update-secrets" "SMTP_HOST=SMTP_HOST:latest")
-            ARGS+=("--update-secrets" "SMTP_USERNAME=SMTP_USERNAME:latest")
-            ARGS+=("--update-secrets" "SMTP_PASSWORD=SMTP_PASSWORD:latest")
-            ARGS+=("--update-secrets" "PRE_AUTH_SECRET=PRE_AUTH_SECRET:latest")
-            ARGS+=("--update-secrets" "GITHUB_CLIENT_ID=GITHUB_CLIENT_ID:latest")
-            ARGS+=("--update-secrets" "GITHUB_CLIENT_SECRET=GITHUB_CLIENT_SECRET:latest")
-            ARGS+=("--update-secrets" "GOOGLE_CLIENT_ID=GOOGLE_CLIENT_ID:latest")
-            ARGS+=("--update-secrets" "GOOGLE_CLIENT_SECRET=GOOGLE_CLIENT_SECRET:latest")
-            ARGS+=("--update-secrets" "GITLAB_CLIENT_ID=GITLAB_CLIENT_ID:latest")
-            ARGS+=("--update-secrets" "GITLAB_CLIENT_SECRET=GITLAB_CLIENT_SECRET:latest")
-            ARGS+=("--update-secrets" "DISCORD_CLIENT_ID=DISCORD_CLIENT_ID:latest")
-            ARGS+=("--update-secrets" "DISCORD_CLIENT_SECRET=DISCORD_CLIENT_SECRET:latest")
-            ARGS+=("--update-secrets" "TWITTER_CLIENT_ID=TWITTER_CLIENT_ID:latest")
-            ARGS+=("--update-secrets" "TWITTER_CLIENT_SECRET=TWITTER_CLIENT_SECRET:latest")
-            ARGS+=("--update-secrets" "BLUESKY_CLIENT_ID=BLUESKY_CLIENT_ID:latest")
-            ARGS+=("--update-secrets" "WARDEN_API_KEY=${{ env.WARDEN_SECRET_NAME }}:latest")
-            ARGS+=("--update-secrets" "WIKI_API_KEY=WIKI_API_KEY:latest")
+            if [ "$MODTALE_SECRET_BUNDLES_ENABLED" != "true" ]; then
+              ARGS+=("--update-env-vars" "WARDEN_URL=$WARDEN_URL_VALUE")
+            fi
+            if [ "$MODTALE_SECRET_BUNDLES_ENABLED" != "true" ]; then
+              ARGS+=("--update-secrets" "SMTP_HOST=SMTP_HOST:latest")
+            fi
+            if [ "$MODTALE_SECRET_BUNDLES_ENABLED" != "true" ]; then
+              ARGS+=("--update-secrets" "SMTP_USERNAME=SMTP_USERNAME:latest")
+            fi
+            if [ "$MODTALE_SECRET_BUNDLES_ENABLED" != "true" ]; then
+              ARGS+=("--update-secrets" "SMTP_PASSWORD=SMTP_PASSWORD:latest")
+            fi
+            if [ "$MODTALE_SECRET_BUNDLES_ENABLED" != "true" ]; then
+              ARGS+=("--update-secrets" "PRE_AUTH_SECRET=PRE_AUTH_SECRET:latest")
+            fi
+            if [ "$MODTALE_SECRET_BUNDLES_ENABLED" != "true" ]; then
+              ARGS+=("--update-secrets" "GITHUB_CLIENT_ID=GITHUB_CLIENT_ID:latest")
+            fi
+            if [ "$MODTALE_SECRET_BUNDLES_ENABLED" != "true" ]; then
+              ARGS+=("--update-secrets" "GITHUB_CLIENT_SECRET=GITHUB_CLIENT_SECRET:latest")
+            fi
+            if [ "$MODTALE_SECRET_BUNDLES_ENABLED" != "true" ]; then
+              ARGS+=("--update-secrets" "GOOGLE_CLIENT_ID=GOOGLE_CLIENT_ID:latest")
+            fi
+            if [ "$MODTALE_SECRET_BUNDLES_ENABLED" != "true" ]; then
+              ARGS+=("--update-secrets" "GOOGLE_CLIENT_SECRET=GOOGLE_CLIENT_SECRET:latest")
+            fi
+            if [ "$MODTALE_SECRET_BUNDLES_ENABLED" != "true" ]; then
+              ARGS+=("--update-secrets" "GITLAB_CLIENT_ID=GITLAB_CLIENT_ID:latest")
+            fi
+            if [ "$MODTALE_SECRET_BUNDLES_ENABLED" != "true" ]; then
+              ARGS+=("--update-secrets" "GITLAB_CLIENT_SECRET=GITLAB_CLIENT_SECRET:latest")
+            fi
+            if [ "$MODTALE_SECRET_BUNDLES_ENABLED" != "true" ]; then
+              ARGS+=("--update-secrets" "DISCORD_CLIENT_ID=DISCORD_CLIENT_ID:latest")
+            fi
+            if [ "$MODTALE_SECRET_BUNDLES_ENABLED" != "true" ]; then
+              ARGS+=("--update-secrets" "DISCORD_CLIENT_SECRET=DISCORD_CLIENT_SECRET:latest")
+            fi
+            if [ "$MODTALE_SECRET_BUNDLES_ENABLED" != "true" ]; then
+              ARGS+=("--update-secrets" "TWITTER_CLIENT_ID=TWITTER_CLIENT_ID:latest")
+            fi
+            if [ "$MODTALE_SECRET_BUNDLES_ENABLED" != "true" ]; then
+              ARGS+=("--update-secrets" "TWITTER_CLIENT_SECRET=TWITTER_CLIENT_SECRET:latest")
+            fi
+            if [ "$MODTALE_SECRET_BUNDLES_ENABLED" != "true" ]; then
+              ARGS+=("--update-secrets" "BLUESKY_CLIENT_ID=BLUESKY_CLIENT_ID:latest")
+            fi
+            if [ "$MODTALE_SECRET_BUNDLES_ENABLED" != "true" ]; then
+              ARGS+=("--update-secrets" "WARDEN_API_KEY=${{ env.WARDEN_SECRET_NAME }}:latest")
+            fi
+            if [ "$MODTALE_SECRET_BUNDLES_ENABLED" != "true" ]; then
+              ARGS+=("--update-secrets" "WIKI_API_KEY=WIKI_API_KEY:latest")
+            fi
             ARGS+=("--remove-secrets" "STATUS_DISCORD_WEBHOOK_URL")
           else
             : "${RUNTIME_SERVICE_ACCOUNT:?Set environment variable GCP_BRANCH_PREVIEW_RUNTIME_SERVICE_ACCOUNT in the branch-preview GitHub environment.}"
@@ -583,16 +700,26 @@ jobs:
             ARGS+=("--update-env-vars" "LOGGING_STRUCTURED_JSON_ADD_ENVIRONMENT=branch-preview")
             ARGS+=("--update-env-vars" "LOGGING_STRUCTURED_JSON_ADD_BRANCH=${{ env.BRANCH_SLUG }}")
             ARGS+=("--labels" "app=modtale,environment=branch-preview,component=backend,branch=${{ env.BRANCH_SLUG }},commit-sha=$GITHUB_SHA")
-            ARGS+=("--update-secrets" "APP_SEEDING_SOURCE_R2_ACCESS_KEY=${{ env.SEEDING_SOURCE_R2_ACCESS_KEY_SECRET_NAME }}:latest")
-            ARGS+=("--update-secrets" "APP_SEEDING_SOURCE_R2_SECRET_KEY=${{ env.SEEDING_SOURCE_R2_SECRET_KEY_SECRET_NAME }}:latest")
-            ARGS+=("--update-secrets" "APP_SEEDING_SOURCE_R2_ENDPOINT=${{ env.SEEDING_SOURCE_R2_ENDPOINT_SECRET_NAME }}:latest")
+            if [ "$MODTALE_SECRET_BUNDLES_ENABLED" != "true" ]; then
+              ARGS+=("--update-secrets" "APP_SEEDING_SOURCE_R2_ACCESS_KEY=${{ env.SEEDING_SOURCE_R2_ACCESS_KEY_SECRET_NAME }}:latest")
+            fi
+            if [ "$MODTALE_SECRET_BUNDLES_ENABLED" != "true" ]; then
+              ARGS+=("--update-secrets" "APP_SEEDING_SOURCE_R2_SECRET_KEY=${{ env.SEEDING_SOURCE_R2_SECRET_KEY_SECRET_NAME }}:latest")
+            fi
+            if [ "$MODTALE_SECRET_BUNDLES_ENABLED" != "true" ]; then
+              ARGS+=("--update-secrets" "APP_SEEDING_SOURCE_R2_ENDPOINT=${{ env.SEEDING_SOURCE_R2_ENDPOINT_SECRET_NAME }}:latest")
+            fi
             ARGS+=("--remove-env-vars" "SMTP_HOST,SMTP_PORT,SMTP_USERNAME,SMTP_PASSWORD,PRE_AUTH_SECRET,GITHUB_CLIENT_ID,GITHUB_CLIENT_SECRET,GOOGLE_CLIENT_ID,GOOGLE_CLIENT_SECRET,GITLAB_CLIENT_ID,GITLAB_CLIENT_SECRET,DISCORD_CLIENT_ID,DISCORD_CLIENT_SECRET,TWITTER_CLIENT_ID,TWITTER_CLIENT_SECRET,BLUESKY_CLIENT_ID,BLUESKY_CLIENT_SECRET,WARDEN_URL,WARDEN_API_KEY,WIKI_API_KEY,WEBHOOK_URL,HYTALEMODDING_KEY,DISCORD_WEBHOOK_URL,ADMIN_DISCORD_WEBHOOK_URL")
             ARGS+=("--remove-secrets" "STATUS_DISCORD_WEBHOOK_URL")
           fi
 
           source ../.github/scripts/configure-public-cache-purge.sh
 
-          gcloud run deploy ${{ env.BACKEND_SERVICE }} "${ARGS[@]}" --format="value(status.url)" > backend_url.txt
+          if [ "$MODTALE_SECRET_BUNDLES_ENABLED" = "true" ]; then
+            python3 ../.github/scripts/secret_bundle_ci.py deploy -- "${ARGS[@]}" > backend_url.txt
+          else
+            gcloud run deploy ${{ env.BACKEND_SERVICE }} "${ARGS[@]}" --format="value(status.url)" > backend_url.txt
+          fi
 
           if [ "${{ env.ENV_TYPE }}" = "prod" ]; then
             BACKEND_REVISION=$(gcloud run services describe "$BACKEND_SERVICE" --region "$REGION" --format="value(status.latestReadyRevisionName)")
@@ -728,9 +855,14 @@ jobs:
             PUBLIC_BACKEND_URL=$B_URL
           fi
           
-          gcloud run services update ${{ env.BACKEND_SERVICE }} \
-            --region $REGION \
-            --update-env-vars "FRONTEND_URL=$FINAL_FRONTEND_URL,BACKEND_URL=$PUBLIC_BACKEND_URL"
+          if [ "$MODTALE_SECRET_BUNDLES_ENABLED" = "true" ]; then
+            python3 .github/scripts/secret_bundle_ci.py deploy -- \
+              --update-env-vars "FRONTEND_URL=$FINAL_FRONTEND_URL,BACKEND_URL=$PUBLIC_BACKEND_URL" >/dev/null
+          else
+            gcloud run services update ${{ env.BACKEND_SERVICE }} \
+              --region $REGION \
+              --update-env-vars "FRONTEND_URL=$FINAL_FRONTEND_URL,BACKEND_URL=$PUBLIC_BACKEND_URL"
+          fi
 
           if [ "${{ env.ENV_TYPE }}" = "prod" ]; then
             BACKEND_REVISION=$(gcloud run services describe "$BACKEND_SERVICE" --region "$REGION" --format="value(status.latestReadyRevisionName)")
@@ -763,41 +895,6 @@ jobs:
           SERVICE_URL: ${{ env.BACKEND_DOMAIN }}
           DEPLOYED_REVISION: ${{ steps.update_backend_self_awareness.outputs.revision || steps.deploy_backend.outputs.revision }}
         run: bash .github/scripts/notify-admin-deploy.sh
-
-      - name: Retain two preview R2 credential versions
-        if: env.ENV_TYPE == 'preview' && env.R2_RUNTIME_CREDENTIALS_REPLACED == 'true'
-        run: |
-          set -euo pipefail
-
-          for secret_name in \
-            "$R2_ACCESS_KEY_SECRET_NAME" \
-            "$R2_SECRET_KEY_SECRET_NAME" \
-            "$R2_ENDPOINT_SECRET_NAME" \
-            "$R2_TOKEN_ID_SECRET_NAME"; do
-            # Keep the current version plus one rollback version. Delayed
-            # destruction preserves a seven-day recovery window without letting
-            # rotated preview credentials accumulate indefinitely.
-            gcloud secrets update "$secret_name" \
-              --project "$PROJECT_ID" \
-              --version-destroy-ttl="604800s" \
-              --quiet
-
-            mapfile -t old_versions < <(
-              gcloud secrets versions list "$secret_name" \
-                --project "$PROJECT_ID" \
-                --filter='state=ENABLED' \
-                --format='value(name.basename())' \
-                | sort -rn \
-                | tail -n +3
-            )
-
-            for version in "${old_versions[@]}"; do
-              gcloud secrets versions destroy "$version" \
-                --secret "$secret_name" \
-                --project "$PROJECT_ID" \
-                --quiet
-            done
-          done
 
       - name: Generate Deployment Summary
         if: always()
@@ -1033,8 +1130,9 @@ jobs:
 
   prepare-preview-source:
     concurrency:
-      group: modtale-template-reader
+      group: modtale-secret-bundle-mutations-v1
       cancel-in-progress: false
+      queue: max
     if: github.repository == 'Modtale/modtale' && github.event_name == 'workflow_dispatch' && inputs.prepare_preview_source
     runs-on: ubuntu-latest
     environment: branch-preview
@@ -1050,6 +1148,14 @@ jobs:
       RUNTIME_SERVICE_ACCOUNT: ${{ vars.GCP_BRANCH_PREVIEW_RUNTIME_SERVICE_ACCOUNT }}
     steps:
       - uses: actions/checkout@v4
+      - name: Resolve environment-specific bundle settings
+        env:
+          BUNDLE_SETTINGS_ENVIRONMENT: branch-preview
+          BUNDLE_SETTINGS_BRANCH_PREVIEW_ENABLED: ${{ vars.MODTALE_BRANCH_PREVIEW_SECRET_BUNDLES_ENABLED }}
+          BUNDLE_SETTINGS_BRANCH_PREVIEW_NEW_SERVICE_APPROVED: ${{ vars.MODTALE_BRANCH_PREVIEW_NEW_SERVICE_APPROVED }}
+          BUNDLE_SETTINGS_BRANCH_PREVIEW_CREDENTIAL_PROVISION_APPROVED: ${{ vars.MODTALE_BRANCH_PREVIEW_CREDENTIAL_PROVISION_APPROVED }}
+        run: python3 .github/scripts/secret_bundle_ci.py resolve-settings
+
       - uses: google-github-actions/auth@v2
         with:
           credentials_json: '${{ secrets.GCP_CREDENTIALS }}'
@@ -1058,6 +1164,10 @@ jobs:
         run: |
           set -euo pipefail
           : "${RUNTIME_SERVICE_ACCOUNT:?Preview runtime service account required}"
+          if [ "$MODTALE_SECRET_BUNDLES_ENABLED" = "true" ]; then
+            python3 .github/scripts/secret_bundle_ci.py validate-source
+            exit 0
+          fi
           if gcloud secrets describe R2_TEMPLATE_READ_ACCESS_KEY --project "$PROJECT_ID" >/dev/null 2>&1; then
             echo "Template reader is already provisioned."
             exit 0
@@ -1103,8 +1213,9 @@ jobs:
 
   cleanup-branch-preview:
     concurrency:
-      group: modtale-preview-cleanup-${{ matrix.branch }}
+      group: modtale-secret-bundle-mutations-v1
       cancel-in-progress: false
+      queue: max
     name: Clean Up Deleted Branch Preview (${{ matrix.branch }})
     needs: find-orphan-previews
     if: needs.find-orphan-previews.outputs.branches != '[]'
@@ -1144,6 +1255,7 @@ jobs:
             exit 1
           fi
 
+          echo "GIT_BRANCH_NAME=$branch_name" >> "$GITHUB_ENV"
           echo "BRANCH_SLUG=$slug" >> "$GITHUB_ENV"
           echo "BACKEND_SERVICE=modtale-backend-$slug" >> "$GITHUB_ENV"
           echo "FRONTEND_SERVICE=modtale-frontend-$slug" >> "$GITHUB_ENV"
@@ -1162,6 +1274,14 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
+      - name: Resolve environment-specific bundle settings
+        env:
+          BUNDLE_SETTINGS_ENVIRONMENT: branch-preview
+          BUNDLE_SETTINGS_BRANCH_PREVIEW_ENABLED: ${{ vars.MODTALE_BRANCH_PREVIEW_SECRET_BUNDLES_ENABLED }}
+          BUNDLE_SETTINGS_BRANCH_PREVIEW_NEW_SERVICE_APPROVED: ${{ vars.MODTALE_BRANCH_PREVIEW_NEW_SERVICE_APPROVED }}
+          BUNDLE_SETTINGS_BRANCH_PREVIEW_CREDENTIAL_PROVISION_APPROVED: ${{ vars.MODTALE_BRANCH_PREVIEW_CREDENTIAL_PROVISION_APPROVED }}
+        run: python3 .github/scripts/secret_bundle_ci.py resolve-settings
+
       - id: auth
         uses: google-github-actions/auth@v2
         with:
@@ -1170,131 +1290,16 @@ jobs:
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v2
 
-      - name: Verify no live branch owns this preview
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: python3 .github/scripts/assert-preview-orphan.py "$BRANCH_SLUG"
-
-      - name: Delete branch Cloud Run services
+      - name: Clean up bundle branch preview
+        if: env.MODTALE_SECRET_BUNDLES_ENABLED == 'true'
         run: |
-          gcloud run services delete "$BACKEND_SERVICE" \
-            --project "$PROJECT_ID" \
-            --region "$REGION" \
-            --quiet || true
-
-          gcloud run services delete "$FRONTEND_SERVICE" \
-            --project "$PROJECT_ID" \
-            --region "$REGION" \
-            --quiet || true
-
-      - name: Remove branch image tags
-        run: |
-          gcloud container images untag "gcr.io/$PROJECT_ID/modtale-backend:$IMAGE_TAG" --quiet || true
-          gcloud container images untag "gcr.io/$PROJECT_ID/modtale-frontend:$IMAGE_TAG" --quiet || true
-
-      - name: Drop branch Mongo database
-        run: |
-          set -euo pipefail
-
-          case "$DB_NAME" in
-            modtale-*)
-              ;;
-            *)
-              echo "::error::Refusing to drop non-preview Mongo database '$DB_NAME'."
-              exit 1
-              ;;
-          esac
-
-          mongodb_uri="$(gcloud secrets versions access latest --project "$PROJECT_ID" --secret="$MONGODB_SECRET_NAME")"
-          echo "::add-mask::$mongodb_uri"
-
+          command -v aws >/dev/null || { sudo apt-get update && sudo apt-get install -y awscli; }
           npm install --silent --prefix "$RUNNER_TEMP/mongo-cleanup" mongodb@6
+          NODE_PATH="$RUNNER_TEMP/mongo-cleanup/node_modules" python3 .github/scripts/secret_bundle_ci.py cleanup
 
-          MONGODB_URI="$mongodb_uri" \
-          NODE_PATH="$RUNNER_TEMP/mongo-cleanup/node_modules" \
-          node .github/scripts/drop-preview-db.cjs
-
-      - name: Delete branch R2 bucket
+      - name: Clean up legacy preview while retaining original credentials
+        if: env.MODTALE_SECRET_BUNDLES_ENABLED != 'true'
         run: |
-          set -euo pipefail
-
-          mask_secret() {
-            local value="${1:-}"
-            if [ -n "$value" ]; then
-              echo "::add-mask::$value"
-            fi
-          }
-
-          case "$R2_BUCKET_NAME" in
-            modtale-branch-*)
-              ;;
-            *)
-              echo "::error::Refusing to delete non-branch R2 bucket '$R2_BUCKET_NAME'."
-              exit 1
-              ;;
-          esac
-
-          r2_access_key="$(gcloud secrets versions access latest --project "$PROJECT_ID" --secret="$R2_ACCESS_KEY_SECRET_NAME" 2>/dev/null || true)"
-          r2_secret_key="$(gcloud secrets versions access latest --project "$PROJECT_ID" --secret="$R2_SECRET_KEY_SECRET_NAME" 2>/dev/null || true)"
-          r2_endpoint="$(gcloud secrets versions access latest --project "$PROJECT_ID" --secret="$R2_ENDPOINT_SECRET_NAME" 2>/dev/null || true)"
-          r2_endpoint="$(printf '%s' "$r2_endpoint" | sed -E 's#(https?://[^/]+).*#\1#')"
-
-          mask_secret "$r2_access_key"
-          mask_secret "$r2_secret_key"
-
-          if [ -z "$r2_access_key" ] || [ -z "$r2_secret_key" ] || [ -z "$r2_endpoint" ]; then
-            echo "Per-branch R2 runtime secrets are missing; skipping object empty step."
-          elif ! command -v aws >/dev/null 2>&1; then
-            sudo apt-get update
-            sudo apt-get install -y awscli
-          fi
-
-          if [ -n "$r2_access_key" ] && \
-             [ -n "$r2_secret_key" ] && \
-             [ -n "$r2_endpoint" ] && \
-             AWS_ACCESS_KEY_ID="$r2_access_key" \
-             AWS_SECRET_ACCESS_KEY="$r2_secret_key" \
-             AWS_DEFAULT_REGION=auto \
-             aws s3api head-bucket \
-               --endpoint-url "$r2_endpoint" \
-               --bucket "$R2_BUCKET_NAME" >/dev/null 2>&1; then
-            AWS_ACCESS_KEY_ID="$r2_access_key" \
-            AWS_SECRET_ACCESS_KEY="$r2_secret_key" \
-            AWS_DEFAULT_REGION=auto \
-            aws s3 rm \
-              --endpoint-url "$r2_endpoint" \
-              "s3://$R2_BUCKET_NAME" \
-              --recursive
-          else
-            echo "R2 bucket '$R2_BUCKET_NAME' does not exist; nothing to delete."
-          fi
-
-          runtime_token_id="$(
-            gcloud secrets versions access latest \
-              --project "$PROJECT_ID" \
-              --secret="$R2_TOKEN_ID_SECRET_NAME" 2>/dev/null || true
-          )"
-          if [ -z "$runtime_token_id" ]; then
-            runtime_token_id="$(
-              gcloud secrets versions access latest \
-                --project "$PROJECT_ID" \
-                --secret="$R2_ACCESS_KEY_SECRET_NAME" 2>/dev/null || true
-            )"
-          fi
-          mask_secret "$runtime_token_id"
-          export R2_RUNTIME_TOKEN_ID="$runtime_token_id"
-
-          : "${CLOUDFLARE_ACCOUNT_ID:?Set secret CLOUDFLARE_ACCOUNT_ID.}"
-          : "${CLOUDFLARE_R2_PROVISIONER:?Set secret CLOUDFLARE_R2_PROVISIONER.}"
-          : "${CLOUDFLARE_API_TOKEN_PROVISIONER:?Set secret CLOUDFLARE_API_TOKEN_PROVISIONER.}"
-          node .github/scripts/cloudflare-r2-preview.mjs cleanup
-
-          for secret_name in \
-            "$R2_ACCESS_KEY_SECRET_NAME" \
-            "$R2_SECRET_KEY_SECRET_NAME" \
-            "$R2_ENDPOINT_SECRET_NAME" \
-            "$R2_TOKEN_ID_SECRET_NAME"; do
-            gcloud secrets delete "$secret_name" \
-              --project "$PROJECT_ID" \
-              --quiet || true
-          done
+          command -v aws >/dev/null || { sudo apt-get update && sudo apt-get install -y awscli; }
+          npm install --silent --prefix "$RUNNER_TEMP/mongo-cleanup" mongodb@6
+          NODE_PATH="$RUNNER_TEMP/mongo-cleanup/node_modules" python3 .github/scripts/secret_bundle_ci.py cleanup-legacy
