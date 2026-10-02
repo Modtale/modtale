@@ -48,7 +48,13 @@ public class ProjectAdminQueryService {
         ProjectMetadataRepair.validate(metadata);
         var snapshot = reviewPersistence.capture(id, token);
         if (!reviewPersistence.applyMetadataRepair(snapshot, metadata)) throw ProjectReviewSnapshot.conflict();
-        projectService.evictProjectCache(snapshot.project());
+        // Conditional repair writes do not mutate the captured project. Invalidate both title-based handles.
+        Project updatedRoute = new Project();
+        updatedRoute.setId(snapshot.project().getId());
+        updatedRoute.setTitle(metadata.containsKey("title") ? (String) metadata.get("title") : snapshot.project().getTitle());
+        updatedRoute.setSlug(snapshot.project().getSlug());
+        updatedRoute.setClassification(snapshot.project().getClassification());
+        projectService.evictProjectDetailsCaches(List.of(snapshot.project(), updatedRoute), List.of());
         adminAuditLogger.logAction(adminId, "RAW_UPDATE_PROJECT", id, "PROJECT",
                 "Repaired metadata fields: " + String.join(", ", new java.util.TreeSet<>(metadata.keySet())));
     }

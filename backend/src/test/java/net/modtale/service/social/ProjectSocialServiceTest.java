@@ -47,6 +47,8 @@ class ProjectSocialServiceTest {
             });
         }
         verify(projects, never()).evictProjectCache(any(Project.class));
+        verify(projects, never()).evictProjectEngagementCache(any());
+        verify(projects, never()).evictProjectCounterCaches(any(), any());
         verifyNoInteractions(repository, notifications);
         verify(users, never()).save(any(User.class));
     }
@@ -59,16 +61,29 @@ class ProjectSocialServiceTest {
         service.voteComment("slug", comment.getId(), "user", true); assertTrue(comment.getUpvotes().contains("user"));
         service.setCommentPinned("slug", comment.getId(), true); assertTrue(comment.isPinned());
         verify(writes, times(4)).applyComments(snapshot);
-        verify(projects, times(4)).evictProjectCache(snapshot.project()); verifyNoInteractions(repository);
+        verify(projects, times(3)).evictProjectCache(snapshot.project());
+        verify(projects).evictProjectEngagementCache(snapshot.project());
+        var order = inOrder(writes, projects);
+        order.verify(writes).applyComments(snapshot);
+        order.verify(projects).evictProjectCache(snapshot.project());
+        order.verify(writes).applyComments(snapshot);
+        order.verify(projects).evictProjectCache(snapshot.project());
+        order.verify(writes).applyComments(snapshot);
+        order.verify(projects).evictProjectEngagementCache(snapshot.project());
+        order.verify(writes).applyComments(snapshot);
+        order.verify(projects).evictProjectCache(snapshot.project());
+        verifyNoInteractions(repository);
     }
     @Test void favoriteFailureDoesNotEvictAndSuccessUsesCanonicalProjectId() {
         var snapshot = setup();
         when(repository.toggle("canonical", "user")).thenThrow(new IllegalStateException("transaction failed"));
         assertThrows(IllegalStateException.class, () -> service.toggleFavorite("slug", "user"));
-        verify(projects, never()).evictProjectCache(any(Project.class)); verify(users, never()).save(any(User.class));
+        verify(projects, never()).evictProjectCounterCaches(any(), any()); verify(users, never()).save(any(User.class));
         doReturn(1).when(repository).toggle("canonical", "user");
         service.toggleFavorite("slug", "user");
-        assertEquals(1, snapshot.project().getFavoriteCount()); verify(projects).evictProjectCache(snapshot.project());
+        assertEquals(1, snapshot.project().getFavoriteCount());
+        verify(projects).evictProjectCounterCaches(List.of(snapshot.project()), List.of());
+        verify(projects, never()).evictProjectCache(any(Project.class));
     }
 
 }

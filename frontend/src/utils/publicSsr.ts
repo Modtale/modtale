@@ -1,0 +1,75 @@
+import type { Project } from '@/types';
+
+export type PublicJsonResult = { data: any | null; status: number };
+
+export const fetchPublicJson = async (resource: string, timeoutMs = 1500): Promise<PublicJsonResult> => {
+    const controller = new AbortController();
+    const timeoutHandle = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+        const response = await fetch(resource, { signal: controller.signal });
+        if (!response.ok) return { data: null, status: response.status };
+        try {
+            return { data: await response.json(), status: response.status };
+        } catch {
+            return { data: null, status: response.status };
+        }
+    } catch {
+        // A timeout/network error is not evidence that the resource is missing.
+        return { data: null, status: 0 };
+    } finally {
+        clearTimeout(timeoutHandle);
+    }
+};
+
+export const isProjectData = (data: any): data is Project => Boolean(
+    data && typeof data.id === 'string' && typeof data.title === 'string'
+    && (!data.status || ['PUBLISHED', 'ARCHIVED', 'UNLISTED'].includes(data.status))
+);
+
+export const isPublicProject = (data: any): data is Project => isProjectData(data) && data.status !== 'UNLISTED';
+
+export const isProjectPage = (data: any): boolean => Boolean(
+    data && Array.isArray(data.content) && data.content.every(isPublicProject)
+);
+
+export const isPlatformStats = (data: any): boolean => Boolean(data &&
+    ['totalProjects', 'totalDownloads', 'totalUsers'].every(key =>
+        typeof data[key] === 'number' && Number.isFinite(data[key]) && data[key] >= 0
+    )
+);
+
+export const buildHomeBootstrap = (marquee: any, trending: any, newest: any, stats: any) => {
+    const homeSectionsReady = {
+        marquee: isProjectPage(marquee),
+        trending: isProjectPage(trending),
+        newest: isProjectPage(newest),
+        stats: isPlatformStats(stats),
+    };
+    const trendingProjects = homeSectionsReady.trending ? trending.content : [];
+    const newestProjects = homeSectionsReady.newest ? newest.content : [];
+    return {
+        homeDataReady: Object.values(homeSectionsReady).every(Boolean),
+        homeSectionsReady,
+        homeProjects: homeSectionsReady.trending ? trendingProjects : newestProjects,
+        homeMarqueeProjects: homeSectionsReady.marquee ? marquee.content : [],
+        homeTrendingProjects: trendingProjects,
+        homeNewestProjects: newestProjects,
+        stats: homeSectionsReady.stats ? stats : null,
+    };
+};
+
+// Older HTML may contain only homeProjects. Preserve its useful seed, but do
+// not let one successful section suppress retries for another failed section.
+export const getHomeSectionReadiness = (data: any) => {
+    const ready = (section: string, items: any) => Array.isArray(items) && items.every(isProjectData) && (
+        data?.homeSectionsReady ? data.homeSectionsReady[section] === true
+            : data?.homeDataReady === true || items.length > 0
+    );
+    return {
+        marquee: ready('marquee', data?.homeMarqueeProjects),
+        trending: ready('trending', data?.homeTrendingProjects ?? data?.homeProjects),
+        newest: ready('newest', data?.homeNewestProjects),
+        stats: isPlatformStats(data?.stats) && (data?.homeSectionsReady ? data.homeSectionsReady.stats === true
+            : data?.homeDataReady === true || [data?.homeProjects, data?.homeMarqueeProjects, data?.homeTrendingProjects, data?.homeNewestProjects].some(items => Array.isArray(items) && items.length > 0)),
+    };
+};

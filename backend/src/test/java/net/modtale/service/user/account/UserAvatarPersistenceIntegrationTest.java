@@ -30,7 +30,7 @@ class UserAvatarPersistenceIntegrationTest {
     private Document stored(){return mongo.getCollection("users").find(new Document("_id","user")).first();}
     private User user(){return mongo.findById("user",User.class);}
     private OAuthAvatarHealingService service(){
-        var service=spy(new OAuthAvatarHealingService(writes));
+        var service=spy(new OAuthAvatarHealingService(writes, mock(net.modtale.service.system.PublicCreatorCacheService.class)));
         doReturn(false).when(service).isImageUrlReachable(OLD);doReturn(true).when(service).isImageUrlReachable(NEW);
         return service;
     }

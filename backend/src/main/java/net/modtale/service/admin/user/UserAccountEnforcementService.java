@@ -17,6 +17,7 @@ import net.modtale.repository.admin.BannedEmailRepository;
 import net.modtale.repository.user.UserRepository;
 import net.modtale.service.admin.audit.AdminAuditLogger;
 import net.modtale.service.communication.EmailService;
+import net.modtale.service.system.PublicCreatorCacheService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Sort;
@@ -27,6 +28,8 @@ import org.springframework.stereotype.Service;
 
 @Service
 public class UserAccountEnforcementService {
+
+    private final PublicCreatorCacheService publicCreatorCacheService;
 
     private static final Logger logger = LoggerFactory.getLogger(UserAccountEnforcementService.class);
     private static final Pattern EMAIL_PATTERN =
@@ -43,8 +46,10 @@ public class UserAccountEnforcementService {
             BannedEmailRepository bannedEmailRepository,
             EmailService emailService,
             MongoTemplate mongoTemplate,
-            AdminAuditLogger adminAuditLogger
+            AdminAuditLogger adminAuditLogger,
+            PublicCreatorCacheService publicCreatorCacheService
     ) {
+        this.publicCreatorCacheService = publicCreatorCacheService;
         this.userRepository = userRepository;
         this.bannedEmailRepository = bannedEmailRepository;
         this.emailService = emailService;
@@ -129,6 +134,7 @@ public class UserAccountEnforcementService {
             throw new IllegalArgumentException("Cannot enable MFA without a valid MFA secret.");
         }
         userRepository.save(updatedData);
+        publicCreatorCacheService.creatorChanged();
         adminAuditLogger.logAction(adminId, "RAW_UPDATE_USER", existing.getId(), "USER", "Updated via Raw JSON");
     }
 
@@ -173,6 +179,7 @@ public class UserAccountEnforcementService {
         user.setGitlabAccessToken(null);
         user.setGitlabRefreshToken(null);
         userRepository.save(user);
+        publicCreatorCacheService.creatorChanged();
         mongoTemplate.remove(new Query(Criteria.where("userId").is(user.getId())), ApiKey.class);
     }
 }

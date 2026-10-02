@@ -429,6 +429,26 @@ jobs:
             echo "Frontend service does not exist."
           fi
 
+      # Cache API v2 needs Buildx >=0.21 / BuildKit >=0.20. The container driver
+      # supports exporting intermediate layers without changing the runner.
+      - name: Set up Docker Buildx
+        if: steps.filter.outputs.backend == 'true' || steps.filter.outputs.frontend == 'true' || env.BACKEND_EXISTS == 'false' || env.FRONTEND_EXISTS == 'false' || env.R2_RUNTIME_CREDENTIALS_REPLACED == 'true'
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
+        with:
+          version: latest
+          driver: docker-container
+
+      - name: Expose GitHub Actions cache runtime
+        if: steps.filter.outputs.backend == 'true' || steps.filter.outputs.frontend == 'true' || env.BACKEND_EXISTS == 'false' || env.FRONTEND_EXISTS == 'false' || env.R2_RUNTIME_CREDENTIALS_REPLACED == 'true'
+        uses: crazy-max/ghaction-github-runtime@04d248b84655b509d8c44dc1d6f990c879747487 # v4
+
+      - name: Install pinned Trivy scanner
+        if: steps.filter.outputs.backend == 'true' || steps.filter.outputs.frontend == 'true' || env.BACKEND_EXISTS == 'false' || env.FRONTEND_EXISTS == 'false' || env.R2_RUNTIME_CREDENTIALS_REPLACED == 'true'
+        uses: aquasecurity/setup-trivy@81e514348e19b6112ce2a7e3ecbafe19c1e1f567 # v0.3.1
+        with:
+          version: v0.75.0
+          cache: true
+
       - name: Build and Deploy Backend
         id: deploy_backend
         if: steps.filter.outputs.backend == 'true' || env.BACKEND_EXISTS == 'false' || env.R2_RUNTIME_CREDENTIALS_REPLACED == 'true'
@@ -504,6 +524,7 @@ jobs:
           if [ "${{ env.ENV_TYPE }}" = "prod" ]; then
             # Keep one production instance warm to prevent user-facing cold starts.
             ARGS+=("--cpu" "1")
+            ARGS+=("--labels" "commit-sha=$GITHUB_SHA")
             ARGS+=("--min-instances" "1")
             ARGS+=("--max-instances" "10")
             ARGS+=("--cpu-throttling")
@@ -532,6 +553,7 @@ jobs:
             # Status monitoring has been retired.
             ARGS+=("--remove-secrets" "STATUS_DISCORD_WEBHOOK_URL")
           elif [ "${{ env.ENV_TYPE }}" = "dev" ]; then
+            ARGS+=("--labels" "commit-sha=$GITHUB_SHA")
             ARGS+=("--cpu" "1")
             ARGS+=("--min-instances" "0")
             ARGS+=("--max-instances" "3")
@@ -570,7 +592,7 @@ jobs:
             ARGS+=("--update-env-vars" "LOGGING_STRUCTURED_JSON_ADD_COMPONENT=backend")
             ARGS+=("--update-env-vars" "LOGGING_STRUCTURED_JSON_ADD_ENVIRONMENT=branch-preview")
             ARGS+=("--update-env-vars" "LOGGING_STRUCTURED_JSON_ADD_BRANCH=${{ env.BRANCH_SLUG }}")
-            ARGS+=("--labels" "app=modtale,environment=branch-preview,component=backend,branch=${{ env.BRANCH_SLUG }}")
+            ARGS+=("--labels" "app=modtale,environment=branch-preview,component=backend,branch=${{ env.BRANCH_SLUG }},commit-sha=$GITHUB_SHA")
             ARGS+=("--update-secrets" "APP_SEEDING_SOURCE_R2_ACCESS_KEY=${{ env.SEEDING_SOURCE_R2_ACCESS_KEY_SECRET_NAME }}:latest")
             ARGS+=("--update-secrets" "APP_SEEDING_SOURCE_R2_SECRET_KEY=${{ env.SEEDING_SOURCE_R2_SECRET_KEY_SECRET_NAME }}:latest")
             ARGS+=("--update-secrets" "APP_SEEDING_SOURCE_R2_ENDPOINT=${{ env.SEEDING_SOURCE_R2_ENDPOINT_SECRET_NAME }}:latest")
@@ -637,18 +659,22 @@ jobs:
           )
 
           if [ "${{ env.ENV_TYPE }}" = "preview" ]; then
-            FRONTEND_ARGS+=("--min-instances" "0")
+            FRONTEND_ARGS+=("--min" "0" "--min-instances" "0")
             FRONTEND_ARGS+=("--max-instances" "2")
             FRONTEND_ARGS+=("--set-env-vars" "LOG_SERVICE_NAME=${{ env.FRONTEND_SERVICE }}")
             FRONTEND_ARGS+=("--set-env-vars" "LOG_COMPONENT=frontend")
             FRONTEND_ARGS+=("--set-env-vars" "LOG_ENVIRONMENT=branch-preview")
             FRONTEND_ARGS+=("--set-env-vars" "LOG_BRANCH=${{ env.BRANCH_SLUG }}")
-            FRONTEND_ARGS+=("--labels" "app=modtale,environment=branch-preview,component=frontend,branch=${{ env.BRANCH_SLUG }}")
+            FRONTEND_ARGS+=("--labels" "app=modtale,environment=branch-preview,component=frontend,branch=${{ env.BRANCH_SLUG }},commit-sha=$GITHUB_SHA")
           elif [ "${{ env.ENV_TYPE }}" = "dev" ]; then
-            FRONTEND_ARGS+=("--min-instances" "0")
+            FRONTEND_ARGS+=("--min" "0" "--min-instances" "0")
+            FRONTEND_ARGS+=("--labels" "commit-sha=$GITHUB_SHA")
             FRONTEND_ARGS+=("--max-instances" "3")
           else
-            FRONTEND_ARGS+=("--min-instances" "1")
+            # Service and revision minimums must agree; keep production warm
+            # until the measured frontend-only staging trial passes.
+            FRONTEND_ARGS+=("--min" "1" "--min-instances" "1")
+            FRONTEND_ARGS+=("--labels" "commit-sha=$GITHUB_SHA")
             FRONTEND_ARGS+=("--max-instances" "3")
           fi
 

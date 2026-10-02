@@ -100,7 +100,13 @@ class MetadataServiceTest {
         assertFalse(existing.isCustomLicenseOpenSource());
         verify(validationService).validateSlug("new-slug");
         verify(reviewPersistence).applyPresentation(any(), eq(false));
-        verify(projectService).evictProjectCache(existing);
+        verify(projectRepository, never()).save(any(Project.class));
+        var order = inOrder(reviewPersistence, projectService);
+        order.verify(reviewPersistence).applyPresentation(any(), eq(false));
+        order.verify(projectService).evictProjectDetailsCaches(argThat(projects -> projects.size() == 2
+                && projects.stream().anyMatch(project -> "sky-tools".equals(project.getSlug())
+                        && project.getClassification() == ProjectClassification.DATA)
+                && projects.contains(existing)), eq(List.of()));
     }
 
     @Test
@@ -174,6 +180,7 @@ class MetadataServiceTest {
 
         verify(reviewPersistence, never()).applyPresentation(any(), anyBoolean());
         verify(projectService, never()).evictProjectCache(existing);
+        verify(projectService, never()).evictProjectDetailsCaches(any(), any());
         assertEquals("owned-image.png", existing.getImageUrl());
     }
 
@@ -194,6 +201,31 @@ class MetadataServiceTest {
 
         verify(reviewPersistence).applyPresentation(any(), eq(false));
         assertEquals("owned-image.png", existing.getImageUrl());
+    }
+
+    @Test
+    void metadataConflictDoesNotInvalidateOldOrNewRoutesOrSaveTheSnapshot() {
+        var existing = new Project();
+        existing.setId("project-1");
+        existing.setTitle("Old title");
+        existing.setSlug("old-slug");
+        existing.setClassification(ProjectClassification.DATA);
+        var updated = new Project();
+        updated.setTitle("New title");
+        updated.setSlug("new-slug");
+        var user = new User();
+        user.setId("user-1");
+        when(projectService.getRawProjectById("project-1")).thenReturn(existing);
+        when(accessControlService.hasProjectPermission(existing, user, "PROJECT_EDIT_METADATA")).thenReturn(true);
+        when(reviewPersistence.applyPresentation(any(), eq(false))).thenReturn(false);
+
+        assertThrows(org.springframework.web.server.ResponseStatusException.class,
+                () -> service.updateMetadata("project-1", updated, user));
+
+        verify(reviewPersistence).applyPresentation(any(), eq(false));
+        verify(projectService, never()).evictProjectDetailsCaches(any(), any());
+        verify(projectService, never()).evictProjectCache(any());
+        verify(projectRepository, never()).save(any(Project.class));
     }
 
 }

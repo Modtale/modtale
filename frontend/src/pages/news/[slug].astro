@@ -1,4 +1,5 @@
 ---
+import { HTML_CACHE, setPublicHtmlCache } from '@/utils/htmlCache';
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import App from '../../App';
 import { fetchNewsPosts } from '@/modules/news/api/newsClient';
@@ -14,15 +15,17 @@ if (slug === 'fresh-feature-showcase' || slug === 'launcher-and-modpacks') {
     return Astro.redirect('/news', 301);
 }
 let posts;
-try { posts = await fetchNewsPosts(); } catch { return new Response('News is temporarily unavailable.', { status: 503 }); }
+try { posts = await fetchNewsPosts(); } catch { return new Response('News is temporarily unavailable.', { status: 503, headers: { 'Cache-Control': 'no-store', 'CDN-Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex' } }); }
 const post = posts.find(post => post.slug === slug);
 
 if (!post) {
-    return Astro.redirect(NEWS_INDEX_PATH, 302);
+    return new Response('News article not found.', { status: 404, headers: { 'Cache-Control': 'no-store', 'CDN-Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex' } });
 }
 
 const path = Astro.url.pathname;
 const canonicalUrl = getNewsPostUrl(post);
+
+setPublicHtmlCache(Astro.response.headers, HTML_CACHE.content);
 
 const initialData = { newsPost: post };
 

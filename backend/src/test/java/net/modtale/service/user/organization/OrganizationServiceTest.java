@@ -49,7 +49,8 @@ class OrganizationServiceTest {
         OrganizationConnectionService organizationConnectionService = new OrganizationConnectionService(
                 userRepository,
                 organizationAccessService,
-                new ConnectedAccountMutationService()
+                new ConnectedAccountMutationService(),
+                mock(net.modtale.service.system.PublicCreatorCacheService.class)
         );
         OrganizationRoleService organizationRoleService = mock(OrganizationRoleService.class);
         OrganizationInviteService organizationInviteService = mock(OrganizationInviteService.class);
@@ -65,7 +66,8 @@ class OrganizationServiceTest {
                 organizationConnectionService,
                 organizationRoleService,
                 organizationInviteService,
-                new AppLimitProperties(10, 5, 10, 5, 5, 50, 20, 10)
+                new AppLimitProperties(10, 5, 10, 5, 5, 50, 20, 10),
+                mock(net.modtale.service.system.PublicCreatorCacheService.class)
         );
     }
 

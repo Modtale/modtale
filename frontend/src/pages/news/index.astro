@@ -1,4 +1,5 @@
 ---
+import { HTML_CACHE, setPublicHtmlCache } from '@/utils/htmlCache';
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import App from '../../App';
 import { fetchNewsPosts } from '@/modules/news/api/newsClient';
@@ -10,12 +11,14 @@ import {
 } from '../../data/news';
 
 let posts;
-try { posts = await fetchNewsPosts(); } catch { return new Response('News is temporarily unavailable.', { status: 503 }); }
+try { posts = await fetchNewsPosts(); } catch { return new Response('News is temporarily unavailable.', { status: 503, headers: { 'Cache-Control': 'no-store', 'CDN-Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex' } }); }
 const [featuredPost] = posts;
 const title = 'Modtale News | Product Updates and Creator Notes';
 const description = 'Read Modtale product updates, creator notes, feature tours, and platform news for Hytale mods, plugins, worlds, assets, and modpacks.';
 const image = getAbsoluteUrl(featuredPost?.socialImage || '/assets/logo_light.svg');
 const path = Astro.url.pathname;
+
+setPublicHtmlCache(Astro.response.headers, HTML_CACHE.content);
 
 const initialData = { newsPosts: posts };
 

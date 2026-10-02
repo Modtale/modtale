@@ -9,7 +9,7 @@ RUN ./gradlew dependencies --no-daemon || true
 
 COPY . .
 
-RUN ./gradlew bootJar --no-daemon
+RUN ./gradlew test bootJar --no-daemon
 
 FROM docker.io/library/eclipse-temurin:26-jre-jammy
 WORKDIR /app

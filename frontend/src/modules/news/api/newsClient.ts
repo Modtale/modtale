@@ -26,5 +26,11 @@ export const newsClient = {
 export async function fetchNewsPosts(): Promise<NewsPost[]> {
     const response = await fetch(`${SERVER_BACKEND_URL}/api/v1/news`, { signal: AbortSignal.timeout(5000) });
     if (!response.ok) throw new Error('News is unavailable');
-    return response.json();
+    const posts = await response.json();
+    if (!Array.isArray(posts) || !posts.every(post => post && typeof post.slug === 'string'
+        && typeof post.title === 'string' && typeof post.description === 'string'
+        && typeof post.socialImage === 'string' && Array.isArray(post.tags))) {
+        throw new Error('Invalid news response');
+    }
+    return posts;
 }
