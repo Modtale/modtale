@@ -571,6 +571,41 @@ class ModpackArchiveServiceTest {
         assertEquals("modpacks/new.zip", version.getFileUrl());
     }
 
+    @Test
+    void generatedArchiveCannotSubstituteADifferentTemporarilyApprovedDependency() throws Exception {
+        Project pack = pack();
+        ProjectVersion parent = version("1.0.0", null);
+        ProjectDependency dependency = new ProjectDependency("plugin", "Plugin", "2.0.0");
+        parent.setDependencies(List.of(dependency));
+        var original = new DownloadArchiveSupport.ResolvedDependency(
+                dependencyProject("plugin", ProjectClassification.PLUGIN), version("2.0.0", "original.jar"));
+        var replacement = new DownloadArchiveSupport.ResolvedDependency(
+                dependencyProject("plugin", ProjectClassification.PLUGIN), version("2.0.0", "replacement.jar"));
+        when(archiveSupport.resolveDependency(dependency)).thenReturn(original, replacement, original, original);
+        when(archiveSupport.download("replacement.jar")).thenReturn(bytes("different-approved-bytes"));
+        when(archiveSupport.extractOriginalFilename("replacement.jar")).thenReturn("plugin.jar");
+
+        assertThrows(IOException.class, () -> service.generateModpackZip(pack, parent));
+        verify(archiveSupport, never()).upload(any(), any());
+        verify(reviewPersistence, never()).cacheModpackArchive(any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void cachedArchiveCannotAdoptChangedParentInputsDuringStorageRead() throws Exception {
+        Project pack = pack();
+        ProjectVersion parent = version("1.0.0", "modpacks/cached.zip");
+        pack.setTitle("Different pack inputs");
+        byte[] different = validEmptyArchive(ModpackArchiveService.cacheBinding(pack, parent));
+        pack.setTitle("Sky Pack");
+        when(archiveSupport.download("modpacks/cached.zip")).thenAnswer(call -> {
+            pack.setTitle("Different pack inputs");
+            return different;
+        });
+
+        assertThrows(IOException.class, () -> service.generateModpackZip(pack, parent));
+        verify(archiveSupport, never()).upload(any(), any());
+    }
+
     private static Project pack() {
         Project project = new Project();
         project.setId("pack-1");

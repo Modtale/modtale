@@ -51,16 +51,32 @@ final class ModpackArchiveService {
     }
 
     byte[] generateModpackZip(Project pack, ProjectVersion version) throws IOException {
+        return generateModpackZip(pack, version, null, null);
+    }
+
+    byte[] generateModpackZip(Project pack, ProjectVersion version, String requiredCacheBinding,
+            List<String> requiredDependencyBindings) throws IOException {
+        String expectedCacheBinding = cacheBinding(pack, version);
         String projectToken = ProjectReviewSnapshot.token(pack);
         String versionToken = VersionReviewSnapshot.token(version);
         List<String> dependencyBindings = currentDependencyBindings(version);
-        byte[] cachedArchive = downloadCachedArchive(pack, version, dependencyBindings);
+        if (requiredCacheBinding != null && (!requiredCacheBinding.equals(expectedCacheBinding)
+                || !dependencyBindings.equals(requiredDependencyBindings))) {
+            throw new IOException("The modpack inputs no longer match the requested approval bindings.");
+        }
+        byte[] cachedArchive = downloadCachedArchive(pack, version, dependencyBindings, expectedCacheBinding);
         if (cachedArchive != null) {
             requireUnchangedDependencies(version, dependencyBindings);
             return cachedArchive;
         }
 
         byte[] zipBytes = buildArchive(pack, version);
+        JsonNode lock = ModpackArchiveValidator.validatedLockfile(zipBytes,
+                version.getModpackConfigs() != null && !version.getModpackConfigs().isEmpty());
+        if (!expectedCacheBinding.equals(lock.path("cacheBinding").asText())
+                || !cachedDependencyBindingsMatch(lock, dependencyBindings)) {
+            throw new IOException("The generated modpack does not match its captured approval bindings.");
+        }
         requireUnchangedDependencies(version, dependencyBindings);
         cacheArchive(pack, version, zipBytes, projectToken, versionToken);
         requireUnchangedDependencies(version, dependencyBindings);
@@ -92,7 +108,7 @@ final class ModpackArchiveService {
         return bindings;
     }
 
-    private byte[] downloadCachedArchive(Project pack, ProjectVersion version, List<String> dependencyBindings) {
+    private byte[] downloadCachedArchive(Project pack, ProjectVersion version, List<String> dependencyBindings, String expectedCacheBinding) {
         if (version.getFileUrl() == null) {
             return null;
         }
@@ -103,7 +119,7 @@ final class ModpackArchiveService {
                 try {
                     JsonNode lock = ModpackArchiveValidator.validatedLockfile(cachedArchive,
                             version.getModpackConfigs() != null && !version.getModpackConfigs().isEmpty());
-                    if (cacheBinding(pack, version).equals(lock.path("cacheBinding").asText())
+                    if (expectedCacheBinding.equals(lock.path("cacheBinding").asText())
                             && cachedDependencyBindingsMatch(lock, dependencyBindings)) return cachedArchive;
                     logger.warn("Cached modpack archive has stale package inputs for project={} version={}. Rebuilding archive.",
                             pack.getId(), version.getVersionNumber());
@@ -166,9 +182,7 @@ final class ModpackArchiveService {
                 writeBinaryEntry(zip, override.path(), override.bytes());
             }
         }
-        byte[] archive = output.toByteArray();
-        ModpackArchiveValidator.validate(archive);
-        return archive;
+        return output.toByteArray();
     }
 
     private List<ModpackOverrideArchive.OverrideFile> prepareOverrides(ProjectVersion version) throws IOException {

@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+import static org.mockito.ArgumentMatchers.*;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -41,6 +42,7 @@ class WorldModListArchiveServiceTest {
         Project project = new Project();
         project.setId("project-1");
         ProjectVersion approved = new ProjectVersion();
+        approved.setId("version-id");
         approved.setVersionNumber("1.0.0");
         approved.setFileUrl("storage/cool.jar");
         approved.setReviewStatus(ProjectVersion.ReviewStatus.APPROVED);
@@ -87,6 +89,7 @@ class WorldModListArchiveServiceTest {
         Project project = new Project();
         project.setId("project-1");
         ProjectVersion version = new ProjectVersion();
+        version.setId("version-id");
         version.setVersionNumber("2.0.0");
         version.setFileUrl("storage/withdrawn.jar");
         version.setReviewStatus(ProjectVersion.ReviewStatus.PENDING);
@@ -113,6 +116,7 @@ class WorldModListArchiveServiceTest {
         Project project = new Project();
         project.setId("project-1");
         ProjectVersion version = new ProjectVersion();
+        version.setId("version-id");
         version.setVersionNumber("1.0.0");
         version.setFileUrl("storage/mod.jar");
         version.setHash(sha256("reviewed"));
@@ -143,6 +147,7 @@ class WorldModListArchiveServiceTest {
         pack.setId("pack");
         pack.setClassification(ProjectClassification.MODPACK);
         ProjectVersion packVersion = new ProjectVersion();
+        packVersion.setId("version-id");
         packVersion.setVersionNumber("1.0.0");
         packVersion.setFileUrl("storage/pack.zip");
         packVersion.setReviewStatus(ProjectVersion.ReviewStatus.APPROVED);
@@ -151,6 +156,7 @@ class WorldModListArchiveServiceTest {
         Project plugin = new Project();
         plugin.setId("plugin");
         ProjectVersion withdrawn = new ProjectVersion();
+        withdrawn.setId("version-id");
         withdrawn.setVersionNumber("2.0.0");
         withdrawn.setFileUrl("storage/plugin.jar");
         withdrawn.setReviewStatus(ProjectVersion.ReviewStatus.PENDING);
@@ -182,6 +188,7 @@ class WorldModListArchiveServiceTest {
         pack.setId("pack");
         pack.setClassification(ProjectClassification.MODPACK);
         ProjectVersion version = new ProjectVersion();
+        version.setId("version-id");
         version.setVersionNumber("1.0.0");
         version.setFileUrl("storage/pack.zip");
         version.setReviewStatus(ProjectVersion.ReviewStatus.APPROVED);
@@ -189,7 +196,7 @@ class WorldModListArchiveServiceTest {
         when(projectService.getRawProjectById("pack")).thenReturn(pack);
         when(accessControlService.isPubliclyReadable(pack)).thenReturn(true);
         when(storageService.download("storage/pack.zip")).thenReturn("stale-bytes".getBytes(StandardCharsets.UTF_8));
-        when(downloadService.generateModpackZip(pack, version, null)).thenReturn("current-bytes".getBytes(StandardCharsets.UTF_8));
+        when(downloadService.generateModpackZip(eq(pack), eq(version), isNull(), anyString(), anyList())).thenReturn("current-bytes".getBytes(StandardCharsets.UTF_8));
 
         Map<String, String> entries = entries(new WorldModListArchiveService(storageService, new ObjectMapper(),
                 projectService, accessControlService, downloadService).generateZip(list));
@@ -210,6 +217,7 @@ class WorldModListArchiveServiceTest {
         Project project = new Project();
         project.setId("project-1");
         ProjectVersion current = new ProjectVersion();
+        current.setId("version-id");
         current.setVersionNumber("2.0.0");
         current.setFileUrl("storage/new.jar");
         current.setReviewStatus(ProjectVersion.ReviewStatus.APPROVED);

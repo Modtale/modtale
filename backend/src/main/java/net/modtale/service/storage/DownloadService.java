@@ -36,6 +36,18 @@ public class DownloadService {
         return modpackArchiveService.generateModpackZip(pack, version);
     }
 
+    public static String modpackCacheBinding(Project pack, ProjectVersion version) {
+        return ModpackArchiveService.cacheBinding(pack, version);
+    }
+
+    public byte[] generateModpackZip(Project pack, ProjectVersion version, User user,
+            String expectedCacheBinding, List<String> expectedDependencyBindings) throws IOException {
+        java.util.Objects.requireNonNull(expectedCacheBinding);
+        List<String> bindings = List.copyOf(expectedDependencyBindings);
+        rateLimitService.consumeModpackGeneration(user);
+        return modpackArchiveService.generateModpackZip(pack, version, expectedCacheBinding, bindings);
+    }
+
     public byte[] generateBundleZip(Project mainProject, ProjectVersion mainVersion, List<String> selectedDependencies, User user) throws IOException {
         rateLimitService.consumeBundleGeneration(user);
         return bundlePackagingService.generateBundleZip(mainProject, mainVersion, selectedDependencies);
