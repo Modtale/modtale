@@ -154,7 +154,8 @@ test('excluded successes must issue XSRF specifically; bootstrap token must matc
       } });
       assert.equal(report.status, 'failed', item.id);
       assert.equal(report.errorCode, badHeaders['cache-control']
-        ? 'credential_or_error_missing_no_store' : 'excluded_success_missing_csrf_cookie', item.id);
+        ? item.kind === 'empty_header' ? 'anonymous_public_response_sets_cookie' : 'credential_or_error_missing_no_store'
+        : 'excluded_success_missing_csrf_cookie', item.id);
     }
   }
   const mismatch = await runApiHeaderDiagnostic(input(), { request: async (url, options) => fixture(url, options,
@@ -618,5 +619,86 @@ test('structural error diagnostics retain only fixed enums and booleans, never a
     assert.equal(report.errorCode, 'unrecognized_access_denial');
     assert.ok(report.observations.at(-1).errorContract);
     assert.ok(!JSON.stringify(report).includes(secret));
+  }
+});
+
+
+function isEmptyHeaderProbe(options) {
+  return options.headers && Object.keys(options.headers).length === 1 && Object.values(options.headers)[0] === '';
+}
+function publicEmptyHeaderFixture(url, options, target, overrides = {}) {
+  const response = target === 'dev' ? originOnlyFixture(url, options) : fixture(url, options);
+  if (isEmptyHeaderProbe(options)) {
+    response.headers.set('cache-control', publicPolicy);
+    response.headers.delete('set-cookie');
+    if (target === 'production') response.headers.set('cf-cache-status', 'HIT');
+    for (const [name, value] of Object.entries(overrides)) response.headers.set(name, value);
+  }
+  return response;
+}
+
+test('empty headers may yield only strictly bounded public responses with explicit normalization uncertainty', async () => {
+  for (const target of ['dev', 'production']) {
+    const report = await runApiHeaderDiagnostic(input(target), {
+      request: async (url, options) => publicEmptyHeaderFixture(url, options, target),
+    });
+    assert.equal(report.status, 'complete', report.errorCode);
+    assert.equal(report.emptyHeaderPublicResponseCount, 7);
+    assert.equal(report.publicSuccessCount, 8);
+    assert.equal(report.catalogSuccessCount, 6);
+    assert.equal(report.projectSuccessCount, 2);
+    const empty = report.observations.filter(item => item.kind === 'empty_header');
+    assert.ok(empty.every(item => item.result === 'empty_header_public_response'));
+    assert.ok(empty.every(item => item.emptyHeaderInterpretation === 'indistinguishable_from_anonymous_request'));
+    assert.ok(empty.every(item => item.transportNormalizationVerified === false));
+    assert.ok(report.limitations.some(item => item.includes('normalization is unproven')));
+  }
+  for (const headers of [
+    { 'cache-control': 'public, max-age=0, s-maxage=600, must-revalidate' },
+    { 'cache-control': publicPolicy + ', no-store' },
+    { 'cache-control': publicPolicy + ', stale-while-revalidate=30' },
+    { 'set-cookie': 'XSRF-TOKEN=must-not-be-public' },
+    { age: '301' }, { age: 'unknown' }, { 'cf-cache-status': 'STALE' },
+    { 'cf-cache-status': 'UPDATING' }, { 'cf-cache-status': 'unrecognized' },
+    { 'cdn-cache-control': 'public, s-maxage=600' },
+  ]) {
+    const report = await runApiHeaderDiagnostic(input('production'), {
+      request: async (url, options) => publicEmptyHeaderFixture(url, options, 'production', headers),
+    });
+    assert.equal(report.status, 'failed');
+    assert.equal(report.emptyHeaderPublicResponseCount, 0);
+    assert.equal(report.edgeVerified, false);
+  }
+});
+
+test('public empty-header HITs never establish catalog/project HIT or nonempty credential exclusion', async () => {
+  const onlyEmptyHits = await runApiHeaderDiagnostic(input('production'), { request: async (url, options) => {
+    const response = publicEmptyHeaderFixture(url, options, 'production');
+    if (!options.headers && new URL(url).pathname !== MISSING_PATH) response.headers.set('cf-cache-status', 'MISS');
+    return response;
+  } });
+  assert.equal(onlyEmptyHits.status, 'limited');
+  assert.equal(onlyEmptyHits.errorCode, 'catalog_cache_hit_not_observed');
+  assert.equal(onlyEmptyHits.emptyHeaderPublicResponseCount, 7);
+  assert.equal(onlyEmptyHits.confirmedPublicHit, false);
+  assert.equal(onlyEmptyHits.confirmedCatalogHit, false);
+  assert.equal(onlyEmptyHits.confirmedProjectHit, false);
+  assert.equal(onlyEmptyHits.edgeVerified, false);
+  for (const badCase of requestCases(input()).filter(item => ['credential', 'browser'].includes(item.kind))) {
+    let index = 0;
+    const cases = requestCases(input());
+    const report = await runApiHeaderDiagnostic(input('production'), { request: async (url, options) => {
+      const item = cases[index++];
+      const response = fixture(url, options);
+      if (item?.id === badCase.id) {
+        response.headers.set('cache-control', publicPolicy);
+        response.headers.set('cf-cache-status', 'HIT');
+        response.headers.delete('set-cookie');
+      }
+      return response;
+    } });
+    assert.equal(report.status, 'failed', badCase.id);
+    assert.equal(report.errorCode, 'credential_or_error_missing_no_store', badCase.id);
+    assert.equal(report.emptyHeaderPublicResponseCount, 0);
   }
 });
