@@ -1,0 +1,82 @@
+name: Dev Responsiveness Diagnostic
+
+on:
+  workflow_dispatch:
+    inputs:
+      phase:
+        description: Operator label only; actual Cloud Run cold-start state is unknown
+        type: choice
+        options: [warm, cold]
+        default: warm
+        required: true
+      expected_deployment_sha:
+        description: Verified 40-character deployed frontend SHA on dev.modtale.net
+        type: string
+        required: true
+      project_path:
+        description: Optional existing public /mod, /modpack or /world fixture path
+        type: string
+        default: ''
+      wiki_path:
+        description: Optional existing public project wiki fixture path
+        type: string
+        default: ''
+      news_path:
+        description: Optional existing public /news/article fixture path
+        type: string
+        default: ''
+
+permissions:
+  contents: read
+
+concurrency:
+  group: modtale-dev-responsiveness-diagnostic
+  cancel-in-progress: false
+
+jobs:
+  diagnose:
+    if: github.repository == 'Modtale/modtale' && github.ref_name == 'develop'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      DIAGNOSTIC_PHASE: ${{ inputs.phase }}
+      DIAGNOSTIC_EXPECTED_SHA: ${{ inputs.expected_deployment_sha }}
+      DIAGNOSTIC_PROJECT_PATH: ${{ inputs.project_path }}
+      DIAGNOSTIC_WIKI_PATH: ${{ inputs.wiki_path }}
+      DIAGNOSTIC_NEWS_PATH: ${{ inputs.news_path }}
+      DIAGNOSTIC_TOOL_ROOT: ${{ runner.temp }}/modtale-diagnostic-tools
+      PUPPETEER_SKIP_DOWNLOAD: 'true'
+    steps:
+      - name: Check out diagnostic harness
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.23.3
+
+      - name: Validate fixed dev target and bounded inputs
+        run: node .github/scripts/dev-responsiveness-diagnostic.mjs validate
+
+      - name: Test diagnostic guards
+        run: node --test .github/tests/dev-responsiveness-diagnostic.test.mjs
+
+      - name: Use preinstalled runner Chrome and existing pinned Lighthouse tooling
+        run: |
+          test -x /usr/bin/google-chrome
+          /usr/bin/google-chrome --version
+          npm install --prefix "$DIAGNOSTIC_TOOL_ROOT" --no-save --ignore-scripts @lhci/cli@0.15.1
+
+      - name: Collect bounded read-only dev observations
+        run: node .github/scripts/dev-responsiveness-diagnostic.mjs
+
+      - name: Preserve diagnostic reports even when blocked
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dev-responsiveness-${{ inputs.phase }}-${{ github.run_id }}
+          path: diagnostic-output/
+          retention-days: 7
+          if-no-files-found: warn
