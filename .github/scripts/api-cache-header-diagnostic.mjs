@@ -16,6 +16,19 @@ export const MISSING_PATH = '/api/v1/projects/modtale-cache-diagnostic-fixed-mis
 const SHARED_CACHE_STATES = new Set(['HIT', 'STALE', 'UPDATING', 'REVALIDATED']);
 const CACHE_STATES = new Set([...SHARED_CACHE_STATES, 'MISS', 'BYPASS', 'DYNAMIC', 'EXPIRED', 'NONE', 'UNKNOWN']);
 const TITLES = { 400: 'Bad Request', 401: 'Unauthorized', 403: 'Forbidden', 404: 'Not Found', 410: 'Gone', 500: 'Internal Server Error', 502: 'Bad Gateway', 503: 'Service Unavailable', 504: 'Gateway Timeout' };
+const INVALID_KEY_DETAILS = Object.freeze({
+  rate_filter: 'Invalid API Key.',
+  api_filter: 'Authentication is required to perform this action: Invalid API Key.',
+});
+const SECURITY_DENIAL_DETAILS = Object.freeze({
+  401: 'You need to sign in before performing this action. If you were already signed in, your session may have expired.',
+  403: 'You do not have permission to perform this action with the current account or API key.',
+});
+function isInvalidKeyProbe(item) {
+  return item?.path === '/api/v1/projects'
+    && ['modtale_key_projects', 'empty_x_modtale_key_projects'].includes(item.case || item.id);
+}
+
 
 class DiagnosticFailure extends Error {
   constructor(code, blocked = false) { super(code); this.code = code; this.blocked = blocked; }
@@ -134,6 +147,18 @@ function isApplicationProblem(response, body, item) {
       || value.title !== TITLES[response.status] || typeof value.detail !== 'string' || !value.detail) return false;
     const type = (response.headers.get('content-type') || '').split(';')[0].toLowerCase();
     const flattened = value.error === value.detail && value.message === value.detail && !Object.hasOwn(value, 'properties');
+    const nested = value.properties && typeof value.properties === 'object' && !Array.isArray(value.properties)
+      && Object.keys(value.properties).length === 2
+      && value.properties.error === value.detail && value.properties.message === value.detail
+      && !Object.hasOwn(value, 'error') && !Object.hasOwn(value, 'message');
+    // The real filter chain rejects an invalid nonempty key in RateLimitFilter
+    // before ApiKeyAuthFilter. Blank keys reach the latter. Their two literal
+    // messages identify only these fixed probes, across the two mapper shapes.
+    const safeType = !Object.hasOwn(value, 'type') || value.type === null || value.type === 'about:blank';
+    const safeInstance = !Object.hasOwn(value, 'instance') || value.instance === null || value.instance === item?.path;
+    if (isInvalidKeyProbe(item) && response.status === 401 && Object.values(INVALID_KEY_DETAILS).includes(value.detail)
+      && safeType && safeInstance && (flattened || nested)) return true;
+
     // Existing canonical ProblemDetail responses remain supported.
     if (value.type === 'about:blank' && flattened) return true;
     // Real ApiKeyAuthFilter -> GlobalExceptionHandler -> Spring MVC serialization
@@ -144,17 +169,44 @@ function isApplicationProblem(response, body, item) {
     // Direct ErrorMessageUtils.writeJsonError uses a bare Jackson3 ObjectMapper:
     // type and instance are null and extension fields stay under properties.
     // Accept only the two source-defined Spring Security denial messages here.
-    const directDetails = {
-      401: 'You need to sign in before performing this action. If you were already signed in, your session may have expired.',
-      403: 'You do not have permission to perform this action with the current account or API key.',
-    };
     return type === 'application/json' && value.type === null && value.instance === null
-      && value.detail === directDetails[response.status]
+      && value.detail === SECURITY_DENIAL_DETAILS[response.status]
       && !Object.hasOwn(value, 'error') && !Object.hasOwn(value, 'message')
       && value.properties && !Array.isArray(value.properties)
       && Object.keys(value.properties).length === 2
       && value.properties.error === value.detail && value.properties.message === value.detail;
   } catch { return false; }
+}
+
+export function summarizeErrorContract(response, body, item) {
+  const summary = {
+    jsonShape: 'invalid', statusMatches: false, titleMatches: false,
+    typeKind: 'unavailable', instanceKind: 'unavailable', detailKind: 'unavailable',
+    flatMirrorsMatch: false, nestedMirrorsMatch: false, propertiesKind: 'unavailable',
+    invalidKeyProbe: isInvalidKeyProbe(item), contractRecognized: false,
+  };
+  try {
+    const value = JSON.parse(body);
+    summary.jsonShape = Array.isArray(value) ? 'array' : value && typeof value === 'object' ? 'object' : 'scalar';
+    if (summary.jsonShape !== 'object') return summary;
+    summary.statusMatches = value.status === response.status;
+    summary.titleMatches = value.title === TITLES[response.status];
+    summary.typeKind = !Object.hasOwn(value, 'type') ? 'missing' : value.type === null ? 'null'
+      : value.type === 'about:blank' ? 'about_blank' : 'other';
+    summary.instanceKind = !Object.hasOwn(value, 'instance') ? 'missing' : value.instance === null ? 'null'
+      : typeof item?.path === 'string' && value.instance === item.path ? 'request_path' : 'other';
+    summary.detailKind = !Object.hasOwn(value, 'detail') ? 'missing' : typeof value.detail !== 'string' ? 'non_string'
+      : !value.detail ? 'empty' : value.detail === INVALID_KEY_DETAILS.rate_filter ? 'rate_filter_invalid_key'
+        : value.detail === INVALID_KEY_DETAILS.api_filter ? 'api_filter_invalid_key'
+          : Object.values(SECURITY_DENIAL_DETAILS).includes(value.detail) ? 'security_denial' : 'other_string';
+    summary.flatMirrorsMatch = typeof value.detail === 'string' && value.error === value.detail && value.message === value.detail;
+    summary.propertiesKind = !Object.hasOwn(value, 'properties') ? 'missing' : value.properties === null ? 'null'
+      : Array.isArray(value.properties) ? 'array' : typeof value.properties === 'object' ? 'object' : 'other';
+    summary.nestedMirrorsMatch = summary.propertiesKind === 'object' && typeof value.detail === 'string'
+      && value.properties.error === value.detail && value.properties.message === value.detail;
+    summary.contractRecognized = Boolean(isApplicationProblem(response, body, item));
+  } catch { /* Never retain raw parsing errors or content. */ }
+  return summary;
 }
 
 export function blockedReason(response, body, item) {
@@ -186,7 +238,7 @@ async function readBoundedBody(response) {
   } finally { reader.releaseLock(); }
 }
 
-function observation(response, item, startedAt, ttfbMs, totalMs) {
+function observation(response, item, startedAt, ttfbMs, totalMs, body) {
   const rawCacheStatus = response.headers.get('cf-cache-status');
   const cacheStatus = (rawCacheStatus || '').toUpperCase();
   const age = response.headers.get('age');
@@ -210,6 +262,7 @@ function observation(response, item, startedAt, ttfbMs, totalMs) {
     revision: /^[a-f0-9]{40}$/.test(revision || '') ? revision : null,
     setCookieObserved: response.headers.has('set-cookie'),
     csrfCookieObserved: csrfCookies(response).length > 0,
+    ...(response.status >= 400 ? { errorContract: summarizeErrorContract(response, body, item) } : {}),
   };
 }
 
@@ -306,7 +359,7 @@ export async function runApiHeaderDiagnostic(input, { request = requestWithoutBr
       const response = await request(url, options);
       const ttfb = now() - start;
       const body = await readBoundedBody(response);
-      const result = observation(response, item, startedAt, ttfb, now() - start);
+      const result = observation(response, item, startedAt, ttfb, now() - start, body);
       report.observations.push(result);
       result.result = validateObservation(response, body, result, fixed.requireEdge);
       if (result.result === 'public_bounded_300') {
