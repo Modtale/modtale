@@ -86,6 +86,10 @@ class MigrationTests(unittest.TestCase):
             return result
         with self.assertRaises(m.MigrationError):m.migrate('production',race)
         self.assertIsNone(base.upload)
+    def test_workflow_validates_before_authentication(self):
+        workflow=(scripts.parent/'workflows/migrate-secret-bundle.yml').read_text()
+        self.assertIn('contains(fromJSON',workflow)
+        self.assertLess(workflow.index('Validate migration tooling with synthetic data'),workflow.index('Authenticate main-project migration'))
     def test_workflow_manual_only(self):
         workflow=(scripts.parent/'workflows/migrate-secret-bundle.yml').read_text()
         self.assertIn('workflow_dispatch:',workflow)
