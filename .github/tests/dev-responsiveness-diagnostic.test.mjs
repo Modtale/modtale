@@ -180,6 +180,8 @@ test('workflow is manual, develop-only, credential-free and standard-runner with
   assert.match(workflow, /github\.ref_name == 'develop'/);
   assert.match(workflow, /runs-on: ubuntu-latest/);
   assert.match(workflow, /node-version: 22\.23\.3/);
+  assert.ok(!/DIAGNOSTIC_TOOL_ROOT: \$\{\{ runner\./.test(workflow));
+  assert.match(workflow, /export DIAGNOSTIC_TOOL_ROOT="\$RUNNER_TEMP\/modtale-diagnostic-tools"/);
   assert.match(workflow, /contents: read/);
   assert.ok(!/secrets\.|id-token:|actions: write|contents: write|environment:|run deploy|gcloud/i.test(workflow));
   assert.match(workflow, /@lhci\/cli@0\.15\.1/);

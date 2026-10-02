@@ -44,7 +44,6 @@ jobs:
       DIAGNOSTIC_PROJECT_PATH: ${{ inputs.project_path }}
       DIAGNOSTIC_WIKI_PATH: ${{ inputs.wiki_path }}
       DIAGNOSTIC_NEWS_PATH: ${{ inputs.news_path }}
-      DIAGNOSTIC_TOOL_ROOT: ${{ runner.temp }}/modtale-diagnostic-tools
       PUPPETEER_SKIP_DOWNLOAD: 'true'
     steps:
       - name: Check out diagnostic harness
@@ -65,6 +64,8 @@ jobs:
 
       - name: Use preinstalled runner Chrome and existing pinned Lighthouse tooling
         run: |
+          export DIAGNOSTIC_TOOL_ROOT="$RUNNER_TEMP/modtale-diagnostic-tools"
+          echo "DIAGNOSTIC_TOOL_ROOT=$DIAGNOSTIC_TOOL_ROOT" >> "$GITHUB_ENV"
           test -x /usr/bin/google-chrome
           /usr/bin/google-chrome --version
           npm install --prefix "$DIAGNOSTIC_TOOL_ROOT" --no-save --ignore-scripts @lhci/cli@0.15.1
