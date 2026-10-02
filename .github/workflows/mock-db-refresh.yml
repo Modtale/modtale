@@ -18,8 +18,9 @@ permissions:
   actions: write
 
 concurrency:
-  group: refresh-mock-database
+  group: modtale-secret-bundle-mutations-v1
   cancel-in-progress: false
+  queue: max
 
 jobs:
   refresh:
