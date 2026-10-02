@@ -45,6 +45,30 @@ class SecurityFilterChainTest {
     }
 
     @Test
+    void previewWritesStillRequireTheTokenMatchingTheCsrfCookie() throws Exception {
+        try (var context = new AnnotationConfigWebApplicationContext()) {
+            context.setServletContext(new MockServletContext());
+            context.register(TestSecurity.class);
+            context.refresh();
+            var csrf = context.getBean(SecurityFilterChain.class).getFilters().stream()
+                    .filter(CsrfFilter.class::isInstance).map(CsrfFilter.class::cast).findFirst().orElseThrow();
+            for (boolean cookie : new boolean[]{false, true}) {
+                for (String header : new String[]{"", "fixture-csrf", "different-token"}) {
+                    var request = new org.springframework.mock.web.MockHttpServletRequest("POST", "/api/v1/auth/logout");
+                    var response = new org.springframework.mock.web.MockHttpServletResponse();
+                    var reached = new java.util.concurrent.atomic.AtomicBoolean();
+                    if (cookie) request.setCookies(new jakarta.servlet.http.Cookie("XSRF-TOKEN", "fixture-csrf"));
+                    if (!header.isEmpty()) request.addHeader("X-XSRF-TOKEN", header);
+                    csrf.doFilter(request, response, (req, res) -> reached.set(true));
+                    boolean valid = cookie && "fixture-csrf".equals(header);
+                    assertEquals(valid, reached.get());
+                    if (!valid) assertEquals(403, response.getStatus());
+                }
+            }
+        }
+    }
+
+    @Test
     void enrollmentAuthorizationRejectsApiKeysAndRequiresBrowserCsrf() throws Exception {
         try (var context = new AnnotationConfigWebApplicationContext()) {
             context.setServletContext(new MockServletContext());

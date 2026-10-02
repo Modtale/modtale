@@ -17,6 +17,7 @@ import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.web.context.SecurityContextRepository;
+import org.springframework.security.web.csrf.CsrfTokenRepository;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -35,6 +36,7 @@ class AuthControllerTest {
     private TwoFactorService twoFactorService;
     private LauncherAuthService launcherAuthService;
     private SecurityContextRepository securityContextRepository;
+    private CsrfTokenRepository csrfTokenRepository;
 
     @BeforeEach
     void setUp() {
@@ -44,6 +46,7 @@ class AuthControllerTest {
         twoFactorService = mock(TwoFactorService.class);
         launcherAuthService = mock(LauncherAuthService.class);
         securityContextRepository = mock(SecurityContextRepository.class);
+        csrfTokenRepository = mock(CsrfTokenRepository.class);
         controller = new AuthController(
                 authenticationService,
                 authenticationMutationService,
@@ -51,7 +54,8 @@ class AuthControllerTest {
                 twoFactorService,
                 launcherAuthService,
                 securityContextRepository,
-                mock(net.modtale.service.auth.MfaEnrollmentService.class)
+                mock(net.modtale.service.auth.MfaEnrollmentService.class),
+                csrfTokenRepository
         );
     }
 
@@ -92,6 +96,7 @@ class AuthControllerTest {
 
         assertEquals(200, result.getStatusCode().value());
         verify(securityContextRepository).saveContext(org.springframework.security.core.context.SecurityContextHolder.createEmptyContext(), request, response);
+        verify(csrfTokenRepository).saveToken(null, request, response);
     }
 
     @Test

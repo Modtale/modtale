@@ -35,7 +35,7 @@ class LoginSessionRotationTest {
   @Bean AccountService accounts(){return mock(AccountService.class);}
   @Bean SecurityContextRepository sessions(){return new HttpSessionSecurityContextRepository();}
   @Bean ClientRegistrationRepository clients(){return mock(ClientRegistrationRepository.class);}
-  @Bean AuthController controller(AuthenticationService a,LauncherAuthService l,TwoFactorService f,AccountService u,SecurityContextRepository s){return new AuthController(a,mock(AuthenticationMutationService.class),u,f,l,s,mock(MfaEnrollmentService.class));}
+  @Bean AuthController controller(AuthenticationService a,LauncherAuthService l,TwoFactorService f,AccountService u,SecurityContextRepository s){return new AuthController(a,mock(AuthenticationMutationService.class),u,f,l,s,mock(MfaEnrollmentService.class),mock(org.springframework.security.web.csrf.CsrfTokenRepository.class));}
   @Bean SecurityFilterChain chain(HttpSecurity http,AuthenticationService auth,LauncherAuthService launcher,AccountService accounts)throws Exception {
    var keys=mock(ApiKeyService.class);
    var config=new SecurityConfig(new ApiKeyAuthFilter(keys,(req,res,h,e)->{res.setStatus(401);return new org.springframework.web.servlet.ModelAndView();}),new RateLimitFilter(keys),
