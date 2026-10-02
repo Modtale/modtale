@@ -99,12 +99,24 @@ function cachePolicy(raw = '') {
   return policy;
 }
 
-export function publicProjectFixture(body) {
+export function publicProjectFixture(body, { verifiedAnonymousCatalog = false } = {}) {
   try {
     const value = JSON.parse(body);
     if (!Array.isArray(value?.content)) return null;
     for (const project of value.content.slice(0, 20)) {
-      if (!project || !['PUBLISHED', 'ARCHIVED'].includes(project.status)) continue;
+      if (!project || typeof project !== 'object' || Array.isArray(project)) continue;
+      if (Object.hasOwn(project, 'status')) {
+        if (!['PUBLISHED', 'ARCHIVED'].includes(project.status)) continue;
+      } else {
+        // ProjectMapper.toSummaryDTO(false) omits status and management fields.
+        // Only the already-verified, query-free anonymous catalog can establish
+        // public scope: its repository query filters PUBLISHED/ARCHIVED projects.
+        if (!verifiedAnonymousCatalog || typeof project.id !== 'string' || !project.id
+          || typeof project.title !== 'string' || !project.title
+          || !Number.isInteger(project.downloadCount) || project.downloadCount < 0
+          || !Number.isInteger(project.favoriteCount) || project.favoriteCount < 0
+          || ['canEdit', 'isOwner', 'versions'].some(name => Object.hasOwn(project, name))) continue;
+      }
       const segment = project.slug || project.id;
       if (typeof segment !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9-]{0,127}$/.test(segment)) continue;
       const prefixes = { PLUGIN: 'mod', DATA: 'mod', ART: 'mod', MODPACK: 'modpack', SAVE: 'world' };
@@ -114,25 +126,44 @@ export function publicProjectFixture(body) {
   return null;
 }
 
-function isApplicationProblem(response, body) {
+function isApplicationProblem(response, body, item) {
   if (!/^(?:application\/json|application\/problem\+json)(?:;|$)/i.test(response.headers.get('content-type') || '')) return false;
   try {
     const value = JSON.parse(body);
-    // ErrorMessageUtils emits these fields for API-key and Spring-security errors.
-    // A generic JSON or HTML403 is not evidence that the application rejected a credential.
-    return value && value.type === 'about:blank' && value.status === response.status
-      && value.title === TITLES[response.status] && typeof value.detail === 'string' && value.detail.length > 0
-      && value.error === value.detail && value.message === value.detail;
+    if (!value || Array.isArray(value) || value.status !== response.status
+      || value.title !== TITLES[response.status] || typeof value.detail !== 'string' || !value.detail) return false;
+    const type = (response.headers.get('content-type') || '').split(';')[0].toLowerCase();
+    const flattened = value.error === value.detail && value.message === value.detail && !Object.hasOwn(value, 'properties');
+    // Existing canonical ProblemDetail responses remain supported.
+    if (value.type === 'about:blank' && flattened) return true;
+    // Real ApiKeyAuthFilter -> GlobalExceptionHandler -> Spring MVC serialization
+    // flattens extension fields, omits the default type, and sets instance to the
+    // request path. Require that exact shape and the actual scoped request path.
+    if (!Object.hasOwn(value, 'type') && type === 'application/problem+json'
+      && typeof item?.path === 'string' && value.instance === item.path && flattened) return true;
+    // Direct ErrorMessageUtils.writeJsonError uses a bare Jackson3 ObjectMapper:
+    // type and instance are null and extension fields stay under properties.
+    // Accept only the two source-defined Spring Security denial messages here.
+    const directDetails = {
+      401: 'You need to sign in before performing this action. If you were already signed in, your session may have expired.',
+      403: 'You do not have permission to perform this action with the current account or API key.',
+    };
+    return type === 'application/json' && value.type === null && value.instance === null
+      && value.detail === directDetails[response.status]
+      && !Object.hasOwn(value, 'error') && !Object.hasOwn(value, 'message')
+      && value.properties && !Array.isArray(value.properties)
+      && Object.keys(value.properties).length === 2
+      && value.properties.error === value.detail && value.properties.message === value.detail;
   } catch { return false; }
 }
 
-export function blockedReason(response, body) {
+export function blockedReason(response, body, item) {
   if (response.status === 429) return 'rate_limited_no_retry';
   if (/challenge/i.test(response.headers.get('cf-mitigated') || '')) return 'waf_challenge';
   if (/\/cdn-cgi\/challenge-platform\/|challenges\.cloudflare\.com\/turnstile\//i.test(response.headers.get('location') || '')) return 'waf_challenge_redirect';
   if (/<title[^>]*>\s*(?:Just a moment|Attention Required)[^<]*<\/title>|cf-chl-(?:widget|managed|captcha)|\/cdn-cgi\/challenge-platform\//i.test(body)) return 'waf_challenge_markup';
   if (response.status >= 400 && /\b(?:error\s*(?:code)?\s*[:=]?\s*1010|cloudflare\s+(?:error\s*)?1010)\b/i.test(body)) return 'waf_1010';
-  if ([401, 403].includes(response.status) && !isApplicationProblem(response, body)) return 'unrecognized_access_denial';
+  if ([401, 403].includes(response.status) && !isApplicationProblem(response, body, item)) return 'unrecognized_access_denial';
   return null;
 }
 
@@ -217,11 +248,11 @@ function requirePublicPolicy(item, requireEdge) {
 }
 
 export function validateObservation(response, body, item, requireEdge = true) {
-  const reason = blockedReason(response, body);
+  const reason = blockedReason(response, body, item);
   if (reason) throw new DiagnosticFailure(reason, true);
   requireCondition(response.status < 300 || response.status >= 400, 'redirect_not_followed');
   if (response.status >= 400) {
-    requireCondition(isApplicationProblem(response, body), 'unrecognized_application_error_contract');
+    requireCondition(isApplicationProblem(response, body, item), 'unrecognized_application_error_contract');
     if (item.kind === 'missing') requireCondition([404, 410].includes(response.status), 'missing_fixture_not_authoritatively_missing');
     requireNoStore(item, requireEdge);
     return 'application_error_no_store';
@@ -289,7 +320,7 @@ export async function runApiHeaderDiagnostic(input, { request = requestWithoutBr
           else report.confirmedCatalogHit = true;
         }
         if (item.id === 'anonymous_projects') {
-          report.publicProjectFixturePath = publicProjectFixture(body);
+          report.publicProjectFixturePath = publicProjectFixture(body, { verifiedAnonymousCatalog: true });
           report.projectFixtureAvailable = report.publicProjectFixturePath !== null;
           if (report.projectFixtureAvailable) {
             const segment = report.publicProjectFixturePath.split('/').at(-1);

@@ -450,3 +450,99 @@ test('absent or unsafe public fixture limits coverage and never widens request s
   assert.equal(gone.errorCode, 'project_policy_not_fully_observed');
   assert.equal(gone.edgeVerified, false);
 });
+
+
+// Captured from local real ApiKeyAuthFilter -> GlobalExceptionHandler MVC output.
+const mvcKeyDenial = {
+  detail: 'Authentication is required to perform this action: Invalid API Key.',
+  instance: '/api/v1/projects', status: 401, title: 'Unauthorized',
+  error: 'Authentication is required to perform this action: Invalid API Key.',
+  message: 'Authentication is required to perform this action: Invalid API Key.',
+};
+// Captured from local ProjectMapper.toSummaryDTO(publicProject) Jackson output.
+const publicSummaryDto = {
+  id: 'fixture-id', slug: 'fixture-slug', title: 'Fixture', classification: 'PLUGIN', downloadCount: 0, favoriteCount: 0,
+};
+
+test('real MVC API-key rejection with omitted type and exact instance is recognized', async () => {
+  for (const target of ['dev', 'production']) {
+    const report = await runApiHeaderDiagnostic(input(target), { request: async (url, options) => fixture(url, options,
+      options.headers && Object.hasOwn(options.headers, 'X-Modtale-Key')
+        ? { status: 401, body: mvcKeyDenial, headers: { 'content-type': 'application/problem+json' } } : {}) });
+    assert.equal(report.status, 'complete', report.errorCode);
+    assert.equal(report.applicationErrorCount, 3);
+    assert.ok(!JSON.stringify(report).includes('Authentication is required'));
+  }
+  for (const body of [
+    { ...mvcKeyDenial, instance: '/api/v1/other' },
+    { ...mvcKeyDenial, instance: undefined },
+    { ...mvcKeyDenial, type: 'https://unrecognized.test/problem' },
+    { ...mvcKeyDenial, type: null },
+    { ...mvcKeyDenial, status: 403 },
+    { ...mvcKeyDenial, title: 'Forbidden' },
+    { ...mvcKeyDenial, message: 'unrelated' },
+    { ...mvcKeyDenial, properties: { error: 'conflicting' } },
+  ]) {
+    const report = await runApiHeaderDiagnostic(input(), { request: async (url, options) => fixture(url, options,
+      options.headers?.['X-Modtale-Key'] ? { status: 401, body } : {}) });
+    assert.equal(report.status, 'blocked');
+    assert.equal(report.errorCode, 'unrecognized_access_denial');
+  }
+});
+
+test('bare Jackson SecurityConfig denial is recognized only with exact nested contract', async () => {
+  for (const [status, detail] of [
+    [401, 'You need to sign in before performing this action. If you were already signed in, your session may have expired.'],
+    [403, 'You do not have permission to perform this action with the current account or API key.'],
+  ]) {
+    const body = { detail, instance: null, properties: { error: detail, message: detail }, status, title: TITLES[status], type: null };
+    const report = await runApiHeaderDiagnostic(input(), { request: async (url, options) => fixture(url, options,
+      options.headers?.Authorization ? { status, body, headers: { 'content-type': 'application/json' } } : {}) });
+    assert.equal(report.status, 'complete', report.errorCode);
+    for (const invalid of [
+      { ...body, detail: 'generic denial', properties: { error: 'generic denial', message: 'generic denial' } },
+      { ...body, instance: '/unexpected' },
+      { ...body, properties: { error: detail } },
+      { ...body, error: detail },
+      { ...body, properties: { error: detail, message: detail, unexpected: true } },
+    ]) {
+      const blocked = await runApiHeaderDiagnostic(input(), { request: async (url, options) => fixture(url, options,
+        options.headers?.Authorization ? { status, body: invalid, headers: { 'content-type': 'application/json' } } : {}) });
+      assert.equal(blocked.status, 'blocked');
+      assert.equal(blocked.errorCode, 'unrecognized_access_denial');
+    }
+    const waf = await runApiHeaderDiagnostic(input(), { request: async (url, options) => fixture(url, options,
+      { status, body, headers: { 'content-type': 'application/json', 'cf-mitigated': 'challenge' } }) });
+    assert.equal(waf.status, 'blocked');
+    assert.equal(waf.errorCode, 'waf_challenge');
+    assert.equal(waf.requestCount, 1);
+  }
+});
+
+test('source-proven public summary DTO permits missing status only in a verified anonymous catalog', async () => {
+  const body = JSON.stringify({ content: [publicSummaryDto] });
+  assert.equal(publicProjectFixture(body), null);
+  assert.equal(publicProjectFixture(body, { verifiedAnonymousCatalog: true }), '/mod/fixture-slug');
+  assert.equal(publicProjectFixture(JSON.stringify({ content: [{ ...publicSummaryDto, slug: undefined }] }),
+    { verifiedAnonymousCatalog: true }), '/mod/fixture-id');
+  for (const override of [
+    { status: 'DRAFT' }, { status: 'PRIVATE' }, { status: 'UNLISTED' }, { status: null }, { status: 'UNKNOWN' },
+    { canEdit: true }, { isOwner: false }, { versions: [] }, { title: undefined }, { id: undefined },
+    { downloadCount: undefined }, { favoriteCount: -1 }, { classification: '__proto__' },
+    { slug: 'https://attacker.test' }, { slug: 'secret?token=value' }, { slug: '../private' },
+  ]) {
+    assert.equal(publicProjectFixture(JSON.stringify({ content: [{ ...publicSummaryDto, ...override }] }),
+      { verifiedAnonymousCatalog: true }), null);
+  }
+  const paths = [];
+  const report = await runApiHeaderDiagnostic(input('production'), { request: async (url, options) => {
+    paths.push(new URL(url).pathname);
+    return fixture(url, options, new URL(url).pathname === '/api/v1/projects' && !options.headers
+      ? { body: { content: [publicSummaryDto] } } : {});
+  } });
+  assert.equal(report.status, 'complete', report.errorCode);
+  assert.equal(report.projectFixtureAvailable, true);
+  assert.equal(report.publicProjectFixturePath, '/mod/fixture-slug');
+  assert.deepEqual(paths.slice(-2), ['/api/v1/projects/fixture-slug', '/api/v1/projects/fixture-slug']);
+  assert.equal(paths.length, MAX_REQUESTS);
+});
