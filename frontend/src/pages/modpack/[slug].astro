@@ -1,4 +1,6 @@
 ---
+import { HTML_CACHE, setPublicHtmlCache, setNoStore } from '@/utils/htmlCache';
+import { fetchPublicJson, isProjectData, isPublicProject } from '@/utils/publicSsr';
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import App from '../../App';
 import { SiteRoutes } from '../../utils/routes';
@@ -18,7 +20,8 @@ const cleanPath = path.replace(/\/$/, "");
 const projectId = slug ? SiteRoutes.extractId(slug) : '';
 
 let modData = null;
-let projectUnavailable = false;
+let projectUnavailableStatus = 0;
+let robots = 'index,follow';
 let title = ROUTE_SEO['/modpacks'].title;
 let description = ROUTE_SEO['/modpacks'].description;
 let image = getProjectOgImageUrl(projectId);
@@ -26,15 +29,10 @@ let jsonLd: any = undefined;
 let ssrSuccessfullyCompleted = false;
 
 if (projectId) {
-    const controller = new AbortController();
-    const timeoutHandle = setTimeout(() => controller.abort(), 2500);
-
     try {
-        const res = await fetch(`${SERVER_BACKEND_URL}/api/v1/projects/${projectId}`, {
-            signal: controller.signal,
-        });
-        if (res.ok) {
-            modData = await res.json();
+        const result = await fetchPublicJson(`${SERVER_BACKEND_URL}/api/v1/projects/${encodeURIComponent(projectId)}`, 2500);
+        if (isProjectData(result.data)) {
+            modData = result.data;
 
             const canonicalUrl = SiteRoutes.project(modData);
             if (cleanPath !== canonicalUrl.replace(/\/$/, "")) {
@@ -52,27 +50,32 @@ if (projectId) {
                 generateOrganizationSchema(),
                 ...generateProjectSchemas(modData),
             ];
-            ssrSuccessfullyCompleted = true;
-        } else if (res.status === 404 || res.status === 410) {
-            projectUnavailable = true;
+            ssrSuccessfullyCompleted = isPublicProject(modData);
+            if (!ssrSuccessfullyCompleted) robots = 'noindex,follow';
+        } else if (result.status === 404 || result.status === 410) {
+            projectUnavailableStatus = result.status;
         }
     } catch (e) {
-        projectUnavailable = false;
-    } finally {
-        clearTimeout(timeoutHandle);
+        projectUnavailableStatus = 0;
     }
 }
 
+if (projectUnavailableStatus) {
+    Astro.response.status = projectUnavailableStatus;
+    robots = 'noindex,follow';
+    title = 'Project unavailable | Modtale';
+    description = 'This project is no longer available on Modtale.';
+}
 if (ssrSuccessfullyCompleted) {
-    Astro.response.headers.set('Cache-Control', 'public, max-age=60, s-maxage=600, stale-while-revalidate=86400');
+    setPublicHtmlCache(Astro.response.headers, HTML_CACHE.content);
 } else {
-    Astro.response.headers.set('Cache-Control', 'public, max-age=0, s-maxage=0, must-revalidate');
+    setNoStore(Astro.response.headers);
 }
 
-const projectInitialData = modData || (projectUnavailable && projectId ? { __projectUnavailable: true, id: projectId } : null);
+const projectInitialData = modData || (projectUnavailableStatus && projectId ? { __projectUnavailable: true, id: projectId } : null);
 const projectBootstrapUrl = !projectInitialData && projectId ? `${BACKEND_URL}/api/v1/projects/${projectId}` : undefined;
 ---
 
-<BaseLayout title={title} description={description} image={image} jsonLd={jsonLd} initialData={projectInitialData} projectBootstrapUrl={projectBootstrapUrl}>
+<BaseLayout title={title} description={description} image={image} jsonLd={jsonLd} initialData={projectInitialData} projectBootstrapUrl={projectBootstrapUrl} robots={robots}>
     <App client:load initialPath={path} ssrData={projectInitialData} />
 </BaseLayout>

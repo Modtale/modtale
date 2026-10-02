@@ -59,11 +59,22 @@ public class CacheConfig {
                 .maximumSize(10000)
                 .recordStats());
 
-        registerWeightedWikiCache(cacheManager, "wikiProjectPayload", WIKI_METADATA_CACHE_MAX_WEIGHT_BYTES, Duration.ofMinutes(30));
-        registerWeightedWikiCache(cacheManager, "wikiProjectJson", WIKI_METADATA_CACHE_MAX_WEIGHT_BYTES, Duration.ofMinutes(30));
-        registerWeightedWikiCache(cacheManager, "wikiPagePayload", WIKI_PAGE_CACHE_MAX_WEIGHT_BYTES, Duration.ofMinutes(30));
-        registerWeightedWikiCache(cacheManager, "wikiPageJson", WIKI_PAGE_CACHE_MAX_WEIGHT_BYTES, Duration.ofMinutes(30));
-        registerWeightedWikiCache(cacheManager, "wikiPageBundleJson", WIKI_PAGE_CACHE_MAX_WEIGHT_BYTES, Duration.ofMinutes(30));
+        // Other instances cannot observe a process-local eviction. Bound public origin staleness
+        // as well as edge staleness, including while purging is disabled or unavailable.
+        for (String cacheName : List.of("projectDetails", "projectDetailDtos", "projectPageDtos",
+                "projectVersionDtos", "projectCommentDtos", "projectGalleryDtos", "projectTeamDtos",
+                "projectVersionChangelogs", "projectVersionChangelogPages", "projectMetaDtos",
+                "projectSearch", "projectSummarySearch", "projectMarqueeSearch",
+                "projectMarqueeSummarySearch", "sitemapData", "platformStats")) {
+            cacheManager.registerCustomCache(cacheName, Caffeine.newBuilder()
+                    .expireAfterWrite(Duration.ofMinutes(5)).maximumSize(10000).recordStats().build());
+        }
+
+        registerWeightedWikiCache(cacheManager, "wikiProjectPayload", WIKI_METADATA_CACHE_MAX_WEIGHT_BYTES, Duration.ofMinutes(5));
+        registerWeightedWikiCache(cacheManager, "wikiProjectJson", WIKI_METADATA_CACHE_MAX_WEIGHT_BYTES, Duration.ofMinutes(5));
+        registerWeightedWikiCache(cacheManager, "wikiPagePayload", WIKI_PAGE_CACHE_MAX_WEIGHT_BYTES, Duration.ofMinutes(5));
+        registerWeightedWikiCache(cacheManager, "wikiPageJson", WIKI_PAGE_CACHE_MAX_WEIGHT_BYTES, Duration.ofMinutes(5));
+        registerWeightedWikiCache(cacheManager, "wikiPageBundleJson", WIKI_PAGE_CACHE_MAX_WEIGHT_BYTES, Duration.ofMinutes(5));
 
         return cacheManager;
     }

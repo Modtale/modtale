@@ -15,6 +15,7 @@ import net.modtale.service.security.validation.SanitizationService;
 import net.modtale.service.user.connection.ConnectedAccountMutationService;
 import net.modtale.util.MongoIdUtils;
 import net.modtale.validation.AccountNameRules;
+import net.modtale.service.system.PublicCreatorCacheService;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
@@ -26,6 +27,8 @@ import org.springframework.stereotype.Service;
 
 @Service
 public class AccountService {
+
+    private final PublicCreatorCacheService publicCreatorCacheService;
 
     private static final int MAX_LAUNCHER_SYNC_PROJECTS = 500;
     private static final int MAX_LAUNCHER_SYNC_LIST_ITEMS = 64;
@@ -49,8 +52,10 @@ public class AccountService {
             OAuthAvatarHealingService oauthAvatarHealingService,
             AccountLifecycleService accountLifecycleService,
             ConnectedAccountMutationService connectedAccountMutationService,
-            AccountPreferencesPersistence preferencesPersistence
+            AccountPreferencesPersistence preferencesPersistence,
+            PublicCreatorCacheService publicCreatorCacheService
     ) {
+        this.publicCreatorCacheService = publicCreatorCacheService;
         this.userRepository = userRepository;
         this.preferencesPersistence = preferencesPersistence;
         this.mongoTemplate = mongoTemplate;
@@ -145,7 +150,9 @@ public class AccountService {
             );
         }
 
-        return userRepository.save(user);
+        User saved = userRepository.save(user);
+        publicCreatorCacheService.creatorChanged();
+        return saved;
     }
 
     public void updateUserAvatar(String userId, String url) {
@@ -201,6 +208,7 @@ public class AccountService {
         OAuthProvider targetProvider = OAuthProvider.fromString(provider);
         if (connectedAccountMutationService.toggleVisibility(user, targetProvider)) {
             userRepository.save(user);
+            publicCreatorCacheService.creatorChanged();
         }
     }
 
@@ -221,6 +229,7 @@ public class AccountService {
 
         if (connectedAccountMutationService.unlink(user, targetProvider)) {
             userRepository.save(user);
+            publicCreatorCacheService.creatorChanged();
         }
     }
 
@@ -257,6 +266,10 @@ public class AccountService {
             throw new org.springframework.web.server.ResponseStatusException(
                     org.springframework.http.HttpStatus.CONFLICT,
                     "Account changed while saving settings. Refresh and retry.");
+        }
+        if (field == AccountPreferencesPersistence.Field.AVATAR
+                || field == AccountPreferencesPersistence.Field.BANNER) {
+            publicCreatorCacheService.creatorChanged();
         }
     }
 

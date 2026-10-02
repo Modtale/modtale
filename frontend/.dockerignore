@@ -1,0 +1,23 @@
+# Build contexts and intermediate layers are cached in this public repository.
+.git
+node_modules
+.astro
+.next
+dist
+build
+.lighthouseci
+coverage
+**/.npmrc
+**/.aws
+**/.ssh
+**/.docker
+**/.config/gcloud
+**/.env
+**/.env.*
+**/*.pem
+**/*.key
+**/credentials*.json
+**/*service-account*.json
+**/gha-creds-*.json
+**/secrets
+*.log

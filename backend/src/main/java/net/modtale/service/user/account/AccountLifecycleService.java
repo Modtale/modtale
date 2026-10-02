@@ -8,6 +8,7 @@ import net.modtale.model.user.User;
 import net.modtale.repository.user.ApiKeyRepository;
 import net.modtale.repository.user.UserRepository;
 import net.modtale.service.analytics.TrackingService;
+import net.modtale.service.system.PublicCreatorCacheService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.mongodb.core.MongoTemplate;
@@ -18,6 +19,8 @@ import org.springframework.stereotype.Service;
 
 @Service
 public class AccountLifecycleService {
+
+    private final PublicCreatorCacheService publicCreatorCacheService;
 
     private static final Logger logger = LoggerFactory.getLogger(AccountLifecycleService.class);
 
@@ -30,8 +33,10 @@ public class AccountLifecycleService {
             UserRepository userRepository,
             ApiKeyRepository apiKeyRepository,
             MongoTemplate mongoTemplate,
-            TrackingService trackingService
+            TrackingService trackingService,
+            PublicCreatorCacheService publicCreatorCacheService
     ) {
+        this.publicCreatorCacheService = publicCreatorCacheService;
         this.userRepository = userRepository;
         this.apiKeyRepository = apiKeyRepository;
         this.mongoTemplate = mongoTemplate;
@@ -48,6 +53,7 @@ public class AccountLifecycleService {
         user.setGitlabRefreshToken(null);
 
         userRepository.save(user);
+        publicCreatorCacheService.creatorChanged();
 
         if (user.getAccountType() == User.AccountType.ORGANIZATION) {
             trackingService.logDeletedOrg(user.getId());
@@ -66,6 +72,7 @@ public class AccountLifecycleService {
 
         user.setDeletedAt(null);
         userRepository.save(user);
+        publicCreatorCacheService.creatorChanged();
 
         if (user.getAccountType() == User.AccountType.ORGANIZATION) {
             trackingService.logNewOrg(user.getId());
@@ -104,6 +111,7 @@ public class AccountLifecycleService {
         );
 
         userRepository.deleteById(user.getId());
+        publicCreatorCacheService.creatorChanged();
         logger.info("Permanently deleted user account: {} ({})", user.getUsername(), user.getId());
     }
 }

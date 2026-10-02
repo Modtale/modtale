@@ -44,7 +44,8 @@ class AccountServiceTest {
                 oauthAvatarHealingService,
                 mock(AccountLifecycleService.class),
                 mock(ConnectedAccountMutationService.class),
-                preferencesPersistence
+                preferencesPersistence,
+                mock(net.modtale.service.system.PublicCreatorCacheService.class)
         );
     }
 

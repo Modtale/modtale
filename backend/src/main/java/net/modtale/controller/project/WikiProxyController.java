@@ -24,7 +24,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/wiki")
 public class WikiProxyController {
 
-    private static final String PUBLIC_WIKI_CACHE_CONTROL = "public, max-age=300, s-maxage=3600, stale-while-revalidate=86400";
+    private static final String PUBLIC_WIKI_CACHE_CONTROL = "public, max-age=0, s-maxage=300, must-revalidate";
 
     private final WikiService wikiService;
     private final AccountService accountService;

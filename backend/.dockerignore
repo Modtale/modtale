@@ -1,0 +1,22 @@
+# Build contexts and intermediate layers are cached in this public repository.
+.git
+.gradle
+build
+out
+bin
+generated
+gradle.properties
+**/.npmrc
+**/.aws
+**/.ssh
+**/.docker
+**/.config/gcloud
+**/.env
+**/.env.*
+**/*.pem
+**/*.key
+**/credentials*.json
+**/*service-account*.json
+**/gha-creds-*.json
+**/secrets
+*.log

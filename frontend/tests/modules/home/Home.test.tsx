@@ -6,6 +6,7 @@ import { HelmetProvider } from 'react-helmet-async';
 import { SSRProvider } from '@/context/SSRContext';
 import { Home } from '@/modules/home/views/Home';
 import { api } from '@/utils/api';
+import { buildHomeBootstrap } from '@/utils/publicSsr';
 
 vi.mock('@/modules/news/api/newsClient', () => ({ newsClient: { list: vi.fn().mockResolvedValue([]) } }));
 
@@ -25,8 +26,8 @@ vi.mock('@/modules/home/components/HeroMarquee', () => ({
 }));
 
 vi.mock('@/modules/home/components/FeaturePreviews', () => ({
-    TrendingProjectsSection: () => <div data-testid="trending-projects-section" />,
-    NewReleasesSection: () => <div data-testid="new-releases-section" />,
+    TrendingProjectsSection: ({ projects }: { projects: unknown[] }) => <div data-testid="trending-projects-section" data-project-count={projects.length} />,
+    NewReleasesSection: ({ projects }: { projects: unknown[] }) => <div data-testid="new-releases-section" data-project-count={projects.length} />,
     ModpackPreviewSection: () => <div data-testid="modpack-preview-section" />,
     DirectDownloadsSection: () => <div data-testid="direct-downloads-section" />,
     LauncherPreviewSection: () => <div data-testid="launcher-preview-section" />,
@@ -98,6 +99,75 @@ describe('Home fallback requests', () => {
         Object.defineProperty(window, 'innerWidth', { configurable: true, writable: true, value: originalInnerWidth });
         Object.defineProperty(window, 'innerHeight', { configurable: true, writable: true, value: originalInnerHeight });
         vi.useRealTimers();
+    });
+
+    const renderHome = async (data: any) => {
+        await act(async () => {
+            root.render(
+                <SSRProvider data={data} initialPath="/">
+                    <HelmetProvider><MemoryRouter initialEntries={['/']}><Home /></MemoryRouter></HelmetProvider>
+                </SSRProvider>
+            );
+        });
+    };
+
+    it('retries every homepage section after all SSR requests fail', async () => {
+        await renderHome(buildHomeBootstrap(null, null, null, null));
+        expect(mockedApi.get).toHaveBeenCalledWith('/projects', { params: { size: 16, sort: 'popular', view: 'marquee' }, timeout: 1800 });
+        expect(mockedApi.get).toHaveBeenCalledWith('/projects', { params: { size: 12, sort: 'trending' }, timeout: 1800 });
+        expect(mockedApi.get).toHaveBeenCalledWith('/projects', { params: { size: 12, sort: 'newest' }, timeout: 1800 });
+        expect(mockedApi.get).toHaveBeenCalledWith('/analytics/platform/stats', { timeout: 1800 });
+    });
+
+    it('does not refetch successfully empty SSR sections', async () => {
+        const empty = { content: [] };
+        await renderHome(buildHomeBootstrap(empty, empty, empty, { totalProjects: 0, totalDownloads: 0, totalUsers: 0 }));
+        await act(async () => { await vi.advanceTimersByTimeAsync(200); });
+        expect(mockedApi.get).not.toHaveBeenCalled();
+        expect(container.querySelector('[data-testid="home-hero-marquee-skeleton"]')).toBeFalsy();
+    });
+
+    it('retries only failed lists when marquee and stats succeeded', async () => {
+        await renderHome(buildHomeBootstrap({ content: [] }, null, null, { totalProjects: 1, totalDownloads: 2, totalUsers: 3 }));
+        expect(mockedApi.get).toHaveBeenCalledTimes(2);
+        expect(mockedApi.get).toHaveBeenCalledWith('/projects', { params: { size: 12, sort: 'trending' }, timeout: 1800 });
+        expect(mockedApi.get).toHaveBeenCalledWith('/projects', { params: { size: 12, sort: 'newest' }, timeout: 1800 });
+    });
+
+    it('retries failed stats even when every project list succeeded', async () => {
+        const empty = { content: [] };
+        await renderHome(buildHomeBootstrap(empty, empty, empty, null));
+        expect(mockedApi.get).toHaveBeenCalledExactlyOnceWith('/analytics/platform/stats', { timeout: 1800 });
+    });
+
+    it('keeps a successful seed visible while refreshing a missing section in the background', async () => {
+        const seed = { content: [{ id: 'sky', title: 'Sky Tools' }] };
+        await renderHome(buildHomeBootstrap({ content: [] }, seed, null, { totalProjects: 1, totalDownloads: 2, totalUsers: 3 }));
+        expect(mockedApi.get).not.toHaveBeenCalled();
+        await act(async () => { await vi.advanceTimersByTimeAsync(200); });
+        expect(mockedApi.get).toHaveBeenCalledExactlyOnceWith('/projects', { params: { size: 12, sort: 'newest' }, timeout: 1800 });
+    });
+
+    it('preserves an authoritative empty newest list instead of substituting trending projects', async () => {
+        const seed = { content: [{ id: 'sky', title: 'Sky Tools' }] };
+        await renderHome(buildHomeBootstrap({ content: [] }, seed, { content: [] }, { totalProjects: 1, totalDownloads: 2, totalUsers: 3 }));
+        await act(async () => { MockObserver.triggerAll(); await vi.advanceTimersByTimeAsync(50); });
+        expect(container.querySelector('[data-testid="new-releases-section"]')?.getAttribute('data-project-count')).toBe('0');
+        expect(mockedApi.get).not.toHaveBeenCalled();
+    });
+
+    it('replaces a borrowed seed with an authoritative empty client response', async () => {
+        const seed = { content: [{ id: 'sky', title: 'Sky Tools' }] };
+        await renderHome(buildHomeBootstrap({ content: [] }, seed, null, { totalProjects: 1, totalDownloads: 2, totalUsers: 3 }));
+        await act(async () => { MockObserver.triggerAll(); await vi.advanceTimersByTimeAsync(50); });
+        expect(container.querySelector('[data-testid="new-releases-section"]')?.getAttribute('data-project-count')).toBe('1');
+        await act(async () => { await vi.advanceTimersByTimeAsync(200); });
+        expect(container.querySelector('[data-testid="new-releases-section"]')?.getAttribute('data-project-count')).toBe('0');
+    });
+
+    it('does not crash on malformed SSR list entries and retries missing sections', async () => {
+        await renderHome({ homeDataReady: true, homeMarqueeProjects: [null], homeTrendingProjects: [{}], homeNewestProjects: 'bad', stats: null });
+        expect(mockedApi.get).toHaveBeenCalledTimes(4);
     });
 
     it('renders the hero immediately when SSR projects are already available', async () => {

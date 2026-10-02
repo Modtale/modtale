@@ -92,7 +92,7 @@ class MetadataServiceTest {
         assertFalse(existing.isCustomLicenseOpenSource());
         verify(validationService).validateSlug("new-slug");
         verify(projectRepository).save(existing);
-        verify(projectService).evictProjectCache(existing);
+        verify(projectService).evictProjectDetailsCaches(org.mockito.ArgumentMatchers.argThat(projects -> projects.size() == 2 && projects.contains(existing)), org.mockito.ArgumentMatchers.eq(List.of()));
     }
 
     @Test

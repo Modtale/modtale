@@ -12,7 +12,7 @@ ENV SSR_API_URL=$SSR_API_URL
 ARG PUBLIC_STATUS_URL
 ENV PUBLIC_STATUS_URL=$PUBLIC_STATUS_URL
 
-RUN npm run build && npm prune --omit=dev --legacy-peer-deps
+RUN npm run check && npm test && npm run build && npm run test:html-cache && npm prune --omit=dev --legacy-peer-deps
 
 FROM node:22.12.0-alpine
 WORKDIR /app

@@ -42,7 +42,7 @@ class WikiProxyControllerTest {
 
         assertEquals(200, response.getStatusCode().value());
         assertEquals(MediaType.APPLICATION_JSON, response.getHeaders().getContentType());
-        assertTrue(response.getHeaders().getFirst(HttpHeaders.CACHE_CONTROL).contains("max-age=300"));
+        assertTrue(response.getHeaders().getFirst(HttpHeaders.CACHE_CONTROL).contains("s-maxage=300"));
         assertEquals(payload, response.getBody());
         verify(wikiService).getWikiPage("project-1", "guides/getting-started", null);
     }
@@ -59,7 +59,7 @@ class WikiProxyControllerTest {
 
         assertEquals(200, response.getStatusCode().value());
         assertEquals(MediaType.APPLICATION_JSON, response.getHeaders().getContentType());
-        assertTrue(response.getHeaders().getFirst(HttpHeaders.CACHE_CONTROL).contains("max-age=300"));
+        assertTrue(response.getHeaders().getFirst(HttpHeaders.CACHE_CONTROL).contains("s-maxage=300"));
         assertEquals(payload, response.getBody());
         verify(wikiService).getWikiPageBundle("project-1", "guides/getting-started", null);
     }

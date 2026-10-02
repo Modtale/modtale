@@ -1,7 +1,8 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import App from '../../App';
-import { isBotUserAgent } from '../../utils/seo';
+import { HTML_CACHE, setPublicHtmlCache, setNoStore } from '@/utils/htmlCache';
+import { fetchPublicJson } from '@/utils/publicSsr';
 import { generateUserMeta } from '../../utils/meta';
 import { ROUTE_SEO } from '../../data/seo-constants';
 import { SERVER_BACKEND_URL } from "@/utils/api.ts";
@@ -10,8 +11,6 @@ import { SiteRoutes } from '../../utils/routes';
 const { username: handle } = Astro.params;
 const path = Astro.url.pathname;
 
-const userAgent = Astro.request.headers.get('user-agent') || '';
-const isBot = isBotUserAgent(userAgent);
 
 let userData = null;
 let title = ROUTE_SEO['/mods'].title;
@@ -20,13 +19,14 @@ let image = 'https://modtale.net/assets/logo.svg';
 let jsonLd: any = undefined;
 let ssrSuccessfullyCompleted = false;
 let ogType = "website";
+let robots = 'index,follow';
 
-if (isBot && handle) {
+if (handle) {
     try {
-        const res = await fetch(`${SERVER_BACKEND_URL}/api/v1/user/profile/${handle}`);
+        const result = await fetchPublicJson(`${SERVER_BACKEND_URL}/api/v1/user/profile/${encodeURIComponent(handle)}`, 2500);
 
-        if (res.ok) {
-            userData = await res.json();
+        if (result.data && typeof result.data.id === 'string' && typeof result.data.username === 'string') {
+            userData = result.data;
             
             const meta = generateUserMeta(userData);
             if (meta) {
@@ -56,17 +56,22 @@ if (isBot && handle) {
 
             jsonLd = [personSchema];
             ssrSuccessfullyCompleted = true;
+        } else if (result.status === 404 || result.status === 410) {
+            Astro.response.status = result.status;
+            robots = 'noindex,follow';
+            title = 'Creator unavailable | Modtale';
+            description = 'This creator profile is no longer available on Modtale.';
         }
     } catch (e) {}
 }
 
 if (ssrSuccessfullyCompleted) {
-    Astro.response.headers.set('Cache-Control', 'public, max-age=60, s-maxage=600, stale-while-revalidate=86400');
+    setPublicHtmlCache(Astro.response.headers, HTML_CACHE.content);
 } else {
-    Astro.response.headers.set('Cache-Control', 'public, max-age=0, s-maxage=0, must-revalidate');
+    setNoStore(Astro.response.headers);
 }
 ---
 
-<BaseLayout title={title} description={description} image={image} jsonLd={jsonLd} initialData={userData} ogType={ogType}>
+<BaseLayout title={title} description={description} image={image} jsonLd={jsonLd} initialData={userData} ogType={ogType} robots={robots}>
     <App client:load initialPath={path} ssrData={userData} />
 </BaseLayout>

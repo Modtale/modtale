@@ -13,6 +13,21 @@ import org.springframework.cache.caffeine.CaffeineCache;
 class CacheConfigTest {
 
     @Test
+    void publicOriginCachesHaveBoundedTtlWhileAuthorityCachePolicyIsUnchanged() {
+        CacheManager manager = new CacheConfig().cacheManager();
+        for (String name : java.util.List.of("projectDetails", "projectPageDtos", "projectSummarySearch",
+                "wikiProjectPayload", "wikiPageJson", "wikiPageBundleJson", "sitemapData")) {
+            var cache = (CaffeineCache) manager.getCache(name);
+            assertNotNull(cache);
+            assertEquals(java.time.Duration.ofMinutes(5), cache.getNativeCache().policy()
+                    .expireAfterWrite().orElseThrow().getExpiresAfter());
+        }
+        var authority = (CaffeineCache) manager.getCache("projectPermissionSnapshots");
+        assertEquals(java.time.Duration.ofMinutes(60), authority.getNativeCache().policy()
+                .expireAfterWrite().orElseThrow().getExpiresAfter());
+    }
+
+    @Test
     void wikiCachesUseByteWeightedBounds() {
         CacheManager cacheManager = new CacheConfig().cacheManager();
 

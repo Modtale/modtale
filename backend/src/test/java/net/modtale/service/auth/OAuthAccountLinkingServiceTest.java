@@ -32,7 +32,7 @@ class OAuthAccountLinkingServiceTest {
         userRepository = mock(UserRepository.class);
         providerProfileService = mock(OAuthProviderProfileService.class);
         connectedAccountMutationService = mock(ConnectedAccountMutationService.class);
-        service = new OAuthAccountLinkingService(userRepository, providerProfileService, connectedAccountMutationService);
+        service = new OAuthAccountLinkingService(userRepository, providerProfileService, connectedAccountMutationService, mock(net.modtale.service.system.PublicCreatorCacheService.class));
     }
 
     @Test

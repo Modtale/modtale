@@ -5,7 +5,6 @@ import { SiteRoutes } from '../utils/routes';
 import {
     buildCanonicalUrl,
     getRobotsDirective,
-    isBotUserAgent,
     isBrowseRoutePath,
     normalizeSeoPath,
 } from '../utils/seo';
@@ -22,6 +21,9 @@ import {
     getBreadcrumbsForClassification,
 } from '../utils/schema';
 import { BACKEND_URL, SERVER_BACKEND_URL } from '@/utils/api.ts';
+import { HTML_CACHE, PUBLIC_SHELL_PATHS, isPrivateHtmlRequest, setPublicHtmlCache, setNoStore } from '@/utils/htmlCache';
+import { isWikiMetadata, isWikiPage } from '@/utils/wikiPayload';
+import { buildHomeBootstrap, fetchPublicJson, isProjectData, isProjectPage, isPublicProject } from '@/utils/publicSsr';
 
 const url = Astro.url;
 const path = url.pathname;
@@ -51,25 +53,11 @@ let wikiBootstrapMetadataData: any = null;
 let wikiBootstrapPageData: any = null;
 let wikiBootstrapPageSlug: string = 'home-1';
 
-const DAY_IN_SECONDS = 60 * 60 * 24;
 const WIKI_SSR_FAST_PATH_TIMEOUT_MS = 220;
-
-const fetchJsonWithTimeout = async (resource: string, timeoutMs = 1500, init: RequestInit = {}) => {
-    const controller = new AbortController();
-    const timeoutHandle = setTimeout(() => controller.abort(), timeoutMs);
-    try {
-        const response = await fetch(resource, {
-            ...init,
-            signal: controller.signal,
-        });
-        if (!response.ok) return null;
-        return await response.json();
-    } catch {
-        return null;
-    } finally {
-        clearTimeout(timeoutHandle);
-    }
-};
+const fetchJsonWithTimeout = async (resource: string, timeoutMs = 1500) => (await fetchPublicJson(resource, timeoutMs)).data;
+let projectUnavailableStatus = 0;
+let wikiUnavailableStatus = 0;
+const privateRequest = isPrivateHtmlRequest(url, Astro.request);
 
 let canonicalOverride = buildCanonicalUrl(cleanPath, searchParams);
 let pageNext = undefined;
@@ -96,12 +84,13 @@ const collectionPageSchema = routeSeo && (cleanPath === '/' || isBrowseRoutePath
 const baseSchemas: any[] = [websiteSchema, organizationSchema];
 if (collectionPageSchema) baseSchemas.push(collectionPageSchema);
 
-const userAgent = Astro.request.headers.get('user-agent') || '';
-const isBot = isBotUserAgent(userAgent);
 const pathSegments = cleanPath.split('/').filter(Boolean);
 const isProjectRoute = pathSegments.length >= 2
     && ['project', 'mod', 'modpack', 'world'].includes(pathSegments[0]);
-const wikiSegmentIndex = isProjectRoute ? pathSegments.indexOf('wiki', 2) : -1;
+const isPublicProjectRoute = isProjectRoute && !privateRequest && (pathSegments.length === 2
+    || (pathSegments.length === 3 && ['download', 'changelog', 'gallery'].includes(pathSegments[2]))
+    || pathSegments[2] === 'wiki');
+const wikiSegmentIndex = isPublicProjectRoute && pathSegments[2] === 'wiki' ? 2 : -1;
 const wikiPagePath = wikiSegmentIndex >= 0 ? pathSegments.slice(wikiSegmentIndex + 1).join('/') : '';
 wikiBootstrapPageSlug = wikiPagePath || 'home-1';
 
@@ -167,37 +156,23 @@ const isStaticBrowseRequest = isBrowseRoute && !isComplex;
 if (classification) {
     if (isHome) {
         try {
-            const homeRequestInit = {
-                headers: { 'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=86400' },
-            };
             const [marquee, trending, newest, stats] = await Promise.all([
-                fetchJsonWithTimeout(`${SERVER_BACKEND_URL}/api/v1/projects?size=16&sort=popular&view=marquee`, 1200, homeRequestInit),
-                fetchJsonWithTimeout(`${SERVER_BACKEND_URL}/api/v1/projects?size=12&sort=trending`, 1200, homeRequestInit),
-                fetchJsonWithTimeout(`${SERVER_BACKEND_URL}/api/v1/projects?size=12&sort=newest`, 1200, homeRequestInit),
-                fetchJsonWithTimeout(`${SERVER_BACKEND_URL}/api/v1/analytics/platform/stats`, 1200, homeRequestInit),
+                fetchJsonWithTimeout(`${SERVER_BACKEND_URL}/api/v1/projects?size=16&sort=popular&view=marquee`, 1200),
+                fetchJsonWithTimeout(`${SERVER_BACKEND_URL}/api/v1/projects?size=12&sort=trending`, 1200),
+                fetchJsonWithTimeout(`${SERVER_BACKEND_URL}/api/v1/projects?size=12&sort=newest`, 1200),
+                fetchJsonWithTimeout(`${SERVER_BACKEND_URL}/api/v1/analytics/platform/stats`, 1200),
             ]);
-
-            const unique = trending?.content || newest?.content || [];
-            const marqueeProjects = marquee?.content || [];
-            const newestProjects = newest?.content || [];
-
-            initialData = {
-                homeDataReady: true,
-                homeProjects: unique || [],
-                homeMarqueeProjects: marqueeProjects,
-                homeTrendingProjects: unique || [],
-                homeNewestProjects: newestProjects,
-                stats: stats || { totalProjects: 0, totalDownloads: 0, totalUsers: 0 },
-            };
+            initialData = buildHomeBootstrap(marquee, trending, newest, stats);
+            const unique = initialData.homeProjects;
 
             const homeListSchema = generateItemListSchema(unique.slice(0, 20));
             const schemas: any[] = [...baseSchemas];
             if (homeListSchema) schemas.push(homeListSchema);
             jsonLd = schemas;
 
-            ssrSuccessfullyCompleted = true;
+            ssrSuccessfullyCompleted = initialData.homeDataReady;
         } catch {
-            initialData = { homeDataReady: false, homeProjects: [], stats: { totalProjects: 0, totalDownloads: 0, totalUsers: 0 } };
+            initialData = buildHomeBootstrap(null, null, null, null);
         }
     } else if (isStaticBrowseRequest) {
         try {
@@ -212,11 +187,9 @@ if (classification) {
                 const classParam = classification === 'ALL' ? '' : `&classification=${classification}`;
                 const endpoint = `${SERVER_BACKEND_URL}/api/v1/projects?size=12&page=${page}${classParam}&sort=${sort}${searchParamStr}${tagsParamStr}`;
 
-                const data = await fetchJsonWithTimeout(endpoint, 2000, {
-                    headers: { 'Cache-Control': 'public, s-maxage=300' },
-                });
+                const data = await fetchJsonWithTimeout(endpoint, 2000);
 
-                if (data) {
+                if (isProjectPage(data)) {
                     initialData = { browseData: data, browseDataReady: true };
 
                     if (data.totalPages > pageNum + 1) {
@@ -245,12 +218,13 @@ if (classification) {
     } else {
         jsonLd = baseSchemas;
     }
-} else if (projectLookupKey && isProjectRoute
-    && (isBot || (pathSegments[0] === 'project' && pathSegments.length === 2))) {
+} else if (projectLookupKey && isPublicProjectRoute && wikiSegmentIndex < 0) {
     try {
-        const modData = await fetchJsonWithTimeout(`${SERVER_BACKEND_URL}/api/v1/projects/${projectLookupKey}`, 2500);
+        const result = await fetchPublicJson(`${SERVER_BACKEND_URL}/api/v1/projects/${encodeURIComponent(projectLookupKey)}`, 2500);
+        const modData = result.data;
+        if (result.status === 404 || result.status === 410) projectUnavailableStatus = result.status;
 
-        if (modData) {
+        if (isProjectData(modData)) {
             const projectUrl = SiteRoutes.project(modData);
             const canonicalBasePath = normalizeSeoPath(projectUrl);
             const currentBasePath = normalizeSeoPath(SiteRoutes.projectBasePathFromPath(cleanPath));
@@ -273,7 +247,8 @@ if (classification) {
                 organizationSchema,
                 ...generateProjectSchemas(modData),
             ];
-            ssrSuccessfullyCompleted = true;
+            ssrSuccessfullyCompleted = isPublicProject(modData);
+            if (!ssrSuccessfullyCompleted) robots = 'noindex,follow';
         } else {
             initialData = null;
         }
@@ -284,20 +259,21 @@ if (classification) {
 
 if (wikiSegmentIndex >= 0 && projectId) {
     const wikiBundlePath = wikiPagePath ? `/_bundle/${wikiPagePath}` : '/_bundle';
-    const wikiBundleRequest = fetchJsonWithTimeout(
+    const wikiBundleRequest = fetchPublicJson(
         `${SERVER_BACKEND_URL}/api/v1/wiki/${encodeURIComponent(projectId)}${wikiBundlePath}`,
-        WIKI_SSR_FAST_PATH_TIMEOUT_MS,
-        { headers: { 'Cache-Control': 'public, s-maxage=600, stale-while-revalidate=3600' } }
+        WIKI_SSR_FAST_PATH_TIMEOUT_MS
     );
     const projectRequest = initialData
         ? Promise.resolve(initialData)
-        : fetchJsonWithTimeout(`${SERVER_BACKEND_URL}/api/v1/projects/${projectId}`, WIKI_SSR_FAST_PATH_TIMEOUT_MS);
-    const wikiBundleData = await wikiBundleRequest;
-    const projectData = initialData
-        ? initialData
-        : wikiBundleData?.project || await projectRequest;
+        : fetchPublicJson(`${SERVER_BACKEND_URL}/api/v1/projects/${encodeURIComponent(projectId)}`, WIKI_SSR_FAST_PATH_TIMEOUT_MS);
+    const wikiBundleResult = await wikiBundleRequest;
+    const wikiBundleData = wikiBundleResult.data;
+    if (wikiBundleResult.status === 404 || wikiBundleResult.status === 410) wikiUnavailableStatus = wikiBundleResult.status;
+    const projectResult = await projectRequest;
+    if (projectResult?.status === 404 || projectResult?.status === 410) projectUnavailableStatus = projectResult.status;
+    const projectData = projectUnavailableStatus ? null : initialData || projectResult?.data || wikiBundleData?.project;
 
-    if (!initialData && projectData && !(projectData as any).__projectUnavailable) {
+    if (!initialData && isProjectData(projectData)) {
         initialData = projectData;
 
         const meta = generateProjectMeta(projectData);
@@ -307,6 +283,11 @@ if (wikiSegmentIndex >= 0 && projectId) {
         }
 
         const projectUrl = SiteRoutes.project(projectData);
+        const currentBasePath = normalizeSeoPath(SiteRoutes.projectBasePathFromPath(cleanPath));
+        const canonicalBasePath = normalizeSeoPath(projectUrl);
+        if (currentBasePath && currentBasePath !== canonicalBasePath) {
+            return Astro.redirect(cleanPath.replace(currentBasePath, canonicalBasePath), 301);
+        }
         const crumbs = getBreadcrumbsForClassification(projectData.classification || 'PLUGIN');
         const breadcrumbSchema = generateBreadcrumbSchema([...crumbs, { name: projectData.title, url: projectUrl }]);
         if (breadcrumbSchema) {
@@ -314,28 +295,43 @@ if (wikiSegmentIndex >= 0 && projectId) {
         }
     }
 
-    if (wikiBundleData?.metadata) {
+    if (!projectUnavailableStatus && isWikiMetadata(wikiBundleData?.metadata)) {
         wikiBootstrapMetadataData = wikiBundleData.metadata;
     }
 
-    if (wikiBundleData?.page) {
+    if (!projectUnavailableStatus && isWikiPage(wikiBundleData?.page)) {
         wikiBootstrapPageData = wikiBundleData.page;
         wikiBootstrapPageSlug = wikiBundleData.pageSlug || wikiBootstrapPageSlug;
     }
 
-    if (initialData || wikiBootstrapPageData) {
-        ssrSuccessfullyCompleted = true;
-    }
+    ssrSuccessfullyCompleted = isPublicProject(initialData) && isWikiMetadata(wikiBootstrapMetadataData) && isWikiPage(wikiBootstrapPageData);
+    if (initialData && !isPublicProject(initialData)) robots = 'noindex,follow';
 }
 
-if (ssrSuccessfullyCompleted && (isHome || isStaticBrowseRequest)) {
-    Astro.response.headers.set('Cache-Control', `public, max-age=300, s-maxage=${DAY_IN_SECONDS}, stale-while-revalidate=${DAY_IN_SECONDS}`);
-} else if (ssrSuccessfullyCompleted && wikiSegmentIndex >= 0) {
-    Astro.response.headers.set('Cache-Control', 'public, max-age=60, s-maxage=600, stale-while-revalidate=3600');
-} else if (ssrSuccessfullyCompleted && isProjectRoute && isBot) {
-    Astro.response.headers.set('Cache-Control', 'public, max-age=60, s-maxage=600, stale-while-revalidate=3600');
+if (wikiUnavailableStatus && initialData) {
+    Astro.response.status = wikiUnavailableStatus;
+    title = 'Wiki page unavailable | Modtale';
+    robots = 'noindex,follow';
+}
+
+if (projectUnavailableStatus && !initialData) {
+    Astro.response.status = projectUnavailableStatus;
+    robots = 'noindex,follow';
+    title = 'Project unavailable | Modtale';
+    description = 'This project is no longer available on Modtale.';
+    initialData = { __projectUnavailable: true, id: projectId };
+}
+
+if (privateRequest) {
+    setNoStore(Astro.response.headers);
+} else if (ssrSuccessfullyCompleted && (isHome || isStaticBrowseRequest)) {
+    setPublicHtmlCache(Astro.response.headers, HTML_CACHE.listings);
+} else if (ssrSuccessfullyCompleted && isPublicProjectRoute) {
+    setPublicHtmlCache(Astro.response.headers, HTML_CACHE.content);
+} else if (PUBLIC_SHELL_PATHS.has(cleanPath) && searchParams.size === 0) {
+    setPublicHtmlCache(Astro.response.headers, HTML_CACHE.shell);
 } else {
-    Astro.response.headers.set('Cache-Control', 'public, max-age=0, s-maxage=0, must-revalidate');
+    setNoStore(Astro.response.headers);
 }
 
 const projectBootstrapUrl = !initialData && isProjectRoute && projectLookupKey ? `${BACKEND_URL}/api/v1/projects/${projectLookupKey}` : undefined;
