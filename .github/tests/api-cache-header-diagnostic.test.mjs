@@ -5,7 +5,7 @@ import { once } from 'node:events';
 import { fileURLToPath } from 'node:url';
 import { test } from 'node:test';
 import { MAX_REQUESTS, MAX_BODY_BYTES, REQUEST_TIMEOUT_MS, MISSING_PATH, validateInputs, requestCases,
-  blockedReason, publicProjectFixture, requestWithoutBrowserHeaders, runApiHeaderDiagnostic } from '../scripts/api-cache-header-diagnostic.mjs';
+  blockedReason, publicProjectFixture, requestWithoutBrowserHeaders, runApiHeaderDiagnostic, summarizeErrorContract } from '../scripts/api-cache-header-diagnostic.mjs';
 
 const publicPolicy = 'public, max-age=0, s-maxage=300, must-revalidate';
 const sha = 'a'.repeat(40);
@@ -475,9 +475,7 @@ test('real MVC API-key rejection with omitted type and exact instance is recogni
   }
   for (const body of [
     { ...mvcKeyDenial, instance: '/api/v1/other' },
-    { ...mvcKeyDenial, instance: undefined },
     { ...mvcKeyDenial, type: 'https://unrecognized.test/problem' },
-    { ...mvcKeyDenial, type: null },
     { ...mvcKeyDenial, status: 403 },
     { ...mvcKeyDenial, title: 'Forbidden' },
     { ...mvcKeyDenial, message: 'unrelated' },
@@ -545,4 +543,80 @@ test('source-proven public summary DTO permits missing status only in a verified
   assert.equal(report.publicProjectFixturePath, '/mod/fixture-slug');
   assert.deepEqual(paths.slice(-2), ['/api/v1/projects/fixture-slug', '/api/v1/projects/fixture-slug']);
   assert.equal(paths.length, MAX_REQUESTS);
+});
+
+
+test('real RateLimitFilter then ApiKeyAuthFilter contracts match only fixed invalid-key probes', async () => {
+  const rateDetail = 'Invalid API Key.';
+  const actualRateDenial = { detail: rateDetail, instance: null,
+    properties: { error: rateDetail, message: rateDetail }, status: 401, title: 'Unauthorized', type: null };
+  const report = await runApiHeaderDiagnostic(input(), { request: async (url, options) => {
+    if (options.headers?.['X-Modtale-Key']) return fixture(url, options,
+      { status: 401, body: actualRateDenial, headers: { 'content-type': 'application/json' } });
+    if (options.headers && Object.hasOwn(options.headers, 'X-Modtale-Key')) return fixture(url, options,
+      { status: 401, body: mvcKeyDenial, headers: { 'content-type': 'application/problem+json' } });
+    return fixture(url, options);
+  } });
+  assert.equal(report.status, 'complete', report.errorCode);
+  const observed = report.observations.find(item => item.case === 'modtale_key_projects');
+  assert.deepEqual(observed.errorContract, {
+    jsonShape: 'object', statusMatches: true, titleMatches: true, typeKind: 'null', instanceKind: 'null',
+    detailKind: 'rate_filter_invalid_key', flatMirrorsMatch: false, nestedMirrorsMatch: true,
+    propertiesKind: 'object', invalidKeyProbe: true, contractRecognized: true,
+  });
+  assert.equal(report.observations.find(item => item.case === 'empty_x_modtale_key_projects').errorContract.detailKind,
+    'api_filter_invalid_key');
+  for (const detail of [rateDetail, mvcKeyDenial.detail]) {
+    for (const contentType of ['application/json', 'application/problem+json']) {
+      for (const type of [undefined, null, 'about:blank']) {
+        for (const instance of [undefined, null, '/api/v1/projects']) {
+          for (const nested of [false, true]) {
+            const body = { detail, status: 401, title: 'Unauthorized', type, instance,
+              ...(nested ? { properties: { error: detail, message: detail } } : { error: detail, message: detail }) };
+            const response = new Response(JSON.stringify(body), { status: 401, headers: { 'content-type': contentType } });
+            assert.equal(blockedReason(response, JSON.stringify(body),
+              { case: 'modtale_key_projects', path: '/api/v1/projects' }), null);
+          }
+        }
+      }
+    }
+  }
+  for (const overrides of [
+    { detail: 'Arbitrary denial', properties: { error: 'Arbitrary denial', message: 'Arbitrary denial' } },
+    { type: 'https://unrecognized.test/problem' }, { instance: '/api/v1/private' }, { title: 'Forbidden' },
+    { properties: { error: rateDetail, message: 'different' } }, { error: rateDetail },
+  ]) {
+    const body = JSON.stringify({ ...actualRateDenial, ...overrides });
+    const response = new Response(body, { status: 401, headers: { 'content-type': 'application/json' } });
+    assert.equal(blockedReason(response, body, { case: 'modtale_key_projects', path: '/api/v1/projects' }),
+      'unrecognized_access_denial');
+  }
+  const body = JSON.stringify(actualRateDenial);
+  const response = new Response(body, { status: 401, headers: { 'content-type': 'application/json' } });
+  assert.equal(blockedReason(response, body, { case: 'authorization_projects', path: '/api/v1/projects' }),
+    'unrecognized_access_denial');
+  assert.equal(blockedReason(response, body, { case: 'modtale_key_projects', path: '/api/v1/private' }),
+    'unrecognized_access_denial');
+  response.headers.set('cf-mitigated', 'challenge');
+  assert.equal(blockedReason(response, body, { case: 'modtale_key_projects', path: '/api/v1/projects' }), 'waf_challenge');
+});
+
+test('structural error diagnostics retain only fixed enums and booleans, never arbitrary values', async () => {
+  const secret = 'sensitive-body-header-cookie-token-do-not-retain';
+  for (const body of [
+    secret, JSON.stringify([secret]), JSON.stringify(secret),
+    JSON.stringify({ type: secret, instance: secret, status: secret, title: secret, detail: secret,
+      properties: { error: secret, message: secret }, error: secret, message: secret }),
+  ]) {
+    const response = new Response(body, { status: 401, headers: { 'content-type': 'application/json' } });
+    const flags = summarizeErrorContract(response, body, { case: 'modtale_key_projects', path: '/api/v1/projects' });
+    assert.ok(Object.values(flags).every(value => typeof value === 'boolean' || typeof value === 'string'));
+    assert.ok(!JSON.stringify(flags).includes(secret));
+    const report = await runApiHeaderDiagnostic(input(), { request: async (url, options) => fixture(url, options,
+      options.headers?.['X-Modtale-Key'] ? { status: 401, body, headers: { 'content-type': 'application/json' } } : {}) });
+    assert.equal(report.status, 'blocked');
+    assert.equal(report.errorCode, 'unrecognized_access_denial');
+    assert.ok(report.observations.at(-1).errorContract);
+    assert.ok(!JSON.stringify(report).includes(secret));
+  }
 });
