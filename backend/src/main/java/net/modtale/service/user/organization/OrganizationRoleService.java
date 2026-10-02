@@ -13,10 +13,13 @@ import net.modtale.model.user.ApiKey;
 import net.modtale.model.user.User;
 import net.modtale.repository.user.UserRepository;
 import net.modtale.service.communication.NotificationService;
+import net.modtale.service.system.PublicCreatorCacheService;
 import org.springframework.stereotype.Service;
 
 @Service
 public class OrganizationRoleService {
+
+    private final PublicCreatorCacheService publicCreatorCacheService;
 
     private final UserRepository userRepository;
     private final OrganizationAccessService organizationAccessService;
@@ -27,8 +30,10 @@ public class OrganizationRoleService {
             UserRepository userRepository,
             OrganizationAccessService organizationAccessService,
             OrganizationApiKeyContextService organizationApiKeyContextService,
-            NotificationService notificationService
+            NotificationService notificationService,
+            PublicCreatorCacheService publicCreatorCacheService
     ) {
+        this.publicCreatorCacheService = publicCreatorCacheService;
         this.userRepository = userRepository;
         this.organizationAccessService = organizationAccessService;
         this.organizationApiKeyContextService = organizationApiKeyContextService;
@@ -56,7 +61,9 @@ public class OrganizationRoleService {
         }
 
         org.getOrganizationRoles().add(new User.OrganizationRole(UUID.randomUUID().toString(), name.trim(), color, perms));
-        return userRepository.save(org);
+        User saved = userRepository.save(org);
+        publicCreatorCacheService.creatorChanged();
+        return saved;
     }
 
     public User updateOrganizationRole(String orgId, String roleId, String name, String color, Set<ApiKey.ApiPermission> perms, User requester) {
@@ -86,7 +93,9 @@ public class OrganizationRoleService {
                     .forEach(member -> organizationApiKeyContextService.syncUserOrgPermissions(member.getUserId(), orgId, perms));
         }
 
-        return userRepository.save(org);
+        User saved = userRepository.save(org);
+        publicCreatorCacheService.creatorChanged();
+        return saved;
     }
 
     public User deleteOrganizationRole(String orgId, String roleId, User requester) {
@@ -107,7 +116,9 @@ public class OrganizationRoleService {
         }
 
         org.getOrganizationRoles().removeIf(existingRole -> existingRole.getId().equals(roleId));
-        return userRepository.save(org);
+        User saved = userRepository.save(org);
+        publicCreatorCacheService.creatorChanged();
+        return saved;
     }
 
     public void updateOrganizationMemberRole(String orgId, String targetUserId, String newRoleId, User requester) {
@@ -147,6 +158,7 @@ public class OrganizationRoleService {
             targetMember.setRoleId(newRole.getId());
             requesterMember.setRoleId(resolveReplacementRoleId(org, targetCurrentRole));
             userRepository.save(org);
+            publicCreatorCacheService.creatorChanged();
 
             organizationApiKeyContextService.syncUserOrgPermissions(targetUserId, orgId, newRole.getPermissions());
             organizationApiKeyContextService.syncUserOrgPermissions(
@@ -159,6 +171,7 @@ public class OrganizationRoleService {
         } else {
             targetMember.setRoleId(newRoleId);
             userRepository.save(org);
+            publicCreatorCacheService.creatorChanged();
             organizationApiKeyContextService.syncUserOrgPermissions(targetUserId, orgId, newRole.getPermissions());
         }
 
@@ -196,6 +209,7 @@ public class OrganizationRoleService {
 
         if (org.getOrganizationMembers().removeIf(member -> member.getUserId().equals(targetUserId))) {
             userRepository.save(org);
+            publicCreatorCacheService.creatorChanged();
             organizationApiKeyContextService.syncUserOrgPermissions(targetUserId, orgId, new HashSet<>());
         }
     }

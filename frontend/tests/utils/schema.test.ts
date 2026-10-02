@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterAll, describe, expect, it, vi } from 'vitest';
 import {
     generateBreadcrumbSchema,
     generateCollectionPageSchema,
@@ -12,6 +12,15 @@ import {
     generateWebsiteSchema,
     getBreadcrumbsForClassification,
 } from '@/utils/schema';
+
+// Schema fixtures must not inherit the deployment's API URLs. Keep SSR distinct
+// so these assertions also catch internal URLs leaking into public image links.
+vi.hoisted(() => {
+    vi.stubEnv('PUBLIC_API_URL', 'http://localhost:8080/api/v1');
+    vi.stubEnv('SSR_API_URL', 'https://internal-api.example.test/api/v1');
+});
+
+afterAll(() => vi.unstubAllEnvs());
 
 describe('schema utils', () => {
     it('returns null when no item list or breadcrumbs are provided', () => {

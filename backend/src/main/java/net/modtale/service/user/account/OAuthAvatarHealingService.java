@@ -8,6 +8,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import net.modtale.model.user.OAuthProvider;
 import net.modtale.model.user.User;
+import net.modtale.service.system.PublicCreatorCacheService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -16,13 +17,16 @@ import org.springframework.web.client.RestClient;
 @Service
 public class OAuthAvatarHealingService {
 
+    private final PublicCreatorCacheService publicCreatorCacheService;
+
     private static final Logger logger = LoggerFactory.getLogger(OAuthAvatarHealingService.class);
 
     private final UserAvatarPersistence persistence;
     private final RestClient restClient;
     private final Map<String, LocalDateTime> avatarHealCooldown = new ConcurrentHashMap<>();
 
-    public OAuthAvatarHealingService(UserAvatarPersistence persistence) {
+    public OAuthAvatarHealingService(UserAvatarPersistence persistence, PublicCreatorCacheService publicCreatorCacheService) {
+        this.publicCreatorCacheService = publicCreatorCacheService;
         this.persistence = persistence;
         this.restClient = RestClient.create();
     }
@@ -59,6 +63,7 @@ public class OAuthAvatarHealingService {
         if (refreshed != null && !refreshed.isBlank() && isImageUrlReachable(refreshed)) {
             if (!persistence.update(snapshot, refreshed)) return;
             user.setAvatarUrl(refreshed);
+            publicCreatorCacheService.creatorChanged();
             logger.info("Healed broken provider avatar for user {} using linked provider.", user.getId());
             return;
         }
@@ -66,6 +71,7 @@ public class OAuthAvatarHealingService {
         String fallback = "https://ui-avatars.com/api/?name=" + java.net.URLEncoder.encode(current.getUsername() == null ? "User" : current.getUsername(), java.nio.charset.StandardCharsets.UTF_8) + "&background=random";
         if (!persistence.update(snapshot, fallback)) return;
         user.setAvatarUrl(fallback);
+        publicCreatorCacheService.creatorChanged();
         logger.warn("Reset broken provider avatar to default for user {}", user.getId());
     }
 

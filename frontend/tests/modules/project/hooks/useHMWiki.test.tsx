@@ -83,6 +83,103 @@ describe('useHMWiki', () => {
         container.remove();
     });
 
+    const validMetadata = { index: { slug: 'intro' }, pages: [{ slug: 'intro', title: 'Intro' }] };
+    const validPage = { title: 'Intro', content: 'Recovered page' };
+    const renderWiki = async () => {
+        await act(async () => {
+            root.render(<Probe projectId="project-1" pageSlug="intro" enabled onRender={snapshot => { latestSnapshot = snapshot; }} />);
+        });
+        await settle();
+    };
+
+    it.each([{}, [], { error: 'upstream failed' }])('recovers malformed SSR metadata and page %j without seeding them', async malformed => {
+        window.__MODTALE_WIKI_BOOTSTRAP = { projectId: 'project-1', metadataData: malformed, pages: { intro: { data: malformed } } };
+        mockedProjectClient.getWikiData.mockResolvedValue(validMetadata);
+        mockedProjectClient.getWikiPage.mockResolvedValue(validPage);
+        await renderWiki();
+        expect(mockedProjectClient.getWikiData).toHaveBeenCalledExactlyOnceWith('project-1');
+        expect(mockedProjectClient.getWikiPage).toHaveBeenCalledExactlyOnceWith('project-1', 'intro');
+        expect(latestSnapshot.data?.mod).toEqual(validMetadata);
+        expect(latestSnapshot.data?.content).toEqual(validPage);
+        expect(latestSnapshot.loading).toBe(false);
+        expect(latestSnapshot.error).toBe(false);
+    });
+
+    it('retains a valid SSR page while recovering malformed metadata', async () => {
+        window.__MODTALE_WIKI_BOOTSTRAP = { projectId: 'project-1', metadataData: {}, pages: { intro: { data: validPage } } };
+        mockedProjectClient.getWikiData.mockResolvedValue(validMetadata);
+        await renderWiki();
+        expect(mockedProjectClient.getWikiData).toHaveBeenCalledOnce();
+        expect(mockedProjectClient.getWikiPage).not.toHaveBeenCalled();
+        expect(latestSnapshot.data?.content).toEqual(validPage);
+    });
+
+    it('retains valid SSR metadata while recovering a malformed page', async () => {
+        window.__MODTALE_WIKI_BOOTSTRAP = { projectId: 'project-1', metadataData: validMetadata, pages: { intro: { data: [] } } };
+        mockedProjectClient.getWikiPage.mockResolvedValue(validPage);
+        await renderWiki();
+        expect(mockedProjectClient.getWikiData).not.toHaveBeenCalled();
+        expect(mockedProjectClient.getWikiPage).toHaveBeenCalledExactlyOnceWith('project-1', 'intro');
+        expect(latestSnapshot.data?.mod).toEqual(validMetadata);
+    });
+
+    it('reuses valid bundle promises even when direct SSR fields are empty', async () => {
+        window.__MODTALE_WIKI_BOOTSTRAP = { projectId: 'project-1', metadataData: undefined, metadata: Promise.resolve(validMetadata), pages: { intro: { data: undefined, promise: Promise.resolve(validPage) } } };
+        await renderWiki();
+        expect(mockedProjectClient.getWikiData).not.toHaveBeenCalled();
+        expect(mockedProjectClient.getWikiPage).not.toHaveBeenCalled();
+        expect(latestSnapshot.data?.content).toEqual(validPage);
+    });
+
+    it('recovers malformed bundle promises through the API once', async () => {
+        window.__MODTALE_WIKI_BOOTSTRAP = { projectId: 'project-1', metadata: Promise.resolve({}), pages: { intro: { promise: Promise.resolve({ error: 'failed' }) } } };
+        mockedProjectClient.getWikiData.mockResolvedValue(validMetadata);
+        mockedProjectClient.getWikiPage.mockResolvedValue(validPage);
+        await renderWiki();
+        expect(mockedProjectClient.getWikiData).toHaveBeenCalledOnce();
+        expect(mockedProjectClient.getWikiPage).toHaveBeenCalledOnce();
+        expect(latestSnapshot.data?.content).toEqual(validPage);
+    });
+
+    it('recovers rejected bundle promises without dropping valid API results', async () => {
+        const metadata = createDeferred<any>();
+        const page = createDeferred<any>();
+        window.__MODTALE_WIKI_BOOTSTRAP = { projectId: 'project-1', metadata: metadata.promise, pages: { intro: { promise: page.promise } } };
+        mockedProjectClient.getWikiData.mockResolvedValue(validMetadata);
+        mockedProjectClient.getWikiPage.mockResolvedValue(validPage);
+        await act(async () => {
+            root.render(<Probe projectId="project-1" pageSlug="intro" enabled onRender={snapshot => { latestSnapshot = snapshot; }} />);
+        });
+        await act(async () => { metadata.reject(new Error('metadata failed')); page.reject(new Error('page failed')); });
+        await settle();
+        expect(mockedProjectClient.getWikiData).toHaveBeenCalledOnce();
+        expect(mockedProjectClient.getWikiPage).toHaveBeenCalledOnce();
+        expect(latestSnapshot.data?.content).toEqual(validPage);
+        expect(latestSnapshot.error).toBe(false);
+    });
+
+    it('does not permanently cache a malformed API page response', async () => {
+        mockedProjectClient.getWikiData.mockResolvedValue(validMetadata);
+        mockedProjectClient.getWikiPage.mockResolvedValueOnce({ error: 'failed' }).mockResolvedValue(validPage);
+        prefetchWikiPage('project-1', 'intro');
+        await settle();
+        await renderWiki();
+        expect(mockedProjectClient.getWikiPage).toHaveBeenCalledTimes(2);
+        expect(latestSnapshot.data?.content).toEqual(validPage);
+        expect(latestSnapshot.error).toBe(false);
+    });
+
+    it('does not permanently cache malformed API metadata', async () => {
+        mockedProjectClient.getWikiData.mockResolvedValueOnce({}).mockResolvedValue(validMetadata);
+        mockedProjectClient.getWikiPage.mockResolvedValue(validPage);
+        prefetchInitialWikiPage('project-1');
+        await settle();
+        await renderWiki();
+        expect(mockedProjectClient.getWikiData).toHaveBeenCalledTimes(2);
+        expect(latestSnapshot.data?.mod).toEqual(validMetadata);
+        expect(latestSnapshot.error).toBe(false);
+    });
+
     it('loads a newly selected page immediately before background prefetch work runs', async () => {
         vi.useFakeTimers();
         const pageRequests = new Map<string, ReturnType<typeof createDeferred<any>>>();

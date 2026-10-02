@@ -14,6 +14,7 @@ import net.modtale.repository.admin.BannedEmailRepository;
 import net.modtale.repository.user.UserRepository;
 import net.modtale.service.analytics.TrackingService;
 import net.modtale.service.user.connection.ConnectedAccountMutationService;
+import net.modtale.service.system.PublicCreatorCacheService;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.core.user.DefaultOAuth2User;
 import org.springframework.security.oauth2.core.user.OAuth2User;
@@ -21,6 +22,8 @@ import org.springframework.stereotype.Service;
 
 @Service
 public class OAuthUserLoginService {
+
+    private final PublicCreatorCacheService publicCreatorCacheService;
 
     private final UserRepository userRepository;
     private final BannedEmailRepository bannedEmailRepository;
@@ -35,8 +38,10 @@ public class OAuthUserLoginService {
             TrackingService trackingService,
             ReservedAccountGuardService reservedAccountGuardService,
             OAuthProviderProfileService providerProfileService,
-            ConnectedAccountMutationService connectedAccountMutationService
+            ConnectedAccountMutationService connectedAccountMutationService,
+            PublicCreatorCacheService publicCreatorCacheService
     ) {
+        this.publicCreatorCacheService = publicCreatorCacheService;
         this.userRepository = userRepository;
         this.bannedEmailRepository = bannedEmailRepository;
         this.trackingService = trackingService;
@@ -63,6 +68,8 @@ public class OAuthUserLoginService {
                 throw new UnauthorizedException("This account is no longer available.");
             }
 
+            boolean publicConnectionChanged = PublicCreatorCacheService.publicConnectionWouldChange(
+                    user, profile.provider(), profile.providerId(), profile.username(), profile.profileUrl(), profile.visible());
             connectedAccountMutationService.linkProvider(
                     user,
                     profile.provider(),
@@ -73,6 +80,7 @@ public class OAuthUserLoginService {
                     accessToken
             );
             userRepository.save(user);
+            if (publicConnectionChanged) publicCreatorCacheService.creatorChanged();
         } else {
             user = createUser(profile, accessToken);
         }

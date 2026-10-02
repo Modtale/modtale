@@ -17,6 +17,7 @@ import net.modtale.service.security.validation.SanitizationService;
 import net.modtale.service.user.account.AccountService;
 import net.modtale.util.MongoIdUtils;
 import net.modtale.validation.AccountNameRules;
+import net.modtale.service.system.PublicCreatorCacheService;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
@@ -24,6 +25,8 @@ import org.springframework.stereotype.Service;
 
 @Service
 public class OrganizationService {
+
+    private final PublicCreatorCacheService publicCreatorCacheService;
 
     private final UserRepository userRepository;
     private final MongoTemplate mongoTemplate;
@@ -48,8 +51,10 @@ public class OrganizationService {
             OrganizationConnectionService organizationConnectionService,
             OrganizationRoleService organizationRoleService,
             OrganizationInviteService organizationInviteService,
-            AppLimitProperties limitProperties
+            AppLimitProperties limitProperties,
+            PublicCreatorCacheService publicCreatorCacheService
     ) {
+        this.publicCreatorCacheService = publicCreatorCacheService;
         this.userRepository = userRepository;
         this.mongoTemplate = mongoTemplate;
         this.trackingService = trackingService;
@@ -138,7 +143,9 @@ public class OrganizationService {
         if (bio != null) {
             org.setBio(sanitizer.sanitizePlainText(bio));
         }
-        return userRepository.save(org);
+        User saved = userRepository.save(org);
+        publicCreatorCacheService.creatorChanged();
+        return saved;
     }
 
     public User createOrganizationRole(String orgId, String name, String color, java.util.Set<ApiKey.ApiPermission> perms, User requester) {
@@ -183,6 +190,7 @@ public class OrganizationService {
         );
         org.setAvatarUrl(url);
         userRepository.save(org);
+        publicCreatorCacheService.creatorChanged();
     }
 
     public void updateOrganizationBanner(String orgId, String url, User requester) {
@@ -195,6 +203,7 @@ public class OrganizationService {
         );
         org.setBannerUrl(url);
         userRepository.save(org);
+        publicCreatorCacheService.creatorChanged();
     }
 
     public void deleteOrganization(String orgId, User requester) {

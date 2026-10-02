@@ -7,6 +7,11 @@ plugins {
 group = 'net.modtale'
 version = '0.0.1-SNAPSHOT'
 
+// Keep the embedded Tomcat family aligned while Boot 4.1.1 manages 11.0.24.
+// 11.0.26 includes the security fixes in 11.0.25 and the latest 11.0.x fixes:
+// https://tomcat.apache.org/security-11.html
+ext['tomcat.version'] = '11.0.26'
+
 java {
     toolchain {
         languageVersion = JavaLanguageVersion.of(26)
@@ -53,15 +58,31 @@ dependencies {
 
     implementation 'org.vineflower:vineflower:1.12.0'
 
-    mockitoAgent('org.mockito:mockito-core') { transitive = false }
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testImplementation 'org.springframework.security:spring-security-test'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher:6.1.3'
+    mockitoAgent('org.mockito:mockito-core') {
+        transitive = false
+    }
+}
+
+// Mockito's documented Java 21+ setup avoids unsupported dynamic self-attachment.
+// Test-only instrumentation uses the same Spring-managed Mockito version.
+tasks.withType(Test).configureEach {
+    jvmArgumentProviders.add(new CommandLineArgumentProvider() {
+        @InputFiles
+        @PathSensitive(PathSensitivity.RELATIVE)
+        FileCollection agentClasspath = configurations.mockitoAgent
+
+        @Override
+        Iterable<String> asArguments() {
+            return ["-javaagent:${agentClasspath.singleFile.absolutePath}".toString()]
+        }
+    })
 }
 
 tasks.named('test') {
     useJUnitPlatform()
-    jvmArgs "-javaagent:${configurations.mockitoAgent.singleFile}"
     exclude '**/FinanceFrontendIntegrationTest.class'
 }
 
@@ -72,7 +93,6 @@ tasks.register('financeFrontendIntegrationTest', Test) {
     classpath = sourceSets.test.runtimeClasspath
     useJUnitPlatform()
     include '**/FinanceFrontendIntegrationTest.class'
-    jvmArgs "-javaagent:${configurations.mockitoAgent.singleFile}"
     outputs.upToDateWhen { false }
 }
 

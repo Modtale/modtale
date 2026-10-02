@@ -12,6 +12,7 @@ import net.modtale.model.user.NotificationType;
 import net.modtale.model.user.User;
 import net.modtale.repository.user.UserRepository;
 import net.modtale.service.communication.NotificationService;
+import net.modtale.service.system.PublicCreatorCacheService;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -21,17 +22,20 @@ public class OrganizationInviteService {
     private final UserRepository userRepository;
     private final OrganizationAccessService organizationAccessService;
     private final NotificationService notificationService;
+    private final PublicCreatorCacheService publicCreatorCacheService;
 
     public OrganizationInviteService(
             UserRepository userRepository,
             OrganizationAccessService organizationAccessService,
             NotificationService notificationService,
-            OrganizationInvitePersistence persistence
+            OrganizationInvitePersistence persistence,
+            PublicCreatorCacheService publicCreatorCacheService
     ) {
         this.persistence = persistence;
         this.userRepository = userRepository;
         this.organizationAccessService = organizationAccessService;
         this.notificationService = notificationService;
+        this.publicCreatorCacheService = publicCreatorCacheService;
     }
 
     public void inviteOrganizationMember(String orgId, String targetUserId, String roleId, User requester) {
@@ -98,6 +102,7 @@ public class OrganizationInviteService {
             org.getOrganizationMembers().add(new User.OrganizationMember(invite.getUserId(), invite.getRoleId()));
             org.getPendingOrgInvites().remove(invite);
             if (!persistence.resolve(snapshot, responder.getId(), requestId, accept)) throw conflict();
+            publicCreatorCacheService.creatorChanged();
 
             String msg = responder.getUsername() + " accepted the invitation to join " + org.getUsername();
             org.getOrganizationMembers().stream()

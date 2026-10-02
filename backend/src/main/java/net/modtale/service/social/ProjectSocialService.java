@@ -46,7 +46,7 @@ final class ProjectSocialService {
     void toggleFavorite(String projectId, String userId) {
         Project project = getProject(projectId);
         project.setFavoriteCount(favorites.toggle(project.getId(), userId));
-        projectService.evictProjectCache(project);
+        projectService.evictProjectCounterCaches(List.of(project), List.of());
     }
 
     void addComment(String projectId, String userId, String content) {
@@ -120,7 +120,7 @@ final class ProjectSocialService {
         }
 
         projectRepository.save(project);
-        projectService.evictProjectCache(project);
+        projectService.evictProjectEngagementCache(project);
     }
 
     void setCommentPinned(String projectId, String commentId, boolean pinned) {

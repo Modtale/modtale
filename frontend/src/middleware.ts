@@ -1,4 +1,5 @@
 import type { MiddlewareHandler } from 'astro';
+import { isPrivateHtmlRequest, setNoStore } from './utils/htmlCache';
 
 const YEAR_IN_SECONDS = 60 * 60 * 24 * 365;
 
@@ -31,7 +32,7 @@ const isLocalHostname = (hostname: string) => {
 
 const isDevModtaleHostname = (hostname: string) => hostname === 'dev.modtale.net';
 
-export const onRequest: MiddlewareHandler = async ({ url }, next) => {
+export const onRequest: MiddlewareHandler = async ({ url, request }, next) => {
     const response = await next();
     const contentType = response.headers.get('content-type') || '';
     const isLocal = isLocalHostname(url.hostname);
@@ -45,10 +46,16 @@ export const onRequest: MiddlewareHandler = async ({ url }, next) => {
 
     if (contentType.includes('text/html')) {
         const policy = response.headers.get('Cache-Control') || 'no-store';
-        // Keep the origin's edge policy, but never retain an old release in browsers.
-        response.headers.set('CDN-Cache-Control', policy);
-        response.headers.set('Cache-Control', /\b(?:private|no-store)\b/i.test(policy)
-            ? policy : 'public, max-age=0, must-revalidate');
+        if (isPrivateHtmlRequest(url, request) || response.status !== 200
+            || response.headers.has('Set-Cookie') || /\b(?:private|no-store)\b/i.test(policy)) {
+            setNoStore(response.headers);
+        } else if (!response.headers.has('CDN-Cache-Control')) {
+            // Routes must opt in with an explicit CDN policy. A browser-only
+            // max-age=0 policy is not permission to store incomplete SSR HTML.
+            setNoStore(response.headers);
+        } else {
+            response.headers.set('Cache-Control', 'public, max-age=0, must-revalidate');
+        }
         response.headers.set('Cache-Tag', `modtale-html-${url.hostname}`);
         if (process.env.MODTALE_DEPLOYMENT_REVISION) {
             response.headers.set('X-Modtale-Revision', process.env.MODTALE_DEPLOYMENT_REVISION);

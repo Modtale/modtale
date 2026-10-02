@@ -13,7 +13,8 @@
     "preview": "astro preview",
     "check": "astro check",
     "test": "node scripts/run-tests.mjs run",
-    "audit:lighthouse": "npx --yes @lhci/cli@0.15.1 autorun"
+    "audit:lighthouse": "npx --yes @lhci/cli@0.15.1 autorun",
+    "test:html-cache": "node --test tests/integration/public-html-cache.test.mjs"
   },
   "dependencies": {
     "@astrojs/node": "^11.1.5",

@@ -9,11 +9,23 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
 class ProjectCacheServiceTest {
+    @org.junit.jupiter.api.Test
+    void contentChangesPurgeButHighVolumeCounterFlushesDoNot() {
+        var manager = new ConcurrentMapCacheManager();
+        var invalidator = org.mockito.Mockito.mock(net.modtale.service.system.PublicContentCacheInvalidator.class);
+        var service = new ProjectCacheService(manager, new ProjectRouteService(), invalidator);
+        var project = new Project(); project.setId("project-1"); project.setTitle("Example");
+        service.evictProjectCounterCaches(java.util.List.of(project), java.util.List.of());
+        service.evictProjectEngagementCache(project);
+        org.mockito.Mockito.verifyNoInteractions(invalidator);
+        service.evictProjectCache(project);
+        org.mockito.Mockito.verify(invalidator).contentChanged();
+    }
 
     @Test
     void counterUpdatesPreserveContentAndPermissionCaches() {
         ConcurrentMapCacheManager manager = new ConcurrentMapCacheManager();
-        ProjectCacheService service = new ProjectCacheService(manager, new ProjectRouteService());
+        ProjectCacheService service = new ProjectCacheService(manager, new ProjectRouteService(), org.mockito.Mockito.mock(net.modtale.service.system.PublicContentCacheInvalidator.class));
         Project project = new Project();
         project.setId("project-1");
         project.setSlug("sky-tools");
@@ -56,7 +68,7 @@ class ProjectCacheServiceTest {
                 "sitemapData",
                 "platformStats"
         );
-        ProjectCacheService cacheService = new ProjectCacheService(cacheManager, new ProjectRouteService());
+        ProjectCacheService cacheService = new ProjectCacheService(cacheManager, new ProjectRouteService(), org.mockito.Mockito.mock(net.modtale.service.system.PublicContentCacheInvalidator.class));
 
         Project project = new Project();
         project.setId("project-1");
@@ -159,7 +171,7 @@ class ProjectCacheServiceTest {
                 "sitemapData",
                 "platformStats"
         );
-        ProjectCacheService cacheService = new ProjectCacheService(cacheManager, new ProjectRouteService());
+        ProjectCacheService cacheService = new ProjectCacheService(cacheManager, new ProjectRouteService(), org.mockito.Mockito.mock(net.modtale.service.system.PublicContentCacheInvalidator.class));
 
         cacheManager.getCache("projectDetails").put("public:missing-project", "cached");
         cacheManager.getCache("projectDetailDtos").put("public:missing-project", "cached");

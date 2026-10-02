@@ -39,7 +39,8 @@ class AccountPreferencesPersistenceIntegrationTest {
                 mock(net.modtale.service.security.validation.SanitizationService.class),
                 mock(CurrentUserResolutionService.class),mock(OAuthAvatarHealingService.class),
                 mock(AccountLifecycleService.class),
-                mock(net.modtale.service.user.connection.ConnectedAccountMutationService.class),writes);
+                mock(net.modtale.service.user.connection.ConnectedAccountMutationService.class),writes,
+                mock(net.modtale.service.system.PublicCreatorCacheService.class));
     }
     @Test void eachFieldUpdatePreservesAuthorityFavoritesAndUnknownData(){
         for(var field:AccountPreferencesPersistence.Field.values()){
