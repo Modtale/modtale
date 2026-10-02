@@ -1,4 +1,4 @@
-name: Modtale CI/CD 
+name: Modtale CI/CD
 
 on:
   push:
@@ -105,7 +105,7 @@ jobs:
           fi
           echo "GIT_BRANCH_NAME=$BRANCH_NAME" >> $GITHUB_ENV
           echo "BRANCH_SLUG=$BRANCH_SLUG" >> $GITHUB_ENV
-          
+
           if [ "$BRANCH_NAME" = "main" ]; then
             echo "ENV_TYPE=prod" >> $GITHUB_ENV
             echo "BUILD_SERVICE_ACCOUNT=${{ vars.GCP_BUILD_SERVICE_ACCOUNT }}" >> $GITHUB_ENV
@@ -130,7 +130,7 @@ jobs:
             echo "WARDEN_ENABLED=true" >> $GITHUB_ENV
             echo "OAUTH_ENABLED=true" >> $GITHUB_ENV
             echo "WARDEN_SECRET_NAME=WARDEN_API_KEY" >> $GITHUB_ENV
-          
+
           elif [ "$BRANCH_NAME" = "develop" ]; then
             echo "ENV_TYPE=dev" >> $GITHUB_ENV
             echo "BUILD_SERVICE_ACCOUNT=${{ vars.GCP_BUILD_SERVICE_ACCOUNT }}" >> $GITHUB_ENV
@@ -155,7 +155,7 @@ jobs:
             echo "WARDEN_ENABLED=true" >> $GITHUB_ENV
             echo "OAUTH_ENABLED=true" >> $GITHUB_ENV
             echo "WARDEN_SECRET_NAME=WARDEN_API_KEY" >> $GITHUB_ENV
-          
+
           else
             SLUG="$BRANCH_SLUG"
             BRANCH_PREVIEW_SOURCE_R2_BUCKET_NAME="${{ vars.GCP_BRANCH_PREVIEW_SOURCE_R2_BUCKET_NAME }}"
@@ -511,7 +511,7 @@ jobs:
           else
             echo "Reusing the existing backend image for a configuration-only rollout."
           fi
-          
+
           ARGS=(
             "--image" "gcr.io/$PROJECT_ID/modtale-backend:${{ env.TAG }}"
             "--region" "$REGION"
@@ -766,7 +766,8 @@ jobs:
           : "${RUNTIME_SERVICE_ACCOUNT:?Set the GitHub environment runtime service account variable for this environment.}"
 
           bash ../.github/scripts/build-container.sh frontend "$TAG" \
-            --build-arg "PUBLIC_API_URL=$API_URL" --build-arg "SSR_API_URL=$SSR_API_URL"
+            --build-arg "PUBLIC_API_URL=$API_URL" --build-arg "SSR_API_URL=$SSR_API_URL" \
+            --build-arg "PUBLIC_FINANCE_DEMO=${{ env.ENV_TYPE == 'preview' && 'true' || 'false' }}"
 
           FRONTEND_ARGS=(
             "--image" "gcr.io/$PROJECT_ID/modtale-frontend:$TAG"
@@ -838,6 +839,12 @@ jobs:
             echo "FINAL_FRONTEND_URL=${{ env.FRONTEND_DOMAIN }}" >> $GITHUB_ENV
           fi
 
+      - name: Verify synthetic finance preview route
+        if: env.ENV_TYPE == 'preview' && (steps.filter.outputs.frontend == 'true' || env.FRONTEND_EXISTS == 'false')
+        run: |
+          curl --fail --silent --show-error --retry 4 --retry-delay 3 "$FINAL_FRONTEND_URL/finance-preview" -o /tmp/finance-preview.html
+          grep -Fq '<title>Finance demo' /tmp/finance-preview.html
+
       - name: Update Backend CORS and Self-Awareness
         id: update_backend_self_awareness
         # Only preview URLs are unknown during the initial backend deploy. Production
@@ -857,7 +864,7 @@ jobs:
           else
             PUBLIC_BACKEND_URL=$B_URL
           fi
-          
+
           if [ "$MODTALE_SECRET_BUNDLES_ENABLED" = "true" ]; then
             python3 .github/scripts/secret_bundle_ci.py deploy -- \
               --update-env-vars "FRONTEND_URL=$FINAL_FRONTEND_URL,BACKEND_URL=$PUBLIC_BACKEND_URL" >/dev/null
@@ -953,7 +960,7 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Component | Status | Target Service | Service URL |" >> $GITHUB_STEP_SUMMARY
           echo "|---|---|---|---|" >> $GITHUB_STEP_SUMMARY
-          
+
           if [ -n "$PUBLIC_API_URL" ]; then
             echo "| **Backend API** | $BACKEND_STATUS | \`${{ env.BACKEND_SERVICE }}\` | [API Endpoint]($PUBLIC_API_URL) |" >> $GITHUB_STEP_SUMMARY
           elif [ -n "$B_URL" ]; then
@@ -961,13 +968,13 @@ jobs:
           else
             echo "| **Backend API** | $BACKEND_STATUS | \`${{ env.BACKEND_SERVICE }}\` | *N/A* |" >> $GITHUB_STEP_SUMMARY
           fi
-          
+
           if [ -n "$F_URL" ]; then
             echo "| **Frontend App** | $FRONTEND_STATUS | \`${{ env.FRONTEND_SERVICE }}\` | [App URL]($F_URL) |" >> $GITHUB_STEP_SUMMARY
           else
             echo "| **Frontend App** | $FRONTEND_STATUS | \`${{ env.FRONTEND_SERVICE }}\` | *N/A* |" >> $GITHUB_STEP_SUMMARY
           fi
-          
+
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "---" >> $GITHUB_STEP_SUMMARY
           echo "*View deployment details in [Google Cloud Console](https://console.cloud.google.com/run?project=${{ env.PROJECT_ID }}).* " >> $GITHUB_STEP_SUMMARY

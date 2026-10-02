@@ -322,7 +322,7 @@ public class VersionDownloadOrchestrationService {
 
     private void trackDownload(Project project, String versionId, DownloadContext context) {
         if (analyticsEligibilityService.shouldCountProjectEngagement(project, context.currentUser())) {
-            trackingService.logDownload(project.getId(), versionId, project.getAuthor(), context.apiRequest(), context.clientIp(), context.launcherClient());
+            trackingService.logDownload(project.getId(), versionId, project.getAuthorId(), context.apiRequest(), context.clientIp(), context.launcherClient());
         }
     }
 
@@ -336,7 +336,7 @@ public class VersionDownloadOrchestrationService {
             trackingService.logDownload(
                     dependency.getProjectId(),
                     null,
-                    dependencyProject != null ? dependencyProject.getAuthor() : null,
+                    dependencyProject != null ? dependencyProject.getAuthorId() : null,
                     context.apiRequest(),
                     context.clientIp(),
                     context.launcherClient()

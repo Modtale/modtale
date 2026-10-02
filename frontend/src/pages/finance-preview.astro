@@ -1,0 +1,31 @@
+---
+import '../index.css';
+import FinanceShowcase from '../modules/finance/demo/FinanceShowcase';
+import FinanceShowcaseFrame from '../modules/finance/demo/FinanceShowcaseFrame';
+const isFrame = Astro.url.searchParams.get('frame') === '1';
+if (import.meta.env.PUBLIC_FINANCE_DEMO !== 'true') {
+    return new Response('Not found', { status: 404 });
+}
+Astro.response.headers.set('X-Robots-Tag', 'noindex, nofollow');
+Astro.response.headers.set('Cache-Control', 'no-store');
+---
+<html lang="en"><head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex,nofollow" />
+    <title>Finance demo · No payments</title>
+    <!-- Match the application layout's Trusted Types bootstrap for Astro hydration. -->
+    <script is:inline>
+        (function() {
+            const tt = window.trustedTypes;
+            if (!tt || typeof tt.createPolicy !== 'function') return;
+            try {
+                tt.createPolicy('default', {
+                    createHTML: (value) => value,
+                    createScript: (value) => value,
+                    createScriptURL: (value) => value
+                });
+            } catch (e) {}
+        })();
+    </script>
+</head><body>{isFrame ? <FinanceShowcase client:only="react" /> : <FinanceShowcaseFrame client:only="react" />}</body></html>

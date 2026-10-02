@@ -242,7 +242,7 @@ class VersionDownloadOrchestrationServiceTest {
 
         assertEquals("sky-tools.jar", payload.filename());
         assertArrayEquals(new byte[]{1, 2, 3}, payload.bytes());
-        verify(trackingService).logDownload("project-1", "version-1", "author-name", false, "203.0.113.1", false);
+        verify(trackingService).logDownload("project-1", "version-1", "author-id", false, "203.0.113.1", false);
     }
 
     @ParameterizedTest
@@ -268,8 +268,8 @@ class VersionDownloadOrchestrationServiceTest {
 
         assertEquals("Sky_Pack_-1.0.0.zip", payload.filename());
         assertArrayEquals(new byte[]{9, 8, 7}, payload.bytes());
-        verify(trackingService).logDownload("pack-1", "version-1", "author-name", true, "198.51.100.9", launcher);
-        verify(trackingService).logDownload("dep-1", null, "author-name", true, "198.51.100.9", launcher);
+        verify(trackingService).logDownload("pack-1", "version-1", "author-id", true, "198.51.100.9", launcher);
+        verify(trackingService).logDownload("dep-1", null, "author-id", true, "198.51.100.9", launcher);
     }
 
     @ParameterizedTest
@@ -299,8 +299,8 @@ class VersionDownloadOrchestrationServiceTest {
 
         assertEquals("Sky_Tools-UNZIP-ME.zip", payload.filename());
         assertArrayEquals(new byte[]{4, 5}, payload.bytes());
-        verify(trackingService).logDownload("project-1", "version-1", "author-name", true, "198.51.100.9", launcher);
-        verify(trackingService).logDownload("dep-1", null, "author-name", true, "198.51.100.9", launcher);
+        verify(trackingService).logDownload("project-1", "version-1", "author-id", true, "198.51.100.9", launcher);
+        verify(trackingService).logDownload("dep-1", null, "author-id", true, "198.51.100.9", launcher);
         verify(projectService, never()).getRawProjectById("dep-2");
         verify(projectService, never()).getRawProjectById("embedded");
     }
@@ -358,6 +358,7 @@ class VersionDownloadOrchestrationServiceTest {
         project.setId(id);
         project.setTitle(title);
         project.setAuthor("author-name");
+        project.setAuthorId("author-id");
         project.setClassification(classification);
         return project;
     }

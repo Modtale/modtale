@@ -15,7 +15,9 @@ class ApiCsrfRequestMatcherTest {
     @ValueSource(strings = {
             "/api/v1/auth/change-password", "/api/v1/auth/credentials", "/api/v1/auth/password",
             "/api/v1/auth/mfa/verify", "/api/v1/auth/launcher/issue", "/api/v1/auth/logout",
-            "/api/v1/user/api-keys", "/api/v1/projects/example"
+            "/api/v1/user/api-keys", "/api/v1/projects/example",
+            "/api/v1/finance/projects/example/donations/checkout-url", "/api/v1/finance/donations/confirm",
+            "/api/v1/finance/creator/payouts/request"
     })
     void sessionMutationsRequireTokenEvenWithEmptyKey(String path) throws Exception {
         var request = new MockHttpServletRequest("POST", path);
@@ -44,7 +46,7 @@ class ApiCsrfRequestMatcherTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"/api/v1/auth/signin", "/api/v1/auth/launcher/exchange", "/api/v1/users/batch", "/api/v1/projects/external/identify"})
+    @ValueSource(strings = {"/api/v1/auth/signin", "/api/v1/auth/launcher/exchange", "/api/v1/users/batch", "/api/v1/projects/external/identify", "/api/v1/finance/webhooks/stripe"})
     void preservesPublicPostOperations(String path) {
         assertFalse(new ApiCsrfRequestMatcher().matches(new MockHttpServletRequest("POST", path)));
         assertTrue(new ApiCsrfRequestMatcher().matches(new MockHttpServletRequest("DELETE", path)));

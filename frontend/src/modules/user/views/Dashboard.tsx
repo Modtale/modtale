@@ -1,6 +1,6 @@
 import React from 'react';
 import { Routes, Route, NavLink, Navigate } from 'react-router-dom';
-import { User, Package, Users, Code, BarChart2, Bell } from 'lucide-react';
+import { User, Package, Users, Code, BarChart2, Bell, Wallet } from 'lucide-react';
 import type { User as UserType } from '@/types';
 import { SiteRoutes } from '@/utils/routes';
 
@@ -9,6 +9,7 @@ import { DeveloperSettings } from './DeveloperSettings';
 import { Analytics } from './Analytics';
 import { Notifications } from './Notifications';
 import { ManageProfile } from './ManageProfile';
+import { FinanceManager } from './FinanceManager';
 import { ManageOrganization } from '@/modules/organization/views/ManageOrganization';
 
 interface DashboardProps {
@@ -52,6 +53,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onRefreshUser }) => 
                                 <SidebarLink to={SiteRoutes.dashboardProjects()} icon={Package} label="Manage Projects" />
                                 <SidebarLink to={SiteRoutes.dashboardOrgs()} icon={Users} label="Organizations" />
                                 <SidebarLink to={SiteRoutes.dashboardAnalytics()} icon={BarChart2} label="Analytics" />
+                                <SidebarLink to={SiteRoutes.dashboardFinance()} icon={Wallet} label="Finance Manager" />
                                 <SidebarLink to={SiteRoutes.dashboardNotifications()} icon={Bell} label="Notifications" />
                                 <div className="h-px bg-slate-100 dark:bg-white/5 my-2 mx-4" />
                                 <SidebarLink to={SiteRoutes.dashboardDeveloper()} icon={Code} label="Developer Settings" />
@@ -68,6 +70,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onRefreshUser }) => 
                                 <Route path="orgs" element={<ManageOrganization user={user} />} />
                                 <Route path="analytics" element={<Analytics />} />
                                 <Route path="analytics/project/:id" element={<Analytics />} />
+                                <Route path="finance" element={<FinanceManager />} />
                                 <Route path="notifications" element={<Notifications user={user} />} />
                                 <Route path="developer" element={<DeveloperSettings user={user} />} />
                             </Routes>

@@ -33,3 +33,7 @@ mock-db/node_modules/
 
 # Local campaign briefs, drafts, and review exports
 /media/2026-09-update/
+
+# Python test runner bytecode
+__pycache__/
+*.pyc

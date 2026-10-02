@@ -107,6 +107,8 @@ public class MetadataService {
         existing.setTypes(updated.getTypes());
         existing.setAllowModpacks(updated.isAllowModpacks());
         existing.setAllowComments(updated.isAllowComments());
+        // Revenue policies use the dedicated owner-authorized finance endpoint.
+        // Ordinary metadata updates must neither reset nor override those settings.
         existing.setHmWikiEnabled(updated.isHmWikiEnabled());
         existing.setHmWikiSlug(updated.getHmWikiSlug() != null ? updated.getHmWikiSlug().trim() : null);
         existing.setGalleryCarouselEnabled(updated.isGalleryCarouselEnabled());

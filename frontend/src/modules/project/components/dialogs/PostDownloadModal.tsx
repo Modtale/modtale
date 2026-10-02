@@ -126,7 +126,7 @@ export const PostDownloadModal: React.FC<PostDownloadModalProps> = ({
                             <p className={`text-xs ${theme.colors.textSecondary} font-medium mt-1`}>Installation instructions for {title}</p>
                         </div>
                     </div>
-                    <button type="button" onClick={handleClose} className={`p-2 rounded-full ${theme.colors.bgSurfaceHover} ${theme.colors.textMuted} hover:${theme.colors.textPrimary} transition-colors`}><X className="w-5 h-5" /></button>
+                    <button type="button" aria-label="Close installation instructions" onClick={handleClose} className={`p-2 rounded-full ${theme.colors.bgSurfaceHover} ${theme.colors.textMuted} hover:${theme.colors.textPrimary} transition-colors`}><X className="w-5 h-5" /></button>
                 </div>
 
                 <div className={`${theme.components.modalBody} !p-0 ${theme.colors.bgSurface}`}>
@@ -242,7 +242,7 @@ export const PostDownloadModal: React.FC<PostDownloadModalProps> = ({
                         </div>
                         <span className={`text-xs font-bold ${theme.colors.textSecondary} group-hover:${theme.colors.textPrimary} transition-colors select-none uppercase tracking-wider`}>Don't show again</span>
                     </button>
-                    <button type="button" onClick={handleClose} className={`px-8 py-2.5 rounded-xl font-black ${theme.colors.accentBg} hover:bg-modtale-accentHover text-white transition-colors shadow-lg active:scale-95 text-sm`}>
+                    <button type="button" aria-label="Close installation instructions" onClick={handleClose} className={`px-8 py-2.5 rounded-xl font-black ${theme.colors.accentBg} hover:bg-modtale-accentHover text-white transition-colors shadow-lg active:scale-95 text-sm`}>
                         Got it
                     </button>
                 </div>

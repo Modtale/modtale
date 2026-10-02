@@ -125,6 +125,35 @@ describe('api utils', () => {
         expect(extractApiErrorMessage({ bad: 'shape' }, 'Fallback')).toBe('Fallback');
     });
 
+    it.each([400, 409, 500])('preserves a retried %s response after refreshing an expired CSRF token', async status => {
+        const handler = (api.interceptors.response as any).handlers[0].rejected;
+        const original = { config: { method: 'post', headers: {} }, response: { status: 403 } };
+        const retried = { response: { status, data: { code: 'SUPPORT_TERMS_CHANGED' } } };
+        vi.spyOn(api, 'get').mockResolvedValueOnce({ data: { token: 'fresh-fixture-token' } });
+        const request = vi.spyOn(api, 'request').mockRejectedValueOnce(retried);
+        await expect(handler(original)).rejects.toBe(retried);
+        expect(request).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({
+            _csrfRetryAttempted: true, headers: { 'X-XSRF-TOKEN': 'fresh-fixture-token' }
+        }));
+    });
+
+    it('does not retry a write if CSRF refresh itself fails', async () => {
+        const handler = (api.interceptors.response as any).handlers[0].rejected;
+        const original = { config: { method: 'post', headers: {} }, response: { status: 403 } };
+        vi.spyOn(api, 'get').mockRejectedValueOnce(new Error('offline'));
+        const request = vi.spyOn(api, 'request');
+        await expect(handler(original)).rejects.toBe(original);
+        expect(request).not.toHaveBeenCalled();
+    });
+
+    it('never refreshes or repeats a mutation twice on a genuine authorization denial', async () => {
+        const handler = (api.interceptors.response as any).handlers[0].rejected;
+        const denied = { config: { method: 'post', headers: {}, _csrfRetryAttempted: true }, response: { status: 403 } };
+        const refresh = vi.spyOn(api, 'get'); const request = vi.spyOn(api, 'request');
+        await expect(handler(denied)).rejects.toBe(denied);
+        expect(refresh).not.toHaveBeenCalled(); expect(request).not.toHaveBeenCalled();
+    });
+
     it('fills in blank auth and network failures with friendlier context', () => {
         const unauthorizedError = new Error('Request failed with status code 401') as Error & {
             response?: { status?: number };

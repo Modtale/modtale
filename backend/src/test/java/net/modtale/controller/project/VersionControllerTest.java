@@ -206,7 +206,7 @@ class VersionControllerTest {
         ByteArrayResource body = assertInstanceOf(ByteArrayResource.class, response.getBody());
         assertArrayEquals(new byte[]{9, 8, 7}, body.getByteArray());
 
-        verify(trackingService).logDownload("project-1", "version-1", "Ada", false, "198.51.100.8", false);
+        verify(trackingService).logDownload("project-1", "version-1", "author-1", false, "198.51.100.8", false);
         verify(trackingService).logDownload("dep-1", null, null, false, "198.51.100.8", false);
     }
 
@@ -239,7 +239,7 @@ class VersionControllerTest {
         assertArrayEquals(new byte[]{1, 2, 3, 4}, body.getByteArray());
 
         verify(storageService).download(version.getFileUrl());
-        verify(trackingService).logDownload("project-1", "version-1", "Ada", false, "203.0.113.5", false);
+        verify(trackingService).logDownload("project-1", "version-1", "author-1", false, "203.0.113.5", false);
     }
 
     @Test
@@ -271,7 +271,7 @@ class VersionControllerTest {
         assertEquals("no-referrer", response.getHeaders().getFirst("Referrer-Policy"));
         org.junit.jupiter.api.Assertions.assertNull(response.getBody());
         verify(storageService, never()).download(anyString());
-        verify(trackingService).logDownload("project-1", "version-1", "Ada", false, "203.0.113.5", false);
+        verify(trackingService).logDownload("project-1", "version-1", "author-1", false, "203.0.113.5", false);
     }
 
     @Test
@@ -309,8 +309,8 @@ class VersionControllerTest {
         ByteArrayResource body = assertInstanceOf(ByteArrayResource.class, response.getBody());
         assertArrayEquals(new byte[]{6, 5, 4}, body.getByteArray());
 
-        verify(trackingService).logDownload("project-1", "version-1", "Ada", true, "192.0.2.11", false);
-        verify(trackingService).logDownload("dep-b", null, "Ada", true, "192.0.2.11", false);
+        verify(trackingService).logDownload("project-1", "version-1", "author-1", true, "192.0.2.11", false);
+        verify(trackingService).logDownload("dep-b", null, "author-1", true, "192.0.2.11", false);
         verify(trackingService, never()).logDownload(eq("dep-a"), isNull(), isNull(), anyBoolean(), anyString(), anyBoolean());
         verify(trackingService, never()).logDownload(eq("dep-c"), isNull(), isNull(), anyBoolean(), anyString(), anyBoolean());
     }

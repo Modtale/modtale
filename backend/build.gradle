@@ -66,10 +66,9 @@ dependencies {
     }
 }
 
-tasks.named('test') {
-    useJUnitPlatform()
-    // Mockito's documented Java 21+ setup avoids unsupported dynamic self-attachment.
-    // Test-only instrumentation uses the same Spring-managed Mockito version.
+// Mockito's documented Java 21+ setup avoids unsupported dynamic self-attachment.
+// Test-only instrumentation uses the same Spring-managed Mockito version.
+tasks.withType(Test).configureEach {
     jvmArgumentProviders.add(new CommandLineArgumentProvider() {
         @InputFiles
         @PathSensitive(PathSensitivity.RELATIVE)
@@ -80,6 +79,21 @@ tasks.named('test') {
             return ["-javaagent:${agentClasspath.singleFile.absolutePath}".toString()]
         }
     })
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+    exclude '**/FinanceFrontendIntegrationTest.class'
+}
+
+tasks.register('financeFrontendIntegrationTest', Test) {
+    description = 'Runs JSDOM and Chromium finance clients against an isolated loopback servlet fixture.'
+    group = 'verification'
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+    useJUnitPlatform()
+    include '**/FinanceFrontendIntegrationTest.class'
+    outputs.upToDateWhen { false }
 }
 
 tasks.register('statusServiceJar', org.springframework.boot.gradle.tasks.bundling.BootJar) {

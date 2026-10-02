@@ -188,4 +188,17 @@ class MetadataServiceTest {
         assertEquals("owned-image.png", existing.getImageUrl());
     }
 
+    @Test
+    void ordinaryMetadataSavePreservesOwnerMonetizationPolicy() {
+        Project existing = new Project(); existing.setId("project-1"); existing.setClassification(ProjectClassification.PLUGIN);
+        existing.setAdsEnabled(false); existing.setDonationsEnabled(true); existing.setSuggestedDonationCents(1500); existing.setDonationRecurringDefault(true);
+        Project updated = new Project(); updated.setTitle("Updated title");
+        User user = new User(); user.setId("editor");
+        when(projectService.getRawProjectById("project-1")).thenReturn(existing);
+        when(accessControlService.hasProjectPermission(existing, user, "PROJECT_EDIT_METADATA")).thenReturn(true);
+        service.updateMetadata("project-1", updated, user);
+        assertFalse(existing.isAdsEnabled()); assertTrue(existing.isDonationsEnabled());
+        assertEquals(1500, existing.getSuggestedDonationCents()); assertTrue(existing.isDonationRecurringDefault());
+    }
+
 }

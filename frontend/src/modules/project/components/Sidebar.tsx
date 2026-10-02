@@ -6,6 +6,7 @@ import { OptimizedImage } from '@/components/ui/OptimizedImage';
 import { getLicenseInfo } from '@/utils/modHelpers';
 import { SiteRoutes } from '@/utils/routes';
 import type { Project, User, ProjectDependency } from '@/types';
+import { SponsoredAdCard } from './ads/SponsoredAdCard';
 import { ProjectMetaSections } from './ProjectMetaSections';
 import { BeaconActivity } from '../beacon/BeaconActivity';
 
@@ -156,6 +157,8 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
                     </div>
                 </SidebarSection>
             )}
+
+            {project.adsEnabled !== false && <SponsoredAdCard projectId={project.id} />}
 
             <SidebarSection title="Project ID" icon={Hash}>
                 <div className="flex items-center justify-between group bg-white dark:bg-slate-900/50 p-3 rounded-xl border border-slate-200 dark:border-white/5">

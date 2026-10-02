@@ -36,6 +36,10 @@ import NotFound from '@/components/ui/error/NotFound';
 import { StatusModal } from '@/components/ui/StatusModal';
 import { api, extractApiErrorMessage } from '@/utils/api';
 import { projectClient } from '../api/projectClient';
+import { financeClient } from '@/modules/finance/api/financeClient';
+import { hasSupportTerms, type DonationConfig } from '@/modules/finance/api/financeTypes';
+import { openSupportCheckout, verifySupportReturn } from '@/modules/finance/api/supportCheckout';
+import { DonationPromptModal } from '../components/dialogs/DonationPromptModal';
 import { mergeProjectVersionChangelogs, projectNeedsChangelogHydration } from '../utils/changelogHydration';
 import { getSelectableBundleDependencies, hasCurseForgeDependencies } from '../utils/dependencyEntries';
 import { resolveGalleryImages } from '../utils/galleryImages';
@@ -111,6 +115,15 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
 
     const [isDepModalOpen, setIsDepModalOpen] = useState(false);
     const [pendingDownload, setPendingDownload] = useState<{ versionNumber: string; gameVersion: string; dependencies: any[]; channel: DownloadChannel } | null>(null);
+    const [pendingFinalDownload, setPendingFinalDownload] = useState<{ versionNumber: string; gameVersion: string; selectedDeps: string[]; channel: DownloadChannel } | null>(null);
+    const [donationConfig, setDonationConfig] = useState<DonationConfig | null>(null);
+    const donationInFlightRef = useRef(false);
+    const donationAttemptRef = useRef(0);
+    const [supportError, setSupportError] = useState('');
+    const activeDonationProjectRef = useRef(project?.id);
+    activeDonationProjectRef.current = project?.id;
+    const [showDonationPrompt, setShowDonationPrompt] = useState(false);
+    const [processingDonation, setProcessingDonation] = useState(false);
     const commentsRef = useRef<HTMLDivElement>(null);
 
     const browseBackTarget = useMemo(() => {
@@ -372,6 +385,37 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
     }, [isHistoryOpen, needsChangelogHydration, project?.id, changelogStateKey, loadChangelogPage]);
 
     useEffect(() => {
+        let active = true;
+        donationAttemptRef.current++;
+        donationInFlightRef.current = false;
+        setProcessingDonation(false);
+        setSupportError('');
+        setDonationConfig(null);
+        setShowDonationPrompt(false);
+        setPendingFinalDownload(null);
+        if (!project?.id) return;
+        financeClient.getDonationConfig(project.id)
+            .then(cfg => { if (active) setDonationConfig(cfg); })
+            .catch(() => { if (active) setDonationConfig(null); });
+        return () => { active = false; };
+    }, [project?.id]);
+
+    useEffect(() => {
+        const params = new URLSearchParams(location.search);
+        const intentId = params.get('donation_intent');
+        const status = params.get('donation_status');
+        if (!intentId || (status !== 'success' && status !== 'cancel')) return;
+        let active = true;
+        void verifySupportReturn(intentId, status === 'cancel', () => active).then(result => {
+            if (!active || !result) return;
+            setStatusModal(result);
+            params.delete('donation_intent'); params.delete('donation_status');
+            navigate({ pathname: location.pathname, search: params.toString() ? `?${params.toString()}` : '', hash: location.hash }, { replace: true });
+        });
+        return () => { active = false; };
+    }, [location.search, location.pathname, location.hash, navigate]);
+
+    useEffect(() => {
         if (prevPathnameRef.current.includes('/wiki') && isWikiRoute && prevPathnameRef.current !== location.pathname) {
             if (pendingMobileWikiScrollRef.current) {
                 pendingMobileWikiScrollRef.current = false;
@@ -594,6 +638,58 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
         throw new Error('The server did not return a usable download link for this file.');
     };
 
+    const shouldPromptDonation = Boolean(donationConfig?.projectId === project?.id && donationConfig?.donationsEnabled && donationConfig?.checkoutEnabled && hasSupportTerms(donationConfig));
+
+    const queueOrStartDownload = async (versionNumber: string, gameVersion: string, selectedDeps: string[], channel: DownloadChannel = 'RELEASE') => {
+        if (shouldPromptDonation) {
+            setSupportError('');
+            setPendingFinalDownload({ versionNumber, gameVersion, selectedDeps, channel });
+            setIsDownloadOpen(false);
+            setShowDonationPrompt(true);
+            setIsDepModalOpen(false);
+            setPendingDownload(null);
+            return;
+        }
+        await finishVersionDownload(versionNumber, gameVersion, selectedDeps, channel);
+    };
+
+    const handleSkipDonation = () => {
+        const pending = pendingFinalDownload;
+        setShowDonationPrompt(false);
+        setPendingFinalDownload(null);
+        if (!pending) return;
+
+        finishVersionDownload(pending.versionNumber, pending.gameVersion, pending.selectedDeps, pending.channel).catch((e) => {
+            showDownloadError(e, 'We could not prepare this download.');
+        });
+    };
+
+    const handleDonateAndContinue = async (amountCents: number, recurring: boolean, guestCheckout: boolean) => {
+        const pending = pendingFinalDownload;
+        if (!pending || !project?.id || donationInFlightRef.current || !shouldPromptDonation || !donationConfig) return;
+        donationInFlightRef.current = true;
+        const attempt = ++donationAttemptRef.current;
+        const requestProjectId = project.id;
+        const isCurrent = () => donationAttemptRef.current === attempt && activeDonationProjectRef.current === requestProjectId;
+        setProcessingDonation(true); setSupportError('');
+        const result = await openSupportCheckout({ projectId: requestProjectId, amountCents, recurring, guestCheckout,
+            expectedPlatformCutBps: donationConfig.donationPlatformCutBps, isCurrent });
+        if (!isCurrent()) return;
+        donationInFlightRef.current = false;
+        setProcessingDonation(false);
+        if (result.status === 'TERMS_CHANGED') {
+            setDonationConfig(result.configuration);
+            setSupportError('Support terms changed. Review the updated share before continuing.');
+            return;
+        }
+        if (result.status === 'OPENED') setStatusModal({ type: 'info', title: 'Checkout Opened', message: 'Support checkout opened in a new tab. Your download will continue.' });
+        else if (result.status === 'SIMULATED') setStatusModal({ type: 'info', title: 'Test Checkout', message: 'No real payment or creator earnings were created.' });
+        else setStatusModal({ type: 'warning', title: 'Support Not Started', message: 'Checkout could not open. Your download will continue without a tip.' });
+        setShowDonationPrompt(false);
+        setPendingFinalDownload(null);
+        finishVersionDownload(pending.versionNumber, pending.gameVersion, pending.selectedDeps, pending.channel).catch((error) => showDownloadError(error, 'We could not prepare this download.'));
+    };
+
     const handleDownloadClick = async (url: string, versionNumber: string, gameVersion: string, deps: any[], channel: string) => {
         try {
             if (project?.classification === 'MODPACK' && hasCurseForgeDependencies(deps)) {
@@ -637,7 +733,7 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
                 return;
             }
 
-            await finishVersionDownload(versionNumber, gameVersion, [], downloadChannel);
+            await queueOrStartDownload(versionNumber, gameVersion, [], downloadChannel);
         } catch (e: unknown) {
             showDownloadError(e, 'We could not prepare this download.');
         }
@@ -749,6 +845,20 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
                 {isShareOpen && <ShareModal isOpen={isShareOpen} onClose={() => setIsShareOpen(false)} url={window.location.href} title={project.title} author={project.author} />}
                 {isReportOpen && <ReportModal isOpen={isReportOpen} onClose={() => setIsReportOpen(false)} targetId={project.id} targetType="PROJECT" targetTitle={project.title} />}
                 {showPostDownloadModal && <PostDownloadModal isOpen={showPostDownloadModal} onClose={() => setShowPostDownloadModal(false)} classification={project.classification!} title={project.title} channel={lastDownloadChannel} isBundle={lastDownloadWasBundle} fileName={lastDownloadedFileName} tags={project.tags} />}
+                <DonationPromptModal
+                    show={showDonationPrompt}
+                    currency={(donationConfig?.currency || 'USD').toUpperCase()}
+                    suggestedAmountCents={Math.max(100, Number(donationConfig?.suggestedDonationCents || project.suggestedDonationCents || 500))}
+                    recurringDefault={Boolean(donationConfig?.donationRecurringDefault ?? project.donationRecurringDefault)}
+                    allowRecurring={Boolean(currentUser && donationConfig?.recurringEnabled)}
+                    platformCutBps={donationConfig?.donationPlatformCutBps}
+                    errorMessage={supportError}
+                    testMode={donationConfig?.testMode ?? false}
+                    onClose={handleSkipDonation}
+                    onSkip={handleSkipDonation}
+                    onDonate={handleDonateAndContinue}
+                    isProcessing={processingDonation}
+                />
 
                 {isHistoryOpen && versionPayloadPending && <HistoryModalSkeleton onClose={() => navigate(projectUrl)} />}
                 {isDownloadOpen && downloadModalPending && <DownloadModalSkeleton onClose={() => navigate(projectUrl)} onViewHistory={navigateToChangelog} />}
@@ -805,13 +915,13 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
                             setPendingDownload(null);
                         }}
                         onDownloadBundle={(selectedDeps) => {
-                            finishVersionDownload(pendingDownload.versionNumber, pendingDownload.gameVersion, selectedDeps, pendingDownload.channel).catch(() => {
-                                showDownloadError(new Error('The dependency bundle link could not be generated.'), 'We could not prepare that bundle download.');
+                            queueOrStartDownload(pendingDownload.versionNumber, pendingDownload.gameVersion, selectedDeps, pendingDownload.channel).catch((e) => {
+                                showDownloadError(e, 'We could not prepare that bundle download.');
                             });
                         }}
                         onDownloadProjectOnly={() => {
-                            finishVersionDownload(pendingDownload.versionNumber, pendingDownload.gameVersion, [], pendingDownload.channel).catch(() => {
-                                showDownloadError(new Error('The project-only download link could not be generated.'), 'We could not prepare that download.');
+                            queueOrStartDownload(pendingDownload.versionNumber, pendingDownload.gameVersion, [], pendingDownload.channel).catch((e) => {
+                                showDownloadError(e, 'We could not prepare that download.');
                             });
                         }}
                     />

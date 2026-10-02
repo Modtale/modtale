@@ -46,6 +46,9 @@ jobs:
         with:
           node-version: 22.12.0
 
+      - name: Test sandbox runner safety guards
+        run: python3 -m unittest discover -s backend/scripts/tests -v
+
       - name: Test workflow and fixture scripts
         run: node --test .github/tests/*.test.mjs mock-db/tests/*.test.mjs
 
@@ -145,6 +148,117 @@ jobs:
 
       - name: Run backend tests
         run: ./gradlew test
+
+  finance-frontend-integration:
+    name: Finance Frontend Session and Browser Tests
+    needs: detect-changes
+    if: needs.detect-changes.outputs.backend == 'true' || needs.detect-changes.outputs.frontend == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.12.0
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+      - name: Install isolated Chromium test browser
+        working-directory: frontend
+        env:
+          PLAYWRIGHT_BROWSERS_PATH: "0"
+        run: npx playwright install --with-deps chromium
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 26
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v3
+      - name: Exercise frontend cookies and finance routes on loopback
+        working-directory: backend
+        run: ./gradlew financeFrontendIntegrationTest
+      - name: Upload session integration reports
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: finance-frontend-session-reports
+          path: |
+            backend/build/reports/tests/financeFrontendIntegrationTest
+            backend/build/test-results/financeFrontendIntegrationTest
+            backend/build/test-results/finance-frontend-ui.xml
+            backend/build/test-results/finance-browser-ui.xml
+            backend/build/finance-browser-artifacts
+          if-no-files-found: error
+
+  finance-transactions:
+    name: Finance Transaction Tests
+    needs: detect-changes
+    if: needs.detect-changes.outputs.backend == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    env:
+      FINANCE_TEST_MONGO_URI: mongodb://127.0.0.1:27018/?replicaSet=finance-test
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 26
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v3
+      - name: Start isolated MongoDB replica set
+        run: |
+          docker run -d --name finance-mongo -p 127.0.0.1:27018:27018 mongo:8.0.32 --replSet finance-test --port 27018 --bind_ip_all
+          for i in {1..60}; do
+            if docker exec finance-mongo mongosh --port 27018 --quiet --eval 'db.adminCommand({ping: 1}).ok' >/dev/null 2>&1; then break; fi
+            sleep 1
+          done
+          docker exec finance-mongo mongosh --port 27018 --quiet --eval 'rs.initiate({_id: "finance-test", members: [{_id: 0, host: "127.0.0.1:27018"}]})'
+          for i in {1..60}; do
+            if docker exec finance-mongo mongosh --port 27018 --quiet --eval 'if (!db.hello().isWritablePrimary) quit(1)' >/dev/null 2>&1; then exit 0; fi
+            sleep 1
+          done
+          exit 1
+      - name: Verify ledger and withdrawal concurrency
+        working-directory: backend
+        run: |
+          ./gradlew test --tests 'net.modtale.service.finance.*'
+          python3 - <<'PYTHON'
+          import pathlib, xml.etree.ElementTree as ET
+          reports = sorted(pathlib.Path('build/test-results/test').glob('TEST-net.modtale.service.finance.*.xml'))
+          assert reports, 'Finance test reports are missing'
+          total = 0
+          for report in reports:
+              suite = ET.parse(report).getroot()
+              counts = {key: int(suite.get(key, 0)) for key in ('tests', 'failures', 'errors', 'skipped')}
+              print(suite.get('name'), counts)
+              assert counts['tests'] > 0 and not any(counts[key] for key in ('failures', 'errors', 'skipped')), 'Finance CI must execute every test without skips'
+              total += counts['tests']
+          print(f'Finance replica validation: {total} tests executed, zero failures/errors/skips')
+          PYTHON
+      - name: Upload finance test reports
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: finance-test-reports
+          path: |
+            backend/build/reports/tests/test
+            backend/build/test-results/test
+          if-no-files-found: error
+      - name: Stop disposable database
+        if: always()
+        run: docker rm -f finance-mongo || true
 
   launcher:
     name: Launcher Tests
