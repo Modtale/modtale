@@ -45,11 +45,13 @@ import os
 from pathlib import Path
 import re
 import tempfile
+from urllib.parse import urlsplit
 import zlib
 
 import secret_bundle_preview_plan as plan
 from secret_bundle import TARGETS
 from secret_bundle_activation_evidence import activation_request, verify_activation
+from secret_bundle_journal_codec import scoped_record_bytes, parse_scoped_record
 
 MAX_BYTES = 65536
 MAX_ETAG_BYTES = 1024
@@ -62,6 +64,8 @@ CONFIG = ('containers(name,image,volumeMounts(name,mountPath,subPath),' + STARTU
 SERVICE_FIELDS = ('name,uid,etag,generation,observedGeneration,reconciling,terminalCondition(state),'
                   'latestCreatedRevision,latestReadyRevision,traffic' + TRAFFIC + ',trafficStatuses' + TRAFFIC
                   + ',template(revision,' + CONFIG + ')')
+WARMUP_SERVICE_FIELDS = SERVICE_FIELDS + ',uri,ingress'
+ROUTE_FIELDS = 'name,uid,generation,trafficStatuses(type,revision,percent,tag,uri)'
 REVISION_FIELDS = 'name,uid,service,createTime,' + CONFIG
 # Readiness is mutable status, not part of the immutable journal snapshot.
 REVISION_READINESS_FIELDS = 'name,uid,conditions(type,state)'
@@ -272,7 +276,7 @@ def traffic(raw, full, latest):
 def parse_service(raw, profile, preview_id):
     _, _, _, full = scope(profile, preview_id)
     keys = {'name', 'uid', 'etag', 'generation', 'observedGeneration', 'reconciling', 'terminalCondition',
-            'latestCreatedRevision', 'latestReadyRevision', 'traffic', 'trafficStatuses', 'template'}
+            'latestCreatedRevision', 'latestReadyRevision', 'traffic', 'trafficStatuses', 'template', 'uri', 'ingress'}
     shape(raw, keys, {'name', 'uid', 'etag', 'generation', 'terminalCondition', 'latestCreatedRevision', 'template'})
     if raw['name'] != full:
         fail()
@@ -295,9 +299,33 @@ def parse_service(raw, profile, preview_id):
     template = revision_name(raw['template']['revision'], full) if raw['template'].get('revision') else created
     desired = traffic(raw.get('traffic', []), full, ready)
     actual = traffic(raw['trafficStatuses'], full, ready) if raw.get('trafficStatuses') else None
+    if 'uri' in raw:
+        public_origin(raw['uri'], full.rsplit('/', 1)[-1])
+    if 'ingress' in raw and raw['ingress'] not in ('INGRESS_TRAFFIC_ALL', 'INGRESS_TRAFFIC_INTERNAL_ONLY',
+                                                  'INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER', 'INGRESS_TRAFFIC_UNSPECIFIED'):
+        fail()
     return {'uid': uid, 'etag': etag, 'generation': int(raw['generation']), 'observed': int(observed),
             'condition': condition, 'reconciling': raw.get('reconciling', False), 'created': created, 'ready': ready,
-            'template': template, 'pin': pin, 'volumes': volumes, 'containers': containers, 'traffic': desired, 'actual': actual}
+            'template': template, 'pin': pin, 'volumes': volumes, 'containers': containers, 'traffic': desired, 'actual': actual,
+            'uri': raw.get('uri'), 'ingress': raw.get('ingress')}
+
+
+def public_origin(value, service, tag=None):
+    value = text(value)
+    try:
+        parsed = urlsplit(value)
+        port = parsed.port
+    except ValueError:
+        fail('Invalid readiness route origin.')
+    if (parsed.scheme != 'https' or parsed.username or parsed.password or port or parsed.path
+            or parsed.query or parsed.fragment or not parsed.hostname or value != 'https://' + parsed.hostname):
+        fail('Invalid readiness route origin.')
+    prefix = '' if tag is None else re.escape(tag) + '---'
+    if re.fullmatch(prefix + re.escape(service) + r'-[a-z0-9-]+\.a\.run\.app', parsed.hostname) is None:
+        fail('Unsupported readiness route origin.')
+    if len(parsed.hostname) > 253 or any(len(label) > 63 for label in parsed.hostname.split('.')):
+        fail('Readiness route exceeds DNS bounds.')
+    return value
 
 
 def parse_revision(raw, profile, preview_id, expected):
@@ -367,10 +395,39 @@ def _pairs(pairs):
     return result
 
 
+def _storage_etags(value, decode=False):
+    """Bound opaque-token JSON growth while preserving the exact CAS bytes."""
+    if isinstance(value, list):
+        return [_storage_etags(item, decode) for item in value]
+    if isinstance(value, dict):
+        result = {}
+        for key, item in value.items():
+            if key == 'etag':
+                if decode:
+                    shape(item, {'base64'}, {'base64'})
+                    raw = base64.b64decode(item['base64'], validate=True)
+                    if len(raw) > MAX_ETAG_BYTES:
+                        fail()
+                    result[key] = text(raw.decode('utf-8'), MAX_ETAG_BYTES)
+                else:
+                    result[key] = {'base64': base64.b64encode(text(item, MAX_ETAG_BYTES).encode('utf-8')).decode('ascii')}
+            else:
+                result[key] = _storage_etags(item, decode)
+        return result
+    return value
+
+
+def decode_journal_bytes(raw):
+    if len(raw) > MAX_BYTES:
+        fail()
+    record = _storage_etags(json.loads(raw.decode('utf-8'), object_pairs_hook=_pairs), True)
+    return validate_record(record)
+
+
 def journal_bytes(record):
     validate_record(record)
     try:
-        raw = json.dumps(record, ensure_ascii=False, sort_keys=True, separators=(',', ':'), allow_nan=False).encode('utf-8')
+        raw = json.dumps(_storage_etags(record), ensure_ascii=False, sort_keys=True, separators=(',', ':'), allow_nan=False).encode('utf-8')
     except (UnicodeError, ValueError, TypeError):
         raise RolloutError('Invalid journal encoding.') from None
     if len(raw) > MAX_BYTES:
@@ -381,14 +438,15 @@ def journal_bytes(record):
 def validate_record(record):
     keys = {'schema', 'profile', 'preview_id', 'raw_branch', 'head_sha', 'transaction_id', 'target_version',
             'base', 'base_revision', 'phase', 'intent_base', 'candidate', 'recovery_candidate',
-            'candidate_verified', 'retained_revisions', 'rollback_origin', 'operation'}
+            'candidate_verified', 'candidate_warmed', 'temporary_tag', 'retained_revisions', 'rollback_origin', 'operation'}
     shape(record, keys, keys)
-    if type(record['schema']) is not int or record['schema'] != 1 or record['phase'] not in PHASES:
+    if type(record['schema']) is not int or record['schema'] != 2 or record['phase'] not in PHASES:
         fail()
     profile, identifier = record['profile'], record['preview_id']
     _, _, service, full = scope(profile, identifier)
     text(record['transaction_id'], 12)
-    if not re.fullmatch(r'[a-z0-9]{12}', record['transaction_id']):
+    if (not re.fullmatch(r'[a-f0-9]{12}', record['transaction_id'])
+            or record['temporary_tag'] not in ('sr-' + record['transaction_id'], 'r' + record['transaction_id'][:9])):
         fail()
     try:
         plan._sha(record['head_sha'])
@@ -403,6 +461,8 @@ def validate_record(record):
             fail()
     version(record['target_version'])
     base = parse_service(record['base'], profile, identifier)
+    if base['uri'] is None or base['ingress'] != 'INGRESS_TRAFFIC_ALL' or any(row.get('tag') == record['temporary_tag'] for row in base['traffic']):
+        fail('The owned warmup route must start absent on an existing public service.')
     ref_pin, _, _ = parse_revision(record['base_revision'], profile, identifier, base['created'])
     if ref_pin != base['pin'] or not ready(base, base['created']):
         fail('The original revision was not verified ready.')
@@ -414,6 +474,10 @@ def validate_record(record):
             parse_revision(record[key], profile, identifier, service + suffix + record['transaction_id'])
     if type(record['candidate_verified']) is not bool or (record['candidate_verified'] and record['candidate'] is None):
         fail()
+    if type(record['candidate_warmed']) is not bool or (record['candidate_warmed'] and record['candidate'] is None):
+        fail()
+    if record['candidate_verified'] and not record['candidate_warmed']:
+        fail('Activation requires a successful owned-route readiness probe.')
     if record['phase'].startswith('promote') or record['phase'] == 'complete':
         if not record['candidate_verified']:
             fail('Promotion requires a persisted successful activation gate.')
@@ -436,9 +500,11 @@ def validate_record(record):
         shape(origin, {'operation', 'base', 'consumed'}, {'operation', 'base', 'consumed'})
         if origin['operation'] not in ('stage', 'promote') or type(origin['consumed']) is not bool:
             fail()
-        origin_base = parse_service(origin['base'], profile, identifier)
+        origin_base = shape(origin['base'], {'uid', 'generation', 'etag'}, {'uid', 'generation', 'etag'})
+        text(origin_base['uid'], 128)
+        text(origin_base['etag'], MAX_ETAG_BYTES)
         expected_generation = base['generation'] + (1 if origin['operation'] == 'promote' else 0)
-        if origin_base['uid'] != base['uid'] or origin_base['generation'] != expected_generation:
+        if type(origin_base['generation']) is not int or origin_base['uid'] != base['uid'] or origin_base['generation'] != expected_generation:
             fail('Rollback origin must remain anchored to its original conditional intent.')
     if record['phase'].startswith('rollback') or record['phase'] == 'rolled_back':
         if origin is None:
@@ -472,12 +538,13 @@ def reservation_bytes(record):
     def qualified(name):
         return full + '/revisions/' + name
     candidate = copy.deepcopy(record['base_revision'])
-    candidate.update(name=qualified(staged), uid='u'*128, createTime='2026-12-31T23:59:59.123456789Z', service=full)
+    candidate.update(name=qualified(staged), uid='"'*128, createTime='2026-12-31T23:59:59.123456789Z', service=full)
     candidate['volumes'][0]['secret']['items'][0]['version'] = record['target_version']
     recovery = copy.deepcopy(candidate)
-    recovery.update(name=qualified(restored), uid='v'*128)
+    recovery.update(name=qualified(restored), uid='"'*128)
     recovery['volumes'] = base['volumes']
-    future.update(phase='rollback_intent', candidate=candidate, recovery_candidate=recovery, candidate_verified=False)
+    future.update(phase='rollback_intent', candidate=candidate, recovery_candidate=recovery,
+                  candidate_verified=False, candidate_warmed=False)
     targets = copy.deepcopy(base['traffic'])
     # A current tagged entry becomes separate percentage/tag rows in canonical form.
     for row in targets:
@@ -485,19 +552,27 @@ def reservation_bytes(record):
             row['revision'] = staged
         row['revision'] = qualified(row['revision'])
         row.setdefault('tag', '')
+    targets.append({'type': REVISION_TYPE, 'revision': qualified(staged), 'percent': 0, 'tag': record['temporary_tag']})
     state = copy.deepcopy(record['base'])
-    state.update(etag='e'*MAX_ETAG_BYTES, generation=str(base['generation']+2), observedGeneration=str(base['generation']+2),
+    state.update(etag='"'*MAX_ETAG_BYTES, generation=str(base['generation']+2), observedGeneration=str(base['generation']+2),
                  reconciling=False, terminalCondition={'state': 'CONDITION_RECONCILING'},
                  latestCreatedRevision=qualified(restored), latestReadyRevision=qualified(restored),
                  traffic=targets, trafficStatuses=copy.deepcopy(targets))
     state['template'].update(revision=qualified(restored), volumes=candidate['volumes'])
-    future.update(intent_base=state, rollback_origin={'operation': 'promote', 'base': copy.deepcopy(state), 'consumed': False},
+    future.update(intent_base=state, rollback_origin={'operation': 'promote',
+                  'base': {'uid': base['uid'], 'generation': base['generation']+1, 'etag': '"'*MAX_ETAG_BYTES}, 'consumed': False},
                   operation=full.rsplit('/services/', 1)[0]+'/operations/'+'o'*128)
     # 512 bytes covers representation/default-value differences not used by guards;
     # 128 is conservative zlib overhead for our <=64-KiB bounded input.
-    raw_limit = len(json.dumps(future, ensure_ascii=False, sort_keys=True, separators=(',', ':')).encode('utf-8')) + 512
-    if raw_limit > MAX_BYTES:
+    file_limit = len(json.dumps(_storage_etags(future), ensure_ascii=False, sort_keys=True, separators=(',', ':')).encode('utf-8')) + 512
+    if file_limit > MAX_BYTES:
         fail('A recovery checkpoint would exceed the journal bound.')
+    try:
+        # The scoped representation references only known fixed resources. It
+        # does not deduplicate unknown UID/etag data or assume compressibility.
+        raw_limit = len(scoped_record_bytes(future, full)) + 512
+    except Exception:
+        raise RolloutError('A scoped recovery checkpoint would exceed the journal bound.') from None
     return 3 + 4*((raw_limit + 128 + 2)//3) + 1
 
 
@@ -523,7 +598,7 @@ class AtomicFileJournal:
         if len(raw) > MAX_BYTES:
             fail()
         try:
-            record = json.loads(raw.decode('utf-8'), object_pairs_hook=_pairs)
+            record = decode_journal_bytes(raw)
         except (ValueError, UnicodeError, RecursionError):
             raise RolloutError('Invalid persisted journal.') from None
         validate_record(record)
@@ -584,7 +659,7 @@ class SecretManagerJournal:
     """
     LIMIT = 16384
 
-    def __init__(self, transport, profile, preview_id=None):
+    def __init__(self, transport, profile, preview_id=None, *, consume_terminal=None, evict_completed=None):
         boundary, _, service, _ = scope(profile, preview_id)
         project, secret = TARGETS[boundary]
         self.transport, self.profile, self.preview_id = transport, profile, preview_id
@@ -592,6 +667,37 @@ class SecretManagerJournal:
         number = {'gen-lang-client-0244308719': '145553429208', 'modtale-pr-preview': '759035195996'}[project]
         self.response_names = {self.name, f'projects/{number}/secrets/{secret}'}
         self.key = 'modtale-rollout-' + service
+        self.consume_terminal = None
+        if consume_terminal is not None:
+            shape(consume_terminal, {'key', 'checksum', 'validate'}, {'key', 'checksum', 'validate'})
+            if (consume_terminal['key'] != 'modtale-deploy-' + service
+                    or not isinstance(consume_terminal['checksum'], str)
+                    or not re.fullmatch(r'[a-f0-9]{64}', consume_terminal['checksum'])
+                    or not callable(consume_terminal['validate'])):
+                fail('Invalid same-service terminal journal transfer.')
+            self.consume_terminal = dict(consume_terminal)
+        self.evict_completed = []
+        seen = set()
+        for eviction in array(evict_completed if evict_completed is not None else []):
+            shape(eviction, {'key', 'checksum', 'validate'}, {'key', 'checksum', 'validate'})
+            key = eviction['key']
+            if not isinstance(key, str) or not key.startswith(('modtale-deploy-', 'modtale-rollout-')):
+                fail('Invalid completed-journal eviction scope.')
+            other = key[len('modtale-deploy-'):] if key.startswith('modtale-deploy-') else key[len('modtale-rollout-'):]
+            if boundary == 'shared':
+                allowed = other in ('modtale-backend', 'modtale-backend-dev')
+            elif boundary == 'branch-preview':
+                allowed = other.startswith('modtale-backend-') and scope('branch-preview', other[len('modtale-backend-'):])[2] == other
+            else:
+                match = re.fullmatch(r'modtale-pr-([1-9][0-9]*)-backend', other)
+                allowed = match is not None and scope('pr-preview', match.group(1))[2] == other
+            if (not allowed or other == service or key in seen
+                    or not isinstance(eviction['checksum'], str)
+                    or not re.fullmatch(r'[a-f0-9]{64}', eviction['checksum'])
+                    or not callable(eviction['validate'])):
+                fail('Invalid completed-journal eviction scope.')
+            seen.add(key)
+            self.evict_completed.append(dict(eviction))
 
     def _request(self, method, fields, **kwargs):
         request = {'api': 'secret-manager-metadata', 'origin': 'https://secretmanager.googleapis.com',
@@ -625,7 +731,7 @@ class SecretManagerJournal:
     def _decode(self, encoded):
         if encoded is None:
             return None, None
-        if not isinstance(encoded, str) or not encoded.startswith('v1:') or len(encoded) >= self.LIMIT:
+        if not isinstance(encoded, str) or encoded[:3] not in ('v1:', 'v2:') or len(encoded) >= self.LIMIT:
             fail('Invalid rollout annotation encoding.')
         try:
             parts = encoded[3:].split('.', 1)
@@ -636,7 +742,10 @@ class SecretManagerJournal:
             raw = decoder.decompress(packed, MAX_BYTES + 1)
             if len(raw) > MAX_BYTES or not decoder.eof or decoder.unused_data or decoder.unconsumed_tail:
                 fail()
-            record = json.loads(raw.decode('utf-8'), object_pairs_hook=_pairs)
+            if encoded.startswith('v1:'):
+                record = decode_journal_bytes(raw)
+            else:
+                record = parse_scoped_record(raw, scope(self.profile, self.preview_id)[3])
         except (ValueError, UnicodeError, zlib.error, RecursionError):
             raise RolloutError('Invalid bounded rollout annotation.') from None
         validate_record(record)
@@ -651,12 +760,53 @@ class SecretManagerJournal:
     def save(self, record, expected):
         if record.get('profile') != self.profile or record.get('preview_id') != self.preview_id:
             fail()
-        raw = journal_bytes(record)
+        journal_bytes(record)  # Preserve the independent file/logical bound.
+        try:
+            raw = scoped_record_bytes(record, scope(self.profile, self.preview_id)[3])
+            if parse_scoped_record(raw, scope(self.profile, self.preview_id)[3]) != record:
+                fail()
+        except Exception:
+            raise RolloutError('Invalid scoped journal encoding.') from None
         body, annotations = self._request('GET', 'name,etag,annotations')
-        _, actual = self._decode(annotations.get(self.key))
+        previous, actual = self._decode(annotations.get(self.key))
         if actual != expected:
             fail('Service journal changed concurrently; resume the stored transaction.')
-        encoded = 'v1:' + base64.b64encode(zlib.compress(raw, level=9)).decode('ascii')
+        accepting_new_stage = (record['phase'] == 'stage_intent'
+            and (previous is None or (previous['phase'] in ('complete', 'rolled_back')
+                                      and previous['transaction_id'] != record['transaction_id'])))
+        if self.consume_terminal is not None and accepting_new_stage:
+            # CI provides a pure ordinary-journal decoder/validator bound to an
+            # independently verified terminal snapshot. It must check complete,
+            # profile/service, and exact new record.base equality, then return
+            # its logical checksum. Only this same-service key can be consumed,
+            # in the very PATCH that durably accepts the new stage intent.
+            transfer = self.consume_terminal
+            if not isinstance(annotations.get(transfer['key']), str):
+                fail('The terminal source journal is unavailable for atomic transfer.')
+            try:
+                accepted = transfer['validate'](annotations[transfer['key']], copy.deepcopy(record))
+            except Exception:
+                raise RolloutError('The terminal source journal could not be verified.') from None
+            if accepted != transfer['checksum']:
+                fail('The terminal source journal changed; no transfer was committed.')
+            del annotations[transfer['key']]
+        if accepting_new_stage:
+            for eviction in self.evict_completed:
+                encoded_source = annotations.get(eviction['key'])
+                if not isinstance(encoded_source, str):
+                    fail('A completed checkpoint changed before capacity reclamation.')
+                try:
+                    # The collector's pure validator must require COMPLETE,
+                    # exact scope and checksum, after a fresh read-only proof of
+                    # positively serving immutable identity/configuration. An
+                    # incomplete or rolled_back witness must never be evicted.
+                    accepted = eviction['validate'](encoded_source, copy.deepcopy(record))
+                except Exception:
+                    raise RolloutError('A completed checkpoint could not be verified.') from None
+                if accepted != eviction['checksum']:
+                    fail('A completed checkpoint changed; no eviction was committed.')
+                del annotations[eviction['key']]
+        encoded = 'v2:' + base64.b64encode(zlib.compress(raw, level=9)).decode('ascii')
         if record['phase'] not in ('complete', 'rolled_back'):
             reserve = reservation_bytes(record)
             if len(encoded) + 1 > reserve:
@@ -709,8 +859,68 @@ class RolloutExecutor:
     def _service(self, record):
         full = scope(record['profile'], record['preview_id'])[3]
         raw = self._request({'api': 'cloud-run-v2', 'origin': ORIGIN, 'method': 'GET',
-                             'path': '/v2/' + full, 'params': {'fields': SERVICE_FIELDS}})
-        return raw, parse_service(raw, record['profile'], record['preview_id'])
+                             'path': '/v2/' + full, 'params': {'fields': WARMUP_SERVICE_FIELDS}})
+        state = parse_service(raw, record['profile'], record['preview_id'])
+        if 'base' in record:
+            base = parse_service(record['base'], record['profile'], record['preview_id'])
+            if state['uri'] != base['uri'] or state['ingress'] != base['ingress']:
+                fail('Service endpoint or ingress changed; no route was warmed.')
+        return raw, state
+
+    def _revision_ready(self, record, candidate):
+        full = scope(record['profile'], record['preview_id'])[3]
+        name = revision_name(candidate['name'], full)
+        raw = self._request({'api': 'cloud-run-v2', 'origin': ORIGIN, 'method': 'GET',
+                             'path': '/v2/' + full + '/revisions/' + name,
+                             'params': {'fields': REVISION_READINESS_FIELDS}})
+        return revision_ready(raw, record['profile'], record['preview_id'], name, candidate['uid'])
+
+    def _warm(self, record, state):
+        """One status-only request per advance, through an authenticated owned route."""
+        full = scope(record['profile'], record['preview_id'])[3]
+        name = self._desired(record, 'stage')[0]
+        raw = self._request({'api': 'cloud-run-v2', 'origin': ORIGIN, 'method': 'GET',
+                             'path': '/v2/' + full, 'params': {'fields': ROUTE_FIELDS}})
+        shape(raw, {'name', 'uid', 'generation', 'trafficStatuses'}, {'name', 'uid', 'generation', 'trafficStatuses'})
+        if raw['name'] != full or raw['uid'] != state['uid'] or raw['generation'] != str(state['generation']):
+            fail('Warmup route identity changed.')
+        rows = array(raw['trafficStatuses'])
+        matches = []
+        for row in rows:
+            shape(row, {'type', 'revision', 'percent', 'tag', 'uri'}, {'type'})
+            if row.get('tag') == record['temporary_tag']:
+                matches.append(row)
+        clean = [{key: value for key, value in row.items() if key != 'uri'} for row in rows]
+        if traffic(clean, full, state['ready']) != state['actual'] or len(matches) != 1:
+            fail('Warmup route distribution does not match the saved stage.')
+        route = matches[0]
+        if (route.get('percent', 0) != 0 or route['type'] != REVISION_TYPE
+                or revision_name(route.get('revision'), full) != name):
+            fail('Warmup tag is not bound to the exact zero-traffic candidate.')
+        if 'uri' not in route:
+            return False
+        uri = public_origin(route['uri'], full.rsplit('/', 1)[-1], record['temporary_tag'])
+        if uri != 'https://' + record['temporary_tag'] + '---' + urlsplit(state['uri']).hostname:
+            fail('Warmup route does not belong to the verified service endpoint.')
+        if self._service(record)[1] != state:
+            fail('Service changed before the readiness request.')
+        request = {'api': 'cloud-run-readiness', 'origin': uri, 'method': 'HEAD',
+                   'path': '/actuator/health/readiness', 'service': full, 'service_uid': state['uid'],
+                   'revision': name, 'tag': record['temporary_tag'], 'base_uri': state['uri']}
+        try:
+            response = self.transport(request)
+        except Exception:
+            raise RolloutError('Readiness request failed; the zero-traffic checkpoint was retained.') from None
+        shape(response, {'status', 'body'}, {'status', 'body'})
+        if type(response['status']) is not int or response['status'] not in (0, 200, 503) or response['body'] != {}:
+            fail('Readiness response metadata is invalid.')
+        if self._service(record)[1] != state:
+            fail('Service changed during the readiness request.')
+        # Only the transport's sanitized connection/timeout sentinel and the
+        # application's not-ready status are retryable. Auth, redirects, scope,
+        # certificate, and every other failure remain closed. The caller owns
+        # the bounded retry budget; this call never loops or changes traffic.
+        return response['status'] == 200
 
     def _revision(self, record, name, allow_404=False):
         full = scope(record['profile'], record['preview_id'])[3]
@@ -739,6 +949,10 @@ class RolloutExecutor:
         updated = copy.deepcopy(record)
         updated.update(changes)
         validate_record(updated)
+        if updated['phase'] not in ('complete', 'rolled_back'):
+            # The raw checkpoint bound applies to every journal implementation,
+            # including local files. SM additionally reserves aggregate quota.
+            reservation_bytes(updated)
         try:
             checksum = self.journal.save(updated, checksum)
         except Exception:
@@ -757,11 +971,12 @@ class RolloutExecutor:
                 fail('A terminal journal can only be replaced by a new transaction for the same service.')
         elif checksum is not None:
             fail()
-        record = {'schema': 1, 'profile': profile, 'preview_id': preview_id, 'raw_branch': raw_branch,
-                  'head_sha': head_sha, 'transaction_id': transaction_id, 'target_version': version(target_version)}
+        record = {'schema': 2, 'profile': profile, 'preview_id': preview_id, 'raw_branch': raw_branch,
+                  'head_sha': head_sha, 'transaction_id': transaction_id, 'target_version': version(target_version),
+                  'temporary_tag': 'r' + transaction_id[:9] if isinstance(transaction_id, str) else None}
         # Scope and transaction validation happen before even a read request.
         _, _, service, _ = scope(profile, preview_id)
-        if not isinstance(transaction_id, str) or not re.fullmatch(r'[a-z0-9]{12}', transaction_id) or len(service + '-sbr-' + transaction_id) > 63:
+        if not isinstance(transaction_id, str) or not re.fullmatch(r'[a-f0-9]{12}', transaction_id) or len(service + '-sbr-' + transaction_id) > 63:
             fail()
         self._lifecycle(record)
         raw, state = self._service(record)
@@ -792,7 +1007,16 @@ class RolloutExecutor:
         self._lifecycle(record)
         if target_version == state['pin']:
             return {'status': 'unchanged', 'version': target_version}
-        history = copy.deepcopy(existing['retained_revisions']) if existing is not None else []
+        if state['uri'] is None or state['ingress'] != 'INGRESS_TRAFFIC_ALL':
+            fail('An existing public service is required for the isolated readiness probe.')
+        if any(row.get('tag') == record['temporary_tag'] for row in state['traffic']):
+            fail('The intended warmup tag already exists; it was not adopted or replaced.')
+        # Keep the immediate predecessor's rollback/provenance metadata bounded.
+        # Older actual revisions and secret versions remain untouched and are
+        # still scanned by inventory; terminal history is never an allowlist for
+        # retirement. Appending every prior transaction would exhaust the shared
+        # metadata container despite successful serial rollouts.
+        history = []
         if existing is not None:
             references = [('base_revision', True), ('candidate', existing['candidate_verified']), ('recovery_candidate', False)]
             for key, verified in references:
@@ -811,7 +1035,10 @@ class RolloutExecutor:
                 else:
                     history.append(entry)
         record.update(base=raw, base_revision=original, phase='stage_intent', intent_base=raw, candidate=None,
-                      recovery_candidate=None, candidate_verified=False, retained_revisions=history, rollback_origin=None, operation=None)
+                      recovery_candidate=None, candidate_verified=False, candidate_warmed=False,
+                      retained_revisions=history, rollback_origin=None, operation=None)
+        # Reserve an actual traffic-row slot before accepting a new journal.
+        self._desired(record, 'stage')
         self._save(record, checksum)
         return {'status': 'prepared', 'revision': service + '-sb-' + transaction_id}
 
@@ -823,6 +1050,9 @@ class RolloutExecutor:
         volumes = copy.deepcopy(base['volumes'])
         volumes[0]['secret']['items'][0]['version'] = record['target_version']
         distribution = copy.deepcopy(base['traffic'])
+        if operation == 'stage':
+            distribution.append({'type': REVISION_TYPE, 'revision': staged_name, 'percent': 0, 'tag': record['temporary_tag']})
+            distribution = traffic(distribution, scope(profile, identifier)[3], None)
         if operation == 'promote':
             percent = sum(row['percent'] for row in distribution if row['revision'] == base['created'])
             distribution = [row for row in distribution if row['revision'] != base['created'] or row.get('tag')]
@@ -833,12 +1063,13 @@ class RolloutExecutor:
             staged_name = service + '-sbr-' + record['transaction_id']
         return staged_name, volumes, distribution
 
-    def _matches(self, record, state, operation):
+    def _matches(self, record, state, operation, *, intent_generation=None):
         profile, identifier = record['profile'], record['preview_id']
         base = parse_service(record['base'], profile, identifier)
-        intent = parse_service(record['intent_base'], profile, identifier)
+        generation = (parse_service(record['intent_base'], profile, identifier)['generation']
+                      if intent_generation is None else intent_generation)
         name, volumes, distribution = self._desired(record, operation)
-        return (state['uid'] == base['uid'] and state['generation'] == intent['generation'] + 1
+        return (state['uid'] == base['uid'] and state['generation'] == generation + 1
                 and state['template'] == name and state['volumes'] == volumes and state['containers'] == base['containers']
                 and state['traffic'] == distribution)
 
@@ -885,6 +1116,8 @@ class RolloutExecutor:
         try:
             record, checksum = self.journal.load()
             validate_record(record)
+            if record['phase'] not in ('complete', 'rolled_back'):
+                reservation_bytes(record)
             if not isinstance(checksum, str) or not re.fullmatch(r'[0-9a-f]{64}', checksum):
                 fail()
             return record, checksum
@@ -906,9 +1139,7 @@ class RolloutExecutor:
                 if state != expected:
                     origin = record['rollback_origin']
                     if operation == 'rollback' and origin is not None and not origin['consumed']:
-                        original = copy.deepcopy(record)
-                        original['intent_base'] = origin['base']
-                        if self._matches(original, state, origin['operation']):
+                        if self._matches(record, state, origin['operation'], intent_generation=origin['base']['generation']):
                             if state['reconciling'] or state['condition'] in ('CONDITION_PENDING', 'CONDITION_RECONCILING'):
                                 return {'status': 'waiting_for_origin_reconciliation'}
                             candidate = self._capture_staged(record)
@@ -923,7 +1154,7 @@ class RolloutExecutor:
                 if operation == 'promote':
                     name = self._desired(record, operation)[0]
                     candidate = self._revision(record, name)
-                    if candidate != record['candidate'] or not ready(state, name):
+                    if candidate != record['candidate'] or not staged_ready(state, name) or not self._revision_ready(record, candidate):
                         fail('Promotion evidence is stale or the revision is not ready.')
                     proof = verify_activation(self.transport, record['profile'], name, candidate['createTime'], record['preview_id'])
                     if proof.get('verified_active') is not True:
@@ -955,14 +1186,25 @@ class RolloutExecutor:
             fail('Created revision does not match the intended numeric mount.')
         if existing is None:
             record, checksum = self._save(record, checksum, **{key: candidate})
-        if not ready(state, target_name):
+        platform_ready = staged_ready(state, target_name) if operation in ('stage', 'rollback') else ready(state, target_name)
+        if not platform_ready:
             return {'status': 'revision_failed' if state['condition'] == 'CONDITION_FAILED' else 'waiting_for_readiness'}
         if phase in ('complete', 'rolled_back'):
             return {'status': phase, 'revision': target_name, 'version': pin}
         if operation == 'rollback':
+            if self._revision(record, revision_name(record['base_revision']['name'], scope(record['profile'], record['preview_id'])[3])) != record['base_revision']:
+                fail('Original rollback revision metadata changed.')
+            if not self._revision_ready(record, record['base_revision']):
+                return {'status': 'waiting_for_original_readiness'}
             self._save(record, checksum, phase='rolled_back')
             return {'status': 'rolled_back', 'revision': target_name, 'version': pin}
         self._lifecycle(record)
+        if not self._revision_ready(record, candidate):
+            return {'status': 'waiting_for_revision_readiness'}
+        if operation == 'stage' and not record['candidate_warmed']:
+            if not self._warm(record, state):
+                return {'status': 'waiting_for_http_readiness'}
+            record, checksum = self._save(record, checksum, candidate_warmed=True)
         proof = verify_activation(self.transport, record['profile'], target_name, candidate['createTime'], record['preview_id'])
         if proof.get('verified_active') is not True:
             return {'status': 'waiting_for_activation', 'reason': proof['reason']}
@@ -1000,7 +1242,63 @@ class RolloutExecutor:
         candidate = self._capture_staged(record)
         if candidate is None and (landed or operation == 'promote'):
             return {'status': 'waiting_for_revision_before_rollback'}
-        origin = {'operation': operation, 'base': record['intent_base'], 'consumed': landed}
+        # Configuration/traffic expectations are derived from the immutable base
+        # and operation. Preserve only the original CAS identity here, avoiding
+        # a third redundant service snapshot in bounded annotation storage.
+        origin = {'operation': operation, 'base': {key: origin_base[key] for key in ('uid', 'generation', 'etag')}, 'consumed': landed}
         self._save(record, checksum, phase='rollback_intent', intent_base=raw, rollback_origin=origin,
                    candidate=candidate, operation=None)
         return {'status': 'rollback_prepared'}
+
+    def terminal_handoff(self, *, use_persisted_activation=False, lock_held=False, lock_group=''):
+        """Read-only provenance for atomic transfer into an ordinary deployment.
+
+        Rollback leaves a zero-traffic recovery template while the saved original
+        revision serves. A new deploy may adopt that exact state only after this
+        check. The caller must recheck the service snapshot and atomically save
+        its durable stage intent AND remove this journal in one Secret metadata
+        CAS, checking journal_checksum. Never delete the journal first: a crash
+        would lose the evidence that permits adoption. This method performs no
+        journal/runtime write and does not authorize a stale lifecycle deployment.
+
+        A caller reading the authenticated durable journal can explicitly reuse
+        its activation proof after event retention expires. COMPLETE includes a
+        persisted candidate_verified gate; rollback's original base_revision was
+        bound to verified_active provenance before the first intent was saved.
+        This option never relaxes immutable identity/configuration/readiness or
+        changes the fresh event requirement for any newly staged candidate.
+        """
+        self._lock(lock_held, lock_group)
+        if type(use_persisted_activation) is not bool:
+            fail('Persisted activation reuse must be explicitly selected.')
+        record, checksum = self._load()
+        if record['phase'] not in ('complete', 'rolled_back'):
+            fail('A pending mount rollout cannot be handed to ordinary deployment.')
+        operation = 'rollback' if record['phase'] == 'rolled_back' else 'promote'
+        raw, state = self._service(record)
+        target = self._desired(record, operation)[0]
+        if (not self._matches(record, state, operation)
+                or not (staged_ready(state, target) if operation == 'rollback' else ready(state, target))):
+            fail('Terminal rollout state drifted; ordinary deployment adoption stopped.')
+        created = record['recovery_candidate'] if operation == 'rollback' else record['candidate']
+        if created is None or self._revision(record, target) != created:
+            fail('Terminal revision identity changed; ordinary deployment adoption stopped.')
+        pin, volumes, containers = parse_revision(created, record['profile'], record['preview_id'], target)
+        if (pin, volumes, containers) != (state['pin'], state['volumes'], state['containers']):
+            fail()
+        serving = record['base_revision'] if operation == 'rollback' else record['candidate']
+        full = scope(record['profile'], record['preview_id'])[3]
+        name = revision_name(serving['name'], full)
+        if any(not any(row['revision'] == name and row['percent'] > 0 for row in distribution)
+               for distribution in (state['traffic'], state['actual'])):
+            fail('Saved serving revision has no verified traffic.')
+        if self._revision(record, name) != serving or not self._revision_ready(record, serving):
+            fail('Saved serving revision is unavailable or not ready.')
+        if not use_persisted_activation and verify_activation(self.transport, record['profile'], name, serving['createTime'], record['preview_id']).get('verified_active') is not True:
+            fail('Saved serving revision activation could not be verified.')
+        if self._service(record)[1] != state or self._revision(record, name) != serving or self._load()[1] != checksum:
+            fail('Terminal handoff observations became stale.')
+        return {'schema': 1, 'profile': record['profile'], 'preview_id': record['preview_id'],
+                'phase': record['phase'], 'journal_key': 'modtale-rollout-' + full.rsplit('/', 1)[-1],
+                'journal_checksum': checksum, 'bundle_version': state['pin'], 'service': raw,
+                'serving_revision': name, 'serving_metadata': copy.deepcopy(serving)}

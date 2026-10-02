@@ -6,7 +6,7 @@ from pathlib import Path
 import sys
 import tempfile
 import unittest
-from unittest.mock import patch
+from unittest.mock import patch, Mock
 
 sys.path.insert(0, str(Path(__file__).parents[1] / 'scripts'))
 import secret_bundle_ci as ci
@@ -71,7 +71,7 @@ class PrepareTests(unittest.TestCase):
         self.subject = ci.BundleCI(lambda req: ci.fail(), env, runner=runner,
                                    store_factory=lambda boundary: BundleStore(boundary, self.backend))
         self.subject.inventory.github_lifecycle = lambda boundary: lifecycle()
-        self.subject.fanout = lambda version: self.calls.append(('fanout', version))
+        self.subject.fanout = lambda version, **kwargs: (self.calls.append(('fanout', version)) or {'status':'complete'})
 
     def test_complete_four_key_publication_and_metadata_only_output(self):
         self.subject.prepare()
@@ -80,7 +80,7 @@ class PrepareTests(unittest.TestCase):
         self.assertEqual(set(key for key in values if key.startswith('branch-preview-alpha-')), set(plan.credential_keys('branch-preview', 'alpha')))
         self.assertEqual(values['branch-preview-other-r2-token-id'], 'other-token')
         output = Path(self.subject.env['GITHUB_ENV']).read_text()
-        self.assertEqual(output, 'MODTALE_SECRET_BUNDLE_VERSION=2\nR2_RUNTIME_CREDENTIALS_REPLACED=true\n')
+        self.assertEqual(output, 'MODTALE_SECRET_BUNDLE_VERSION=2\nR2_RUNTIME_CREDENTIALS_REPLACED=true\nMODTALE_SECRET_BUNDLE_DEPLOYMENT_PENDING=false\n')
         self.assertNotIn('synthetic', output)
         provision_env = next(env for argv, env in self.calls if isinstance(argv, list) and argv[0] == 'node')
         self.assertEqual(provision_env['GITHUB_ENV'], '')
@@ -131,6 +131,68 @@ class PrepareTests(unittest.TestCase):
         self.assertFalse(self.backend.published)
 
 
+class SharedMetadataPreparationTests(unittest.TestCase):
+    def prepare(self, response, *, profile='dev', pin='1'):
+        directory=tempfile.TemporaryDirectory();self.addCleanup(directory.cleanup)
+        output=Path(directory.name)/'metadata.env'
+        store=Mock()
+        runner=Mock(side_effect=AssertionError('Shared preparation must not run a payload command'))
+        for action in (store.read,store.update,store.backend.read,store.backend.publish,store.backend.latest_enabled):
+            action.side_effect=AssertionError('Shared preparation must not touch the payload backend')
+        transport=Mock(return_value=response)
+        subject=ci.BundleCI(transport,{**ENV,'ENV_TYPE':profile,'GIT_BRANCH_NAME':'develop' if profile=='dev' else 'main',
+            'BACKEND_SERVICE':'modtale-backend-dev' if profile=='dev' else 'modtale-backend',
+            'RUNTIME_SERVICE_ACCOUNT':deploy.RUNTIME_IDENTITIES[profile],
+            'MODTALE_SECRET_BUNDLE_SHARED_VERSION':pin,'GITHUB_ENV':str(output)},runner=runner,
+            store_factory=lambda boundary:store)
+        subject.lifecycle=Mock()
+        return subject,transport,store,runner,output
+
+    def test_shared_success_uses_only_exact_enabled_version_metadata(self):
+        for profile in ('dev','prod'):
+            for project in ('gen-lang-client-0244308719','145553429208'):
+                with self.subTest(profile=profile,project=project):
+                    subject,transport,store,runner,output=self.prepare({'status':200,'body':{
+                        'name':f'projects/{project}/secrets/MODTALE_CONFIG_SHARED/versions/1','state':'ENABLED'}},profile=profile)
+                    subject.prepare()
+                    self.assertEqual(output.read_text(),'MODTALE_SECRET_BUNDLE_VERSION=1\n')
+                    transport.assert_called_once_with({'api':'secret-manager-metadata','origin':'https://secretmanager.googleapis.com',
+                        'method':'GET','path':'/v1/projects/gen-lang-client-0244308719/secrets/MODTALE_CONFIG_SHARED/versions/1',
+                        'params':{'fields':'name,state'}})
+                    from secret_bundle_transport import validate_request
+                    validate_request(transport.call_args.args[0])
+                    self.assertEqual(store.mock_calls,[]);runner.assert_not_called();subject.lifecycle.assert_called_once_with()
+
+    def test_shared_metadata_failure_never_accesses_or_publishes_payload(self):
+        name='projects/gen-lang-client-0244308719/secrets/MODTALE_CONFIG_SHARED/versions/1'
+        cases=[{'status':status,'body':{}} for status in (403,404,500)]
+        cases += [{'status':200,'body':{'name':name,'state':state}} for state in ('DISABLED','DESTROYED','STATE_UNSPECIFIED')]
+        cases += [{'status':200,'body':{'name':wrong,'state':'ENABLED'}} for wrong in
+                  (name.replace('/1','/2'),name.replace('/1','/latest'),name.replace('MODTALE_CONFIG_SHARED','MODTALE_CONFIG_BRANCH_PREVIEW'),
+                   name.replace('gen-lang-client-0244308719','modtale-pr-preview'),name.replace('gen-lang-client-0244308719','999999999999'))]
+        cases += [{'status':200,'body':{'name':name,'state':'ENABLED','payload':{'data':'synthetic'}}},
+                  {'status':200,'body':{'name':name}}, {'status':True,'body':{'name':name,'state':'ENABLED'}}]
+        for response in cases:
+            with self.subTest(response=response):
+                subject,transport,store,runner,output=self.prepare(response)
+                with self.assertRaises(ci.CIError):subject.prepare()
+                self.assertFalse(output.exists());self.assertEqual(store.mock_calls,[]);runner.assert_not_called()
+                self.assertEqual(transport.call_count,1)
+
+    def test_shared_latest_or_invalid_pin_stops_before_any_secret_request(self):
+        for pin in ('latest','0','01','-1','1.0',''):
+            subject,transport,store,runner,output=self.prepare(None,pin=pin)
+            with self.assertRaises(ValueError):subject.prepare()
+            transport.assert_not_called();runner.assert_not_called();self.assertEqual(store.mock_calls,[])
+            self.assertFalse(output.exists())
+
+    def test_shared_metadata_transport_failure_does_not_fall_back_to_payload_access(self):
+        subject,transport,store,runner,output=self.prepare(None)
+        transport.side_effect=RuntimeError('synthetic metadata failure')
+        with self.assertRaises(RuntimeError):subject.prepare()
+        self.assertEqual(store.mock_calls,[]);runner.assert_not_called();self.assertFalse(output.exists())
+
+
 class DeploymentAPI:
     def __init__(self, exists=True):
         self.full = 'projects/gen-lang-client-0244308719/locations/us-central1/services/modtale-backend-alpha'
@@ -171,6 +233,8 @@ class DeploymentAPI:
             body = {'name': self.secret, 'etag': self.etag}
             if req['method'] == 'GET': body['annotations'] = copy.deepcopy(self.annotations)
             return {'status': 200, 'body': body}
+        if req['api'] == 'cloud-run-v1-ownership':
+            return {'status':200,'body':{'items':[{'metadata':{'name':self.full.rsplit('/',1)[-1],'uid':self.service['uid']}}]}}
         if req['api'] == 'cloud-run-readiness':
             return {'status':self.warm_status,'body':{}}
         if req['api'] == 'cloud-logging':
@@ -187,7 +251,12 @@ class DeploymentAPI:
                 return {'status':200,'body':{'name':revision['name'],'uid':revision['uid'],
                     'conditions':[{'type':'Ready','state':self.readiness_state},{'type':'ContainerHealthy','state':'CONDITION_SUCCEEDED'}]}}
             body = self.revisions.get(req['path'].rsplit('/',1)[-1]) if '/revisions/' in req['path'] else self.service
-            return {'status': 200, 'body': copy.deepcopy(body)} if body else {'status': 404, 'body': {}}
+            body=copy.deepcopy(body)
+            if body is not None and 'serviceAccount' in req['params']['fields']:
+                profile=getattr(self,'profile','branch-preview')
+                if '/revisions/' in req['path']:body['serviceAccount']=deploy.RUNTIME_IDENTITIES[profile]
+                else:body['template']['serviceAccount']=deploy.RUNTIME_IDENTITIES[profile]
+            return {'status': 200, 'body': body} if body else {'status': 404, 'body': {}}
         if req['method'] == 'PATCH':
             if req['body']['etag'] != self.service['etag']: return {'status': 412, 'body': {}}
             if self.crash == 'before-promote': self.crash = None; raise RuntimeError('synthetic-private')
@@ -449,7 +518,7 @@ class DeploymentTests(unittest.TestCase):
         subject=api.ci({'GITHUB_RUN_ID':'9999','GITHUB_SHA':'c'*40})
         self.assertEqual(deploy.deploy(subject,['--image',IMAGE]),'https://modtale-backend-alpha-synthetic-uc.a.run.app')
         current,_=journal.load()
-        self.assertEqual(current['schema'],2)
+        self.assertEqual(current['schema'],3)
         self.assertEqual(current['serving_revision'],baseline)
         self.assertEqual(current['retained_revisions'][0]['name'],old)
         self.assertIn(old,api.revisions)
@@ -485,24 +554,11 @@ class DeploymentTests(unittest.TestCase):
         tags=[row.get('tag') for row in api.service['traffic'] if row.get('tag')]
         self.assertEqual(tags,['owner-rollback'])
 
-    def test_readiness_timeout_retries_same_owned_route_without_restage(self):
-        api=DeploymentAPI();original=api.transport;heads=[]
-        def transport(request):
-            if request['api']=='cloud-run-readiness':
-                heads.append(copy.deepcopy(request))
-                if len(heads)==1:return {'status':0,'body':{}}
-            return original(request)
-        subject=api.ci();subject.transport=transport
-        deploy.deploy(subject,['--image',IMAGE])
-        self.assertEqual(len(heads),2);self.assertEqual(heads[0],heads[1])
-        self.assertEqual(len(api.commands),1)
-        self.assertFalse(any(row.get('tag') for row in api.service['traffic']))
-
-    def test_larger_foreign_journal_stops_new_tag_reservation_before_mutation(self):
+    def test_scoped_codec_preserves_larger_foreign_journal_without_extra_storage(self):
         api=DeploymentAPI();manual='modtale-initial-dev-v1';api.annotations[manual]='m'*(4429-len(manual))
-        with self.assertRaises(ci.CIError):deploy.deploy(api.ci(),['--image',IMAGE])
-        self.assertFalse(api.commands)
-        self.assertEqual(api.annotations,{manual:'m'*(4429-len(manual))})
+        deploy.deploy(api.ci(),['--image',IMAGE])
+        self.assertEqual(api.annotations[manual],'m'*(4429-len(manual)))
+        self.assertLess(sum(len(k)+len(v) for k,v in api.annotations.items()),16384)
 
     def test_warmup_redirect_or_wrong_tag_route_never_promotes(self):
         for mode in ('redirect','wrong-route'):
@@ -516,6 +572,20 @@ class DeploymentTests(unittest.TestCase):
             subject=api.ci();subject.transport=transport
             with self.assertRaises(ci.CIError):deploy.deploy(subject,['--image',IMAGE])
             self.assertFalse(any(req['api']=='cloud-run-v2' and req['method']=='PATCH' for req in api.requests))
+
+    def test_readiness_timeout_retries_same_owned_route_without_restage(self):
+        api=DeploymentAPI();original=api.transport;heads=[]
+        def transport(request):
+            if request['api']=='cloud-run-readiness':
+                heads.append(copy.deepcopy(request))
+                if len(heads)==1:return {'status':0,'body':{}}
+            return original(request)
+        subject=api.ci();subject.transport=transport
+        deploy.deploy(subject,['--image',IMAGE])
+        self.assertEqual(len(heads),2);self.assertEqual(heads[0],heads[1])
+        self.assertEqual(len(api.commands),1)
+        self.assertFalse(any(row.get('tag') for row in api.service['traffic']))
+
 
     def test_new_service_requires_specific_network_approval(self):
         api = DeploymentAPI(exists=False)
@@ -637,6 +707,13 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertIn('MODTALE_SECRET_BUNDLES_ENABLED != \'true\'', pr)
         self.assertNotIn('migrate-secret', cd + pr)
 
+    def test_lifecycle_jobs_have_explicit_pull_request_read_scope(self):
+        root=Path(__file__).parents[1]/'workflows'
+        text=(root/'ci-cd.yml').read_text()
+        self.assertIn("actions: 'read'\n      pull-requests: 'read'\n      id-token: 'write'",text)
+        self.assertIn('contents: read\n      pull-requests: read\n      id-token: write',text)
+        self.assertIn('pull-requests: write',(root/'pr-preview.yml').read_text())
+
     def test_mock_refresh_keeps_dedicated_source_and_template_identities(self):
         text = (Path(__file__).parents[1]/'workflows/mock-db-refresh.yml').read_text()
         for name in ('MOCK_SOURCE_MONGODB_URI','MOCK_TEMPLATE_MONGODB_URI','MOCK_SOURCE_R2_ACCESS_KEY','MOCK_TEMPLATE_R2_ACCESS_KEY'):
@@ -654,11 +731,11 @@ class CleanupTests(unittest.TestCase):
         def runner(argv, env=None):
             self.calls.append((argv, env))
             return b'{"exists": true}' if argv[-1] == 'inspect-bucket' else b''
-        self.subject = ci.BundleCI(lambda req: {'status': 404, 'body': {}},
+        self.subject = ci.BundleCI(lambda req: {'status':200,'body':{'name':'projects/'+ENV['PROJECT_ID']+'/secrets/MODTALE_CONFIG_BRANCH_PREVIEW','etag':'fake','annotations':{}}} if req['api']=='secret-manager-metadata' else {'status': 404, 'body': {}},
             {**ENV, 'DB_NAME': 'modtale-alpha', 'IMAGE_TAG': 'alpha'}, runner=runner,
             store_factory=lambda boundary: BundleStore(boundary, self.backend))
         self.subject.inventory.github_lifecycle = lambda boundary: {'repository': plan.REPOSITORY, 'complete': True, 'items': []}
-        self.subject.fanout = lambda version: self.calls.append(('fanout', version))
+        self.subject.fanout = lambda version, **kwargs: (self.calls.append(('fanout', version)) or {'status':'complete'})
 
     def test_only_intended_keys_removed_after_confirmed_service_absence(self):
         self.subject.cleanup()
@@ -755,6 +832,10 @@ class TransportContractTests(unittest.TestCase):
 
 
 class FanoutAPI(DeploymentAPI):
+    def __init__(self):
+        super().__init__()
+        self.service['ingress']='INGRESS_TRAFFIC_ALL'
+
     def transport(self, req):
         import secret_bundle_preview_inventory as inventory
         if req['api'] == 'github':
@@ -772,6 +853,7 @@ class FanoutAPI(DeploymentAPI):
                 return {'status':200,'body':{'services':[{'name':self.full}]}}
             response=super().transport(req)
             if response['status'] != 200: return response
+            if fields == 'name':return {'status':200,'body':{'name':response['body']['name']}}
             if fields in (rollout.REVISION_READINESS_FIELDS,deploy.TAG_ROUTE_FIELDS):return response
             body=response['body']
             if '/revisions/' in req['path']:
@@ -780,7 +862,8 @@ class FanoutAPI(DeploymentAPI):
                     for container in body['containers']:
                         container.pop('image',None);container.pop('startupProbe',None)
             else:
-                body.pop('uri',None);body.pop('ingress',None)
+                if fields != rollout.WARMUP_SERVICE_FIELDS:
+                    body.pop('uri',None);body.pop('ingress',None)
                 if fields == inventory.SERVICE_FIELDS:
                     body['template']['serviceAccount']=inventory.RUNTIME_ACCOUNTS['branch-preview']
                     for container in body['template']['containers']:

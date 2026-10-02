@@ -1,4 +1,5 @@
 """Crash/recovery tests use only in-process fake APIs and temporary metadata files."""
+import base64
 import copy
 import hashlib
 import json
@@ -6,6 +7,7 @@ from pathlib import Path
 import sys
 import tempfile
 import unittest
+import zlib
 
 sys.path.insert(0, str(Path(__file__).parents[1] / 'scripts'))
 import secret_bundle_rollout as r
@@ -28,6 +30,7 @@ class FakeRun:
             'volumes': [{'name': 'bundle', 'secret': {'secret': secret, 'defaultMode': 292,
                          'items': [{'path': boundary + '.json', 'version': '1', 'mode': 256}]}}]}
         self.service = {'name': self.full, 'uid': 'service-uid', 'etag': 'e1', 'generation': '1',
+            'uri': 'https://' + self.short + '-synthetic-uc.a.run.app', 'ingress': 'INGRESS_TRAFFIC_ALL',
             'observedGeneration': '1', 'terminalCondition': {'state': 'CONDITION_SUCCEEDED'},
             'latestCreatedRevision': cfg['revision'], 'latestReadyRevision': cfg['revision'], 'template': cfg,
             'traffic': [{'type': r.LATEST_TYPE, 'percent': 100}],
@@ -38,6 +41,9 @@ class FakeRun:
         self.auto_ready = True
         self.activated, self.log_status = True, 200
         self.cloud_crash = None
+        self.head_status = 200
+        self.head_requests = []
+        self.revision_conditions = {}
         self.annotations, self.metadata_etag = {}, 'm1'
         self.metadata_conflict = False
         self.journal_crash = None
@@ -52,12 +58,20 @@ class FakeRun:
         self.service['reconciling'] = False
         self.service['terminalCondition']['state'] = 'CONDITION_SUCCEEDED' if success else 'CONDITION_FAILED'
         if success:
-            self.service['latestReadyRevision'] = self.service['latestCreatedRevision']
+            # A zero-percent candidate does not become the serving pointer.
+            targets = [row for row in self.service['traffic'] if row.get('percent', 0)]
+            if any(row.get('revision') == self.service['latestCreatedRevision'] for row in targets):
+                self.service['latestReadyRevision'] = self.service['latestCreatedRevision']
             self.service['observedGeneration'] = self.service['generation']
             self.service['trafficStatuses'] = copy.deepcopy(self.service['traffic'])
 
     def __call__(self, request):
         self.requests.append(copy.deepcopy(request))
+        if request['api'] == 'cloud-run-readiness':
+            self.head_requests.append(copy.deepcopy(request))
+            assert request['method'] == 'HEAD' and request['path'] == '/actuator/health/readiness'
+            assert request['origin'] == 'https://' + request['tag'] + '---' + self.service['uri'][len('https://'):]
+            return {'status': self.head_status, 'body': {}}
         if request['api'] == 'cloud-logging':
             assert request['params']['fields'] == 'entries(insertId),nextPageToken'
             assert 'timestamp>=' in request['body']['filter']
@@ -83,8 +97,19 @@ class FakeRun:
         assert request['api'] == 'cloud-run-v2' and request['origin'] == r.ORIGIN
         if request['method'] == 'GET':
             if request['path'] == '/v2/' + self.full:
-                assert request['params']['fields'] == r.SERVICE_FIELDS
+                if request['params']['fields'] == r.ROUTE_FIELDS:
+                    rows = copy.deepcopy(self.service['trafficStatuses'])
+                    for row in rows:
+                        if row.get('tag'):
+                            row['uri'] = 'https://' + row['tag'] + '---' + self.service['uri'][len('https://'):]
+                    return {'status': 200, 'body': {'name': self.full, 'uid': self.service['uid'],
+                            'generation': self.service['generation'], 'trafficStatuses': rows}}
+                assert request['params']['fields'] == r.WARMUP_SERVICE_FIELDS
                 return {'status': 200, 'body': copy.deepcopy(self.service)}
+            if request['params']['fields'] == r.REVISION_READINESS_FIELDS:
+                name = request['path'].rsplit('/', 1)[-1]
+                return {'status': 200, 'body': {'name': name, 'uid': self.revisions[name]['uid'],
+                    'conditions': copy.deepcopy(self.revision_conditions.get(name, [{'type': 'Ready', 'state': 'CONDITION_SUCCEEDED'}]))}}
             assert request['params']['fields'] == r.REVISION_FIELDS
             name = request['path'].rsplit('/', 1)[-1]
             return {'status': 200, 'body': copy.deepcopy(self.revisions[name])} if name in self.revisions else {'status': 404, 'body': {}}
@@ -129,7 +154,7 @@ class MemoryJournal:
         self.crash_after = False
 
     def load(self):
-        return (json.loads(self.raw), hashlib.sha256(self.raw).hexdigest()) if self.raw is not None else (None, None)
+        return (r.decode_journal_bytes(self.raw), hashlib.sha256(self.raw).hexdigest()) if self.raw is not None else (None, None)
 
     def save(self, record, expected):
         self.calls += 1
@@ -375,13 +400,261 @@ class RolloutTests(unittest.TestCase):
         self.assertEqual(self.begin()['status'], 'prepared')
         self.assertEqual(self.api.patches, [])
         self.assertEqual(self.executor().advance(**LOCK)['status'], 'stage_requested')
-        self.assertEqual(self.api.service['traffic'], [{'type': r.REVISION_TYPE, 'revision': old, 'percent': 100}])
+        self.assertEqual(self.api.service['traffic'], [{'type': r.REVISION_TYPE, 'revision': old, 'percent': 100},
+                         {'type': r.REVISION_TYPE, 'revision': self.api.short + '-sb-a123456789ab', 'percent': 0, 'tag': 'ra12345678'}])
         self.assertEqual(self.executor().advance(**LOCK)['status'], 'verified_ready_for_promotion')
         self.assertEqual(len(self.api.patches), 1)
         result = self.finish()
         self.assertEqual(result['status'], 'complete')
         self.assertEqual(self.api.service['traffic'][0]['revision'], result['revision'])
         self.assertEqual(len(self.api.patches), 2)
+
+    def test_owned_tag_warms_exact_candidate_once_then_is_removed_by_promotion(self):
+        old = self.api.service['latestReadyRevision']
+        self.begin()
+        self.executor().advance(**LOCK)
+        self.assertEqual(self.api.service['latestReadyRevision'], old)
+        self.assertEqual(self.executor().advance(**LOCK)['status'], 'verified_ready_for_promotion')
+        self.assertTrue(self.journal.load()[0]['candidate_warmed'])
+        self.assertEqual(len(self.api.head_requests), 1)
+        request = self.api.head_requests[0]
+        self.assertEqual(request['tag'], 'ra12345678')
+        self.assertEqual(request['revision'], self.api.short + '-sb-a123456789ab')
+        self.assertEqual(set(request), {'api', 'origin', 'method', 'path', 'service', 'service_uid', 'revision', 'tag', 'base_uri'})
+        self.finish()
+        self.assertEqual(len(self.api.head_requests), 1)
+        self.assertFalse(any(row.get('tag') == request['tag'] for row in self.api.service['traffic']))
+
+    def test_existing_owned_tag_collision_and_nonhex_transaction_fail_before_mutation(self):
+        old = self.api.service['latestReadyRevision']
+        self.api.service['traffic'].append({'type': r.REVISION_TYPE, 'revision': old, 'percent': 0, 'tag': 'ra12345678'})
+        self.api.service['trafficStatuses'] = copy.deepcopy(self.api.service['traffic'])
+        with self.assertRaises(r.RolloutError):
+            self.begin()
+        self.assertIsNone(self.journal.raw)
+        self.assertEqual(self.api.patches, [])
+        self.setUp()
+        with self.assertRaises(r.RolloutError):
+            self.begin(transaction_id='z123456789ab')
+        self.assertEqual(self.api.requests, [])
+
+    def test_legacy_full_transaction_tag_checkpoint_remains_resumable(self):
+        self.begin()
+        record, checksum = self.journal.load()
+        record['temporary_tag'] = 'sr-' + record['transaction_id']
+        self.journal.save(record, checksum)
+        self.executor().advance(**LOCK)
+        self.assertEqual(self.finish()['status'],'complete')
+        self.assertEqual(self.api.head_requests[0]['tag'],'sr-a123456789ab')
+        self.assertFalse(any(row.get('tag')=='sr-a123456789ab' for row in self.api.service['traffic']))
+
+    def test_short_tag_collisions_and_wrong_recorded_suffix_fail_closed(self):
+        self.begin()
+        record, _ = self.journal.load()
+        self.assertEqual(record['temporary_tag'],'r'+record['transaction_id'][:9])
+        for tag in ('r'+record['transaction_id'][:10], 'r000000000', 'sr-'+record['transaction_id'][:9]):
+            with self.assertRaises(r.RolloutError):r.validate_record({**record,'temporary_tag':tag})
+        self.setUp()
+        old=self.api.service['latestReadyRevision']
+        self.api.service['traffic'].append({'type':r.REVISION_TYPE,'revision':old,'percent':0,'tag':'ra12345678'})
+        self.api.service['trafficStatuses']=copy.deepcopy(self.api.service['traffic'])
+        with self.assertRaises(r.RolloutError):self.begin(transaction_id='a12345678fff')
+        self.assertIsNone(self.journal.raw)
+
+    def test_maximum_branch_tag_route_fits_dns_and_overlong_labels_are_rejected(self):
+        service='modtale-backend-'+'a'*20
+        valid='https://r123456789---'+service+'-abcdefghij-uc.a.run.app'
+        self.assertLessEqual(len(valid.removeprefix('https://').split('.')[0]),63)
+        self.assertEqual(r.public_origin(valid,service,'r123456789'),valid)
+        with self.assertRaises(r.RolloutError):
+            r.public_origin('https://sr-123456789abc---'+service+'-abcdefghij-uc.a.run.app',service,'sr-123456789abc')
+
+    def test_nonpublic_or_missing_endpoint_is_not_warmed_or_mutated(self):
+        for ingress in ('INGRESS_TRAFFIC_INTERNAL_ONLY', 'INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER', None):
+            with self.subTest(ingress=ingress):
+                self.setUp()
+                if ingress is None:
+                    self.api.service.pop('uri')
+                else:
+                    self.api.service['ingress'] = ingress
+                with self.assertRaises(r.RolloutError):
+                    self.begin()
+                self.assertIsNone(self.journal.raw)
+                self.assertEqual(self.api.patches, [])
+                self.assertEqual(self.api.head_requests, [])
+
+    def test_timeout_or_not_ready_retries_identical_route_before_promotion(self):
+        for status in (0, 503):
+            with self.subTest(status=status):
+                self.setUp()
+                self.begin()
+                self.executor().advance(**LOCK)
+                self.api.head_status = status
+                self.assertEqual(self.executor().advance(**LOCK)['status'], 'waiting_for_http_readiness')
+                self.assertFalse(self.journal.load()[0]['candidate_warmed'])
+                self.assertEqual(len(self.api.patches), 1)
+                self.api.head_status = 200
+                self.assertEqual(self.finish()['status'], 'complete')
+                self.assertEqual(len(self.api.head_requests), 2)
+                self.assertEqual(self.api.head_requests[0], self.api.head_requests[1])
+
+    def test_fatal_or_redirected_head_stops_even_with_activation_event(self):
+        for status in (True, -1, 201, 301, 302, 307, 308, 401, 403, 404, 500, 504, 600):
+            with self.subTest(status=status):
+                self.setUp()
+                self.begin()
+                self.executor().advance(**LOCK)
+                self.api.head_status = status
+                with self.assertRaises(r.RolloutError):
+                    self.executor().advance(**LOCK)
+                self.assertFalse(self.journal.load()[0]['candidate_warmed'])
+                self.assertEqual(len(self.api.patches), 1)
+
+    def test_missing_activation_keeps_tag_and_old_traffic_after_successful_head(self):
+        self.begin()
+        self.executor().advance(**LOCK)
+        self.api.activated = False
+        self.assertEqual(self.executor().advance(**LOCK)['status'], 'waiting_for_activation')
+        self.assertEqual(self.executor().advance(**LOCK)['status'], 'waiting_for_activation')
+        self.assertEqual(len(self.api.head_requests), 1)
+        self.assertEqual(len(self.api.patches), 1)
+        self.assertTrue(any(row.get('tag') == 'ra12345678' for row in self.api.service['traffic']))
+        self.executor().rollback(**LOCK)
+        self.assertEqual(self.finish()['status'], 'rolled_back')
+        self.assertFalse(any(row.get('tag') == 'ra12345678' for row in self.api.service['traffic']))
+
+    def test_mutable_candidate_readiness_is_not_frozen_into_immutable_checkpoint(self):
+        self.begin()
+        self.executor().advance(**LOCK)
+        name = self.api.service['latestCreatedRevision']
+        self.api.revision_conditions[name] = [{'type': 'Ready', 'state': 'CONDITION_PENDING'}]
+        self.assertEqual(self.executor().advance(**LOCK)['status'], 'waiting_for_revision_readiness')
+        self.assertEqual(self.api.head_requests, [])
+        self.assertNotIn('conditions', self.journal.raw.decode())
+        self.api.revision_conditions[name] = [{'type': 'Ready', 'state': 'CONDITION_SUCCEEDED'},
+                                            {'type': 'Active', 'state': 'CONDITION_FAILED'}]
+        self.assertEqual(self.finish()['status'], 'complete')
+
+    def test_route_identity_and_url_drift_fail_before_head(self):
+        changes = [lambda body: body.update(uid='other'), lambda body: body.update(generation='99'),
+                   lambda body: body.update(name=body['name'].replace('/services/', '/services/foreign-')),
+                   lambda body: body['trafficStatuses'][-1].update(uri='https://evil.example.test'),
+                   lambda body: body['trafficStatuses'][-1].update(uri='https://other---'+self.api.short+'-synthetic-uc.a.run.app'),
+                   lambda body: body['trafficStatuses'][-1].update(revision=self.api.short+'-00001-abc'),
+                   lambda body: body['trafficStatuses'][-1].update(percent=1),
+                   lambda body: body['trafficStatuses'][-1].update(tag='foreign')]
+        for change in changes:
+            with self.subTest(change=change):
+                self.setUp()
+                self.begin()
+                self.executor().advance(**LOCK)
+                delegate = self.api
+                def transport(request):
+                    result = delegate(request)
+                    if request.get('params', {}).get('fields') == r.ROUTE_FIELDS:
+                        change(result['body'])
+                    return result
+                subject = r.RolloutExecutor(transport, self.journal, self.lifecycle)
+                with self.assertRaises(r.RolloutError):
+                    subject.advance(**LOCK)
+                self.assertEqual(self.api.head_requests, [])
+                self.assertEqual(len(self.api.patches), 1)
+
+    def test_missing_tag_uri_waits_without_probe_or_promotion(self):
+        self.begin()
+        self.executor().advance(**LOCK)
+        delegate = self.api
+        def transport(request):
+            result = delegate(request)
+            if request.get('params', {}).get('fields') == r.ROUTE_FIELDS:
+                result['body']['trafficStatuses'][-1].pop('uri')
+            return result
+        subject = r.RolloutExecutor(transport, self.journal, self.lifecycle)
+        self.assertEqual(subject.advance(**LOCK)['status'], 'waiting_for_http_readiness')
+        self.assertEqual(self.api.head_requests, [])
+
+    def test_fatal_transport_error_preserves_checkpoint_and_suppresses_diagnostics(self):
+        self.begin()
+        self.executor().advance(**LOCK)
+        delegate = self.api
+        def transport(request):
+            if request['api'] == 'cloud-run-readiness':
+                raise RuntimeError('SYNTHETIC-PRIVATE')
+            return delegate(request)
+        subject = r.RolloutExecutor(transport, self.journal, self.lifecycle)
+        with self.assertRaises(r.RolloutError) as error:
+            subject.advance(**LOCK)
+        self.assertNotIn('SYNTHETIC-PRIVATE', str(error.exception))
+        self.assertFalse(self.journal.load()[0]['candidate_warmed'])
+        self.assertEqual(self.finish()['status'], 'complete')
+
+    def test_cloud_drift_during_head_is_not_checkpointed_or_promoted(self):
+        self.begin()
+        self.executor().advance(**LOCK)
+        delegate = self.api
+        def transport(request):
+            result = delegate(request)
+            if request['api'] == 'cloud-run-readiness':
+                self.api.service['generation'] = '99'
+                self.api.service['etag'] = 'external'
+            return result
+        subject = r.RolloutExecutor(transport, self.journal, self.lifecycle)
+        with self.assertRaises(r.RolloutError):
+            subject.advance(**LOCK)
+        self.assertFalse(self.journal.load()[0]['candidate_warmed'])
+        self.assertEqual(len(self.api.patches), 1)
+
+    def test_rollback_before_warm_preserves_user_tags_without_starting_recovery_candidate(self):
+        old = self.api.service['latestReadyRevision']
+        self.api.service['traffic'] = [{'type': r.REVISION_TYPE, 'revision': old, 'percent': 100, 'tag': 'stable'}]
+        self.api.service['trafficStatuses'] = copy.deepcopy(self.api.service['traffic'])
+        self.begin()
+        saved = r.parse_service(self.journal.load()[0]['base'], self.api.profile, self.api.preview)['traffic']
+        self.executor().advance(**LOCK)
+        self.executor().rollback(**LOCK)
+        self.assertEqual(self.finish()['status'], 'rolled_back')
+        self.assertEqual(self.api.service['traffic'], saved)
+        self.assertEqual(self.api.service['latestReadyRevision'], old)
+        self.assertNotEqual(self.api.service['latestReadyRevision'], self.api.service['latestCreatedRevision'])
+        self.assertEqual(self.api.head_requests, [])
+
+    def test_route_and_readiness_requests_use_exact_supported_metadata_masks(self):
+        self.begin()
+        self.finish()
+        fields = [request.get('params', {}).get('fields') for request in self.api.requests]
+        self.assertIn(r.WARMUP_SERVICE_FIELDS, fields)
+        self.assertIn('name,uid,generation,trafficStatuses(type,revision,percent,tag,uri)', fields)
+        self.assertIn('name,uid,conditions(type,state)', fields)
+        self.assertTrue(all('message' not in (value or '') and 'env' not in (value or '') for value in fields))
+
+    def test_generic_journal_rejects_future_raw_checkpoint_overflow_before_stage(self):
+        old = self.api.short + '-' + 'a' * (63 - len(self.api.short) - 1)
+        self.api.service['latestCreatedRevision'] = self.api.service['latestReadyRevision'] = old
+        self.api.service['template']['revision'] = old
+        image = 'gcr.io/' + 'a' * (1023 - len('gcr.io/') - len('@sha256:') - 64) + '@sha256:' + 'b' * 64
+        self.api.service['template']['containers'][0]['image'] = image
+        rows = [{'type': r.REVISION_TYPE, 'revision': old, 'percent': 100}]
+        rows += [{'type': r.REVISION_TYPE, 'revision': old, 'percent': 0, 'tag': 't' + str(index).zfill(2) + 'a' * 60}
+                 for index in range(68)]
+        self.api.service['traffic'] = rows
+        self.api.service['trafficStatuses'] = copy.deepcopy(rows)
+        self.api.add_revision(old)
+        with self.assertRaises(r.RolloutError):
+            self.begin()
+        self.assertEqual(self.api.patches, [])
+        self.assertEqual(self.api.head_requests, [])
+        self.assertIsNone(self.journal.raw)
+
+    def test_exhausted_traffic_row_bound_rejects_before_accepting_journal(self):
+        old = self.api.service['latestReadyRevision']
+        rows = [{'type': r.REVISION_TYPE, 'revision': old, 'percent': 100}]
+        rows += [{'type': r.REVISION_TYPE, 'revision': old, 'percent': 0, 'tag': 't' + str(index)} for index in range(99)]
+        self.api.service['traffic'] = rows
+        self.api.service['trafficStatuses'] = copy.deepcopy(rows)
+        with self.assertRaises(r.RolloutError):
+            self.begin()
+        self.assertIsNone(self.journal.raw)
+        self.assertEqual(self.api.patches, [])
 
     def test_images_environment_and_original_secrets_are_never_read_or_rewritten(self):
         original = copy.deepcopy(self.api.private)
@@ -571,6 +844,126 @@ class RolloutTests(unittest.TestCase):
         self.assertEqual({entry['bundle_version'] for entry in record['retained_revisions']}, {'1','2'})
         self.assertTrue(all(entry['verified_active'] for entry in record['retained_revisions']))
         self.assertEqual(len(self.api.revisions), 3)
+
+    def test_repeated_terminal_rollouts_bound_predecessor_metadata_and_keep_all_revisions(self):
+        for number in range(2, 10):
+            self.begin(target_version=str(number), transaction_id=f'{number:012x}', replace_terminal=number>2)
+            self.finish()
+            refs = self.journal.load()[0]['retained_revisions']
+            self.assertLessEqual(len(refs), 2)
+            if number > 2:
+                self.assertEqual({entry['bundle_version'] for entry in refs}, {str(number-2),str(number-1)})
+        self.assertEqual(len(self.api.revisions), 9)
+        self.assertIn(self.api.short+'-00001-abc', self.api.revisions)
+        self.assertEqual({revision['volumes'][0]['secret']['items'][0]['version'] for revision in self.api.revisions.values()},
+                         {str(number) for number in range(1,10)})
+
+    def test_terminal_handoff_verifies_serving_original_after_rollback_without_writes(self):
+        for phase in ('complete', 'rolled_back', 'rollback_before_activation'):
+            with self.subTest(phase=phase):
+                self.setUp()
+                original = self.api.service['latestReadyRevision']
+                self.begin()
+                if phase != 'rollback_before_activation':
+                    self.finish()
+                else:
+                    self.executor().advance(**LOCK)
+                if phase != 'complete':
+                    self.executor().rollback(**LOCK)
+                    self.finish()
+                before = copy.deepcopy(self.api.service)
+                journal_before = self.journal.raw
+                self.head = 'b' * 40  # The next deploy owns its current-head gate.
+                result = self.executor().terminal_handoff(**LOCK)
+                expected = before['latestCreatedRevision'] if phase == 'complete' else original
+                self.assertEqual(result['serving_revision'], expected)
+                self.assertEqual(result['serving_metadata'], self.api.revisions[expected])
+                self.assertEqual(result['service'], before)
+                self.assertEqual(result['journal_checksum'], self.journal.load()[1])
+                self.assertEqual(result['journal_key'], 'modtale-rollout-' + self.api.short)
+                self.assertEqual(result['bundle_version'], '2' if phase == 'complete' else '1')
+                self.assertEqual(self.journal.raw, journal_before)
+                self.assertEqual(self.api.service, before)
+                if phase != 'complete':
+                    self.assertNotEqual(result['serving_revision'], before['latestCreatedRevision'])
+
+    def test_terminal_handoff_rejects_pending_or_unlocked_without_mutation(self):
+        self.begin()
+        before = len(self.api.requests)
+        with self.assertRaises(r.RolloutError):
+            self.executor().terminal_handoff()
+        self.assertEqual(len(self.api.requests), before)
+        with self.assertRaises(r.RolloutError):
+            self.executor().terminal_handoff(**LOCK)
+        self.assertEqual(self.api.patches, [])
+
+    def test_terminal_handoff_rejects_drift_missing_evidence_and_original_identity_change(self):
+        changes = [lambda: self.api.service.update(uid='replacement'),
+                   lambda: self.api.service.update(generation='999'),
+                   lambda: self.api.service.update(observedGeneration='0'),
+                   lambda: self.api.service.update(reconciling=True),
+                   lambda: self.api.service['trafficStatuses'][0].update(percent=0),
+                   lambda: self.api.revisions[self.api.short+'-00001-abc'].update(uid='replacement'),
+                   lambda: self.api.revision_conditions.update({self.api.short+'-00001-abc': [{'type':'Ready','state':'CONDITION_FAILED'}]}),
+                   lambda: setattr(self.api, 'activated', False)]
+        for change in changes:
+            with self.subTest(change=change):
+                self.setUp()
+                self.begin()
+                self.finish()
+                self.executor().rollback(**LOCK)
+                self.finish()
+                change()
+                patches, journal = len(self.api.patches), self.journal.raw
+                with self.assertRaises(r.RolloutError):
+                    self.executor().terminal_handoff(**LOCK)
+                self.assertEqual(len(self.api.patches), patches)
+                self.assertEqual(self.journal.raw, journal)
+
+    def test_terminal_handoff_rechecks_after_activation_and_preserves_journal(self):
+        self.begin()
+        self.finish()
+        original = self.api
+        def transport(request):
+            result = original(request)
+            if request['api'] == 'cloud-logging':
+                self.api.service['generation'] = '999'
+            return result
+        subject = r.RolloutExecutor(transport, self.journal, self.lifecycle)
+        journal = self.journal.raw
+        with self.assertRaises(r.RolloutError):
+            subject.terminal_handoff(**LOCK)
+        self.assertEqual(self.journal.raw, journal)
+
+    def test_explicit_authenticated_terminal_provenance_survives_log_retention_expiry(self):
+        for phase in ('complete','rolled_back'):
+            with self.subTest(phase=phase):
+                self.setUp()
+                self.begin()
+                self.finish()
+                if phase=='rolled_back':
+                    self.executor().rollback(**LOCK)
+                    self.finish()
+                self.api.activated=False
+                with self.assertRaises(r.RolloutError):self.executor().terminal_handoff(**LOCK)
+                self.api.requests.clear()
+                result=self.executor().terminal_handoff(use_persisted_activation=True,**LOCK)
+                self.assertEqual(result['phase'],phase)
+                self.assertFalse(any(request['api']=='cloud-logging' for request in self.api.requests))
+                self.api.service['uid']='changed'
+                with self.assertRaises(r.RolloutError):self.executor().terminal_handoff(use_persisted_activation=True,**LOCK)
+
+    def test_persisted_provenance_option_is_strict_and_does_not_bypass_new_candidate_gate(self):
+        self.begin()
+        self.finish()
+        for invalid in ('true',1,None):
+            with self.assertRaises(r.RolloutError):self.executor().terminal_handoff(use_persisted_activation=invalid,**LOCK)
+        self.executor().terminal_handoff(use_persisted_activation=True,**LOCK)
+        self.begin(target_version='3',transaction_id='b123456789ab',replace_terminal=True)
+        self.executor().advance(**LOCK)
+        self.api.activated=False
+        self.assertEqual(self.executor().advance(**LOCK)['status'],'waiting_for_activation')
+        self.assertFalse(self.journal.load()[0]['candidate_verified'])
 
     def test_malformed_cloud_response_or_journal_never_leaks(self):
         self.api.service['template']['containers'][0]['env'] = [{'value': 'SYNTHETIC-PRIVATE'}]
@@ -889,6 +1282,219 @@ class RolloutTests(unittest.TestCase):
             self.begin()
         self.assertEqual(len(self.api.annotations), 100)
         self.assertEqual(self.api.patches, [])
+
+    def test_legacy_annotation_decoder_preserves_checksum_then_writes_scoped_codec(self):
+        self.begin()
+        record = self.journal.load()[0]
+        raw = r.journal_bytes(record)
+        journal = r.SecretManagerJournal(self.api, self.api.profile, self.api.preview)
+        self.api.annotations[journal.key] = 'v1:' + base64.b64encode(zlib.compress(raw)).decode()
+        loaded, checksum = journal.load()
+        self.assertEqual(loaded, record)
+        self.assertEqual(checksum, hashlib.sha256(raw).hexdigest())
+        journal.save(loaded, checksum)
+        self.assertTrue(self.api.annotations[journal.key].startswith('v2:'))
+        self.assertEqual(journal.load()[0], record)
+
+    def test_ordinary_terminal_transfer_is_one_atomic_same_service_metadata_write(self):
+        source = 'modtale-deploy-' + self.api.short
+        # Coexistence would exceed quota. The single CAS replaces the validated
+        # source, so capacity must be checked against the resulting map only.
+        source_value = 'synthetic-terminal' + 'x'*13000
+        self.api.annotations = {source: source_value, 'unrelated': 'preserved'}
+        verified = []
+        def validate(encoded, record):
+            self.assertEqual(encoded, source_value)
+            self.assertEqual(record['base'], self.api.service)
+            self.assertEqual(record['phase'], 'stage_intent')
+            verified.append(True)
+            return 'a'*64
+        self.journal = r.SecretManagerJournal(self.api, self.api.profile, self.api.preview,
+            consume_terminal={'key': source, 'checksum': 'a'*64, 'validate': validate})
+        self.begin()
+        self.assertNotIn(source, self.api.annotations)
+        self.assertIn(self.journal.key, self.api.annotations)
+        self.assertEqual(self.api.annotations['unrelated'], 'preserved')
+        self.assertEqual(self.api.patches, [])
+        writes = [item for item in self.api.requests if item['api']=='secret-manager-metadata' and item['method']=='PATCH']
+        self.assertEqual(len(writes), 1)
+        self.assertNotIn(source, writes[0]['body']['annotations'])
+        self.assertIn(self.journal.key, writes[0]['body']['annotations'])
+        self.finish()
+        self.assertEqual(len(verified), 1)
+
+    def test_terminal_transfer_failure_or_capacity_does_not_remove_source(self):
+        for error in ('checksum', 'validator', 'capacity', 'cas', 'absent'):
+            with self.subTest(error=error):
+                self.setUp()
+                source = 'modtale-deploy-' + self.api.short
+                self.api.annotations = {source: 'synthetic-terminal', 'unrelated': 'preserved'}
+                def validate(encoded, record):
+                    if error == 'validator':
+                        raise RuntimeError('SYNTHETIC-PRIVATE')
+                    return ('b' if error == 'checksum' else 'a')*64
+                if error == 'capacity': self.api.annotations['unrelated'] = 'x'*15000
+                if error == 'cas': self.api.metadata_conflict = True
+                if error == 'absent': del self.api.annotations[source]
+                before = copy.deepcopy(self.api.annotations)
+                self.journal = r.SecretManagerJournal(self.api, self.api.profile, self.api.preview,
+                    consume_terminal={'key':source, 'checksum':'a'*64, 'validate':validate})
+                with self.assertRaises(r.RolloutError) as caught:
+                    self.begin()
+                self.assertNotIn('SYNTHETIC-PRIVATE', str(caught.exception))
+                self.assertEqual(self.api.annotations, before)
+                self.assertEqual(self.api.patches, [])
+
+    def test_terminal_transfer_acceptance_crash_resumes_without_source_or_extra_transfer(self):
+        source = 'modtale-deploy-' + self.api.short
+        self.api.annotations[source] = 'synthetic-terminal'
+        self.journal = r.SecretManagerJournal(self.api, self.api.profile, self.api.preview,
+            consume_terminal={'key':source, 'checksum':'a'*64, 'validate':lambda encoded,record:'a'*64})
+        self.api.journal_crash = 'after'
+        with self.assertRaises(r.RolloutError): self.begin()
+        self.assertNotIn(source, self.api.annotations)
+        self.assertEqual(self.journal.load()[0]['phase'], 'stage_intent')
+        self.assertEqual(self.finish()['status'], 'complete')
+
+    def test_terminal_transfer_cannot_consume_foreign_service_or_rollout_key(self):
+        for source in ('modtale-deploy-modtale-backend-other', 'modtale-rollout-'+self.api.short, 'unrelated'):
+            with self.assertRaises(r.RolloutError):
+                r.SecretManagerJournal(self.api, self.api.profile, self.api.preview,
+                    consume_terminal={'key':source,'checksum':'a'*64,'validate':lambda a,b:'a'*64})
+        self.assertEqual(self.api.requests, [])
+
+    def test_terminal_transfer_can_replace_old_terminal_target_but_does_not_run_on_rollback(self):
+        self.journal = r.SecretManagerJournal(self.api, self.api.profile, self.api.preview)
+        self.begin()
+        self.finish()
+        source = 'modtale-deploy-' + self.api.short
+        self.api.annotations[source] = 'verified-ordinary-terminal'
+        called = []
+        def validate(encoded, record):
+            self.assertEqual(encoded, 'verified-ordinary-terminal')
+            self.assertEqual(record['base'], self.api.service)
+            called.append(True)
+            return 'a'*64
+        self.journal = r.SecretManagerJournal(self.api, self.api.profile, self.api.preview,
+            consume_terminal={'key':source,'checksum':'a'*64,'validate':validate})
+        self.begin(target_version='3',transaction_id='b123456789ab',replace_terminal=True)
+        self.assertNotIn(source,self.api.annotations)
+        self.finish()
+        self.executor().rollback(**LOCK)
+        self.assertEqual(self.finish()['status'],'rolled_back')
+        self.assertEqual(len(called),1)
+
+    def test_completed_checkpoint_eviction_is_atomic_scoped_and_not_repeated(self):
+        key = 'modtale-deploy-modtale-backend-beta'
+        value = 'synthetic-complete'+'x'*13000
+        self.api.annotations = {key:value,'unrelated':'preserved'}
+        called = []
+        def validate(encoded, record):
+            self.assertEqual(encoded,value)
+            self.assertEqual(record['phase'],'stage_intent')
+            called.append(True)
+            return 'b'*64
+        self.journal = r.SecretManagerJournal(self.api,self.api.profile,self.api.preview,
+            evict_completed=[{'key':key,'checksum':'b'*64,'validate':validate}])
+        self.begin()
+        self.assertNotIn(key,self.api.annotations)
+        self.assertIn(self.journal.key,self.api.annotations)
+        writes=[req for req in self.api.requests if req['api']=='secret-manager-metadata' and req['method']=='PATCH']
+        self.assertEqual(len(writes),1)
+        self.assertEqual(self.api.patches,[])
+        self.finish()
+        self.executor().rollback(**LOCK)
+        self.finish()
+        self.assertEqual(len(called),1)
+        self.assertEqual(self.api.annotations['unrelated'],'preserved')
+
+    def test_eviction_rejects_cross_boundary_target_service_duplicates_and_wrong_checksum(self):
+        for key in ('unrelated','modtale-deploy-modtale-backend-alpha','modtale-rollout-modtale-backend-alpha',
+                    'modtale-deploy-modtale-backend-dev','modtale-deploy-modtale-pr-12-backend'):
+            with self.assertRaises(r.RolloutError):
+                r.SecretManagerJournal(self.api,self.api.profile,self.api.preview,
+                    evict_completed=[{'key':key,'checksum':'b'*64,'validate':lambda a,b:'b'*64}])
+        entry={'key':'modtale-rollout-modtale-backend-beta','checksum':'b'*64,'validate':lambda a,b:'b'*64}
+        with self.assertRaises(r.RolloutError):
+            r.SecretManagerJournal(self.api,self.api.profile,self.api.preview,evict_completed=[entry,entry])
+        self.assertEqual(self.api.requests,[])
+        self.api.annotations[entry['key']]='source'
+        self.journal=r.SecretManagerJournal(self.api,self.api.profile,self.api.preview,
+            evict_completed=[{**entry,'validate':lambda a,b:'c'*64}])
+        with self.assertRaises(r.RolloutError):self.begin()
+        self.assertEqual(self.api.annotations,{entry['key']:'source'})
+        self.assertEqual(self.api.patches,[])
+
+    def test_eviction_validator_rejects_pending_or_rolled_back_and_preserves_entire_map(self):
+        for phase in ('stage_intent','promote_wait','rolled_back'):
+            with self.subTest(phase=phase):
+                self.setUp()
+                keys=['modtale-deploy-modtale-backend-beta','modtale-rollout-modtale-backend-gamma']
+                self.api.annotations={keys[0]:'complete',keys[1]:phase,'foreign':'preserved'}
+                def validate(encoded,record):
+                    if encoded!='complete':raise RuntimeError('SYNTHETIC-PRIVATE')
+                    return 'b'*64
+                self.journal=r.SecretManagerJournal(self.api,self.api.profile,self.api.preview,
+                    evict_completed=[{'key':key,'checksum':'b'*64,'validate':validate} for key in keys])
+                before=copy.deepcopy(self.api.annotations)
+                with self.assertRaises(r.RolloutError) as caught:self.begin()
+                self.assertNotIn('SYNTHETIC-PRIVATE',str(caught.exception))
+                self.assertEqual(self.api.annotations,before)
+                self.assertEqual(self.api.patches,[])
+
+    def test_completed_eviction_conflict_or_lost_acceptance_has_no_partial_deletion(self):
+        for outcome in ('conflict','lost-accepted'):
+            with self.subTest(outcome=outcome):
+                self.setUp()
+                key='modtale-rollout-modtale-backend-beta'
+                self.api.annotations={key:'complete','foreign':'preserved'}
+                self.journal=r.SecretManagerJournal(self.api,self.api.profile,self.api.preview,
+                    evict_completed=[{'key':key,'checksum':'b'*64,'validate':lambda a,b:'b'*64}])
+                if outcome=='conflict':self.api.metadata_conflict=True
+                else:self.api.journal_crash='after'
+                with self.assertRaises(r.RolloutError):self.begin()
+                self.assertEqual(self.api.patches,[])
+                if outcome=='conflict':self.assertEqual(self.api.annotations,{key:'complete','foreign':'preserved'})
+                else:
+                    self.assertNotIn(key,self.api.annotations)
+                    self.assertEqual(self.journal.load()[0]['phase'],'stage_intent')
+                    self.assertEqual(self.finish()['status'],'complete')
+
+    def test_three_long_branch_consumers_share_capacity_and_recover_a_crashed_stage(self):
+        identifiers = ('first-preview-branch','second-preview-branc','third-preview-branch')
+        metadata = FakeRun()
+        metadata.annotations['unrelated'] = 'x'*690
+        lifecycle = lambda profile: {'repository':plan.REPOSITORY,'complete':True,
+            'items':[{'name':identifier,'head_sha':HEAD} for identifier in identifiers]}
+        checkpoints = []
+        apis = []
+        for index, identifier in enumerate(identifiers):
+            api = FakeRun(preview=identifier)
+            apis.append(api)
+            api.service['etag'] = '"' + chr(65+index)*131 + '"'
+            def transport(request, api=api):
+                return metadata(request) if request['api']=='secret-manager-metadata' else api(request)
+            journal = r.SecretManagerJournal(transport,'branch-preview',identifier)
+            executor = r.RolloutExecutor(transport,journal,lifecycle)
+            old = api.service['latestCreatedRevision']
+            proof = {'verified_active':True,'ownership_verified':True,'profile':'branch-preview','preview_id':identifier,
+                'service_uid':api.service['uid'],'revision_uid':api.revisions[old]['uid'],'bundle_version':'1'}
+            executor.begin('branch-preview','2',f'{index+1:012x}',proof,preview_id=identifier,
+                           raw_branch=identifier,head_sha=HEAD,**LOCK)
+            checkpoints.append(sum(len(key.encode())+len(value.encode()) for key,value in metadata.annotations.items()))
+            if index == 2:
+                api.cloud_crash = 'after'
+                with self.assertRaises(r.RolloutError): executor.advance(**LOCK)
+                executor = r.RolloutExecutor(transport,r.SecretManagerJournal(transport,'branch-preview',identifier),lifecycle)
+            for _ in range(10):
+                result = executor.advance(**LOCK)
+                if result['status']=='complete': break
+            self.assertEqual(result['status'],'complete')
+            self.assertEqual(len(api.patches),2)
+        self.assertTrue(all(value<16384 for value in checkpoints))
+        self.assertEqual(len(metadata.annotations),4)
+        self.assertEqual(metadata.annotations['unrelated'],'x'*690)
+        self.assertTrue(all(len(api.revisions)==2 for api in apis))
 
     def test_later_rollback_capacity_refusal_leaves_current_traffic_and_journal_intact(self):
         self.journal = r.SecretManagerJournal(self.api, self.api.profile, self.api.preview)

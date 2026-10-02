@@ -9,10 +9,11 @@ import zlib
 
 from configure_secret_bundle import plan as runtime_plan
 from secret_bundle import TARGETS, numeric_version
+from secret_bundle_journal_codec import scoped_record_bytes, parse_scoped_record
 from secret_bundle_activation_evidence import verify_activation
 from secret_bundle_ci import CIError, LOCK, fail
-from secret_bundle_rollout import (SecretManagerJournal, SERVICE_FIELDS, REVISION_FIELDS, parse_service,
-                                   parse_revision, ready, scope, REVISION_TYPE, require_readiness_startup_probe, operation_name, staged_ready, revision_ready, REVISION_READINESS_FIELDS)
+from secret_bundle_rollout import (RolloutExecutor, SecretManagerJournal, SERVICE_FIELDS, REVISION_FIELDS, parse_service,
+                                   parse_revision, ready, scope, REVISION_TYPE, require_readiness_startup_probe, operation_name, staged_ready, revision_ready, REVISION_READINESS_FIELDS, public_origin)
 
 DEPLOY_SERVICE_FIELDS = SERVICE_FIELDS + ',uri,ingress'
 TAG_ROUTE_FIELDS = 'name,uid,generation,trafficStatuses(type,revision,percent,tag,uri)'
@@ -70,6 +71,8 @@ def _decode_etags(value):
 
 
 def deployment_record_bytes(record):
+    if record.get('schema') == 3:
+        return scoped_record_bytes(record, scope(record['profile'], record['preview_id'])[3])
     # Opaque etags remain byte-exact after decoding. Their storage representation
     # has a known4/3 bound, including strings containing JSON-escape characters.
     return json.dumps(_encode_etags(record), ensure_ascii=False, sort_keys=True, separators=(',', ':'), allow_nan=False).encode('utf-8')
@@ -109,7 +112,7 @@ def deployment_reservation_bytes(record):
         target['revision'] = full + '/revisions/' + target['revision']
         target.setdefault('tag', '')
     stage_targets = copy.deepcopy(targets)
-    if record['schema'] == 2:
+    if record['schema'] in (2, 3):
         stage_targets.append({'type': REVISION_TYPE, 'revision': qualified, 'percent': 0, 'tag': record['temporary_tag']})
     staged = {'name': full, 'uid': uid, 'etag': '"' * MAX_ETAG_BYTES,
               'generation': '9' * 18, 'observedGeneration': '9' * 18, 'reconciling': False,
@@ -140,6 +143,8 @@ class DeploymentJournal:
         project, secret = TARGETS[boundary]
         self.name = f'projects/{project}/secrets/{secret}'
         self.key = 'modtale-deploy-' + service
+        self.consume_terminal = None
+        self.evict_completed = []
 
     def request(self, method, *, body=None):
         req = {'api': 'secret-manager-metadata', 'origin': 'https://secretmanager.googleapis.com',
@@ -166,28 +171,40 @@ class DeploymentJournal:
         raw = decoder.decompress(base64.b64decode(parts[0], validate=True), MAX_RECORD_BYTES + 1)
         if len(raw) > MAX_RECORD_BYTES or not decoder.eof or decoder.unused_data or decoder.unconsumed_tail:
             fail()
-        record = _decode_etags(json.loads(raw))
+        header = json.loads(raw)
+        record = (parse_scoped_record(raw, scope(self.profile, self.preview_id)[3])
+                  if isinstance(header, dict) and header.get('schema') == 3 else _decode_etags(header))
         allowed = {'schema', 'profile', 'preview_id', 'digest', 'revision', 'pin', 'head', 'base', 'phase', 'staged', 'candidate', 'desired', 'serving_revision', 'serving_metadata', 'retained_revisions', 'expected_image', 'reservation_bytes', 'operation'}
-        if record.get('schema') == 2:
+        if record.get('schema') in (2, 3):
             allowed |= {'temporary_tag', 'obsolete_tags'}
-        if set(record) != allowed or record['schema'] not in (1, 2) or record['profile'] != self.profile or record['preview_id'] != self.preview_id or record['phase'] not in PHASES:
+        if record.get('schema') == 3:
+            allowed.update(('baseline_provenance', 'intent_kind'))
+        if set(record) != allowed or record['schema'] not in (1, 2, 3) or record['profile'] != self.profile or record['preview_id'] != self.preview_id or record['phase'] not in PHASES:
             fail()
         if not re.fullmatch(r'[a-f0-9]{64}', record['digest']) or not re.fullmatch(r'[a-f0-9]{40}', record['head']):
+            fail()
+        if record['schema'] == 3 and record['baseline_provenance'] not in ('activation_event', 'completed_checkpoint', 'healthy_fallback_unverified', 'mount_handoff', 'no_service'):
+            fail()
+        if record['schema'] == 3 and record['intent_kind'] not in ('workflow', 'fanout_refresh'):
             fail()
         numeric_version(record['pin'])
         service = scope(self.profile, self.preview_id)[2]
         if record['revision'] != service + '-bd-' + record['digest'][:12]:
             fail()
-        if record['schema'] == 2:
-            if record['temporary_tag'] != 'sb-' + record['digest'][:12]:
+        if record['schema'] in (2, 3):
+            expected_tag = ('b' + record['digest'][:9]) if record['schema'] == 3 else ('sb-' + record['digest'][:12])
+            if record['temporary_tag'] != expected_tag:
                 fail()
             tags = record['obsolete_tags']
             if (not isinstance(tags, list) or len(tags) > MAX_OBSOLETE_TAGS or len(set(tags)) != len(tags)
-                    or any(not isinstance(tag, str) or re.fullmatch(r'sb-[a-f0-9]{12}', tag) is None or tag == record['temporary_tag'] for tag in tags)):
+                    or any(not isinstance(tag, str) or re.fullmatch(r'(?:sb-[a-f0-9]{12}|b[a-f0-9]{9})', tag) is None or tag == record['temporary_tag'] for tag in tags)):
                 fail()
         if record['operation'] is not None:
             operation_name(record['operation'], scope(self.profile, self.preview_id)[3])
         if not isinstance(record['expected_image'], str) or re.fullmatch(r'[A-Za-z0-9._:/-]+@sha256:[a-f0-9]{64}', record['expected_image']) is None:
+            fail()
+        if record.get('intent_kind') == 'fanout_refresh' and (record['base'] is None
+                or record['expected_image'] != record['base']['template']['containers'][0]['image']):
             fail()
         if not isinstance(record['retained_revisions'], list) or len(record['retained_revisions']) > MAX_RETAINED_REVISIONS:
             fail()
@@ -213,10 +230,29 @@ class DeploymentJournal:
         _, checksum = self.decode(annotations.get(self.key))
         if checksum != expected:
             fail()
+        if self.consume_terminal is not None:
+            handoff = self.consume_terminal
+            source = SecretManagerJournal(self.ci.transport, self.profile, self.preview_id)
+            source_record, source_checksum = source._decode(annotations.get(source.key))
+            if (record['phase'] != 'stage_intent' or handoff['journal_key'] != source.key
+                    or source_checksum != handoff['journal_checksum'] or source_record is None
+                    or source_record['phase'] not in ('complete', 'rolled_back')
+                    or record['base'] != handoff['service']
+                    or record['serving_revision'] != handoff['serving_revision']
+                    or record['serving_metadata'] != handoff['serving_metadata']):
+                raise CIError('Terminal mount provenance changed; no journal transfer was committed.')
+            del annotations[source.key]
+        for eviction in self.evict_completed:
+            if (record['phase'] != 'stage_intent' or eviction['key'] == self.key
+                    or eviction['validate'](annotations.get(eviction['key']), copy.deepcopy(record)) != eviction['checksum']):
+                raise CIError('Completed checkpoint changed; eviction and dependent staging were stopped.')
+            del annotations[eviction['key']]
         annotations[self.key] = value
         if len(annotations) > 100 or sum(len(k.encode()) + len(v.encode()) for k, v in annotations.items()) >= 16384:
             fail()
         self.request('PATCH', body={'name': self.name, 'etag': metadata['etag'], 'annotations': annotations})
+        self.consume_terminal = None
+        self.evict_completed = []
         return hashlib.sha256(raw).hexdigest()
 
 
@@ -314,14 +350,26 @@ def _identity_matches(record, raw, *, promoted=False):
 
 
 def remove_owned_tags(rows, record, tags):
-    service = scope(record['profile'], record['preview_id'])[2]
+    if rows is None:
+        fail()
     result = []
     for row in rows:
-        if row.get('tag') in tags:
-            if row.get('percent', 0) != 0 or row.get('revision') != service + '-bd-' + row['tag'][3:]:
-                fail()
-        else:
+        tag = row.get('tag')
+        if tag not in tags:
             result.append(copy.deepcopy(row))
+            continue
+        if tag == record.get('temporary_tag'):
+            expected = record['revision']
+        else:
+            if tag not in record.get('obsolete_tags', []) or record['base'] is None:
+                fail()
+            baseline = parse_service(raw_service(record['base']), record['profile'], record['preview_id'])
+            saved = [item for item in baseline['traffic'] if item.get('tag') == tag and item['percent'] == 0]
+            if len(saved) != 1:
+                fail()
+            expected = saved[0]['revision']
+        if row['percent'] != 0 or row['revision'] != expected:
+            fail()
     return result
 
 
@@ -331,7 +379,7 @@ def stage_distribution(record):
     else:
         rows = parse_service(raw_service(record['base']), record['profile'], record['preview_id'])['traffic']
     rows = copy.deepcopy(rows)
-    if record['schema'] == 2:
+    if record['schema'] in (2, 3):
         if any(row.get('tag') == record['temporary_tag'] for row in rows):
             fail()
         rows.append({'type': REVISION_TYPE, 'revision': record['revision'], 'percent': 0, 'tag': record['temporary_tag']})
@@ -339,7 +387,7 @@ def stage_distribution(record):
 
 
 def warm_candidate(ci, record, current):
-    if record['schema'] != 2:
+    if record['schema'] not in (2, 3):
         raise CIError('An untagged legacy checkpoint requires controlled fresh-head supersession before warmup.')
     full = scope(record['profile'], record['preview_id'])[3]
     route = ci.request('GET', '/v2/' + full, TAG_ROUTE_FIELDS)
@@ -353,7 +401,10 @@ def warm_candidate(ci, record, current):
     if (set(row) - {'type', 'revision', 'percent', 'tag', 'uri'} or row.get('type') != REVISION_TYPE
             or row.get('revision', '').rsplit('/', 1)[-1] != record['revision'] or row.get('percent', 0) != 0):
         fail()
+    service = full.rsplit('/', 1)[-1]
+    public_origin(current['uri'], service)
     expected_uri = 'https://' + record['temporary_tag'] + '---' + current['uri'].removeprefix('https://')
+    public_origin(expected_uri, service, record['temporary_tag'])
     if row.get('uri') != expected_uri or not current['uri'].startswith('https://'):
         fail()
     if ci.request('GET', '/v2/' + full, DEPLOY_SERVICE_FIELDS) != current:
@@ -396,6 +447,208 @@ def verify_completed_deployment(ci, record, current, *, activation=False):
 
 
 
+def defer_own_pending_deployment(ci, profile, preview_id):
+    """Prove an observed own candidate can reach ordinary resume/supersession.
+
+    This performs no runtime mutation and does not claim fanout completion. The
+    whole fanout is deferred until the workflow's mandatory strict final pass.
+    An unobserved stage write or another preview's pending journal is not adopted.
+    """
+    if profile != ci.profile or preview_id != ci.preview_id or ci.boundary == 'shared':
+        fail()
+    journal = DeploymentJournal(ci, profile, preview_id)
+    record, checksum = journal.load()
+    if record is None or record['phase'] == 'complete':
+        return False
+    full = scope(profile, preview_id)[3]
+    if ci.env.get('BACKEND_SERVICE') != full.rsplit('/', 1)[-1]:
+        fail()
+    current = ci.request('GET', '/v2/' + full, DEPLOY_SERVICE_FIELDS)
+    record, checksum, current = reconcile_prior_promotion(ci, journal, record, checksum, current)
+    if record['phase'] == 'complete':
+        return False
+    ci.lifecycle()
+    if record['phase'] not in ('stage_intent', 'stage_wait') or record['base'] is None:
+        raise CIError('Unobserved or ambiguous deployment needs explicit recovery before publication fanout.')
+    _identity_matches(record, current)
+    state = parse_service(raw_service(current), profile, preview_id)
+    if (not staged_ready(state, record['revision']) or state['traffic'] != stage_distribution(record)
+            or state['pin'] != record['pin'] or state['containers'][0]['image'] != record['expected_image']):
+        fail()
+    candidate = ci.request('GET', '/v2/' + full + '/revisions/' + record['revision'], REVISION_FIELDS)
+    parsed = parse_revision(candidate, profile, preview_id, record['revision'])
+    if (parsed != (state['pin'], state['volumes'], state['containers'])
+            or (record['candidate'] is not None and candidate != record['candidate'])):
+        fail()
+    saved = record['serving_metadata']
+    name = record['serving_revision']
+    if saved is None or name is None or ci.request('GET', '/v2/' + full + '/revisions/' + name, REVISION_FIELDS) != saved:
+        fail()
+    parse_revision(saved, profile, preview_id, name)
+    if any(not any(row['revision'] == name and row['percent'] > 0 for row in distribution)
+           for distribution in (state['traffic'], state['actual'])):
+        fail()
+    if ci.inventory._ownership(profile, preview_id, 'backend', full.rsplit('/', 1)[-1], [0]) != current['uid']:
+        fail()
+    ci.lifecycle()
+    if ci.request('GET', '/v2/' + full, DEPLOY_SERVICE_FIELDS) != current or journal.load()[1] != checksum:
+        fail()
+    return True
+
+
+def healthy_baseline_fallback(ci, profile, identifier, current, revision):
+    """Observe existing traffic-pool health; never claim old loader activation.
+
+    This can start only an ordinary controlled deployment. Its new candidate
+    still must produce a fresh exact activation event before any promotion.
+    """
+    full = scope(profile, identifier)[3]
+    name = revision['name'].rsplit('/', 1)[-1]
+    state = parse_service(raw_service(current), profile, identifier)
+    if (current.get('ingress') != 'INGRESS_TRAFFIC_ALL'
+            or any([row for row in distribution if row['percent'] > 0] != [{'type': REVISION_TYPE, 'revision': name, 'percent': 100}]
+                   for distribution in (state['traffic'], state['actual']))):
+        fail()
+    request = {'api': 'cloud-run-baseline-readiness', 'method': 'HEAD',
+               'origin': current['uri'], 'path': '/actuator/health/readiness',
+               'service': full, 'service_uid': current['uid'], 'revision': name,
+               'revision_uid': revision['uid'], 'base_uri': current['uri']}
+    deadline = time.monotonic() + 120
+    while time.monotonic() < deadline:
+        response = ci.transport(request)
+        if (not isinstance(response, dict) or set(response) != {'status', 'body'}
+                or response['body'] != {} or type(response['status']) is not int):
+            fail()
+        if response['status'] == 200:
+            ci.lifecycle()
+            if (ci.request('GET', '/v2/' + full, DEPLOY_SERVICE_FIELDS) != current
+                    or ci.request('GET', '/v2/' + full + '/revisions/' + name, REVISION_FIELDS) != revision):
+                fail()
+            return
+        if response['status'] not in (0, 503):
+            fail()
+        ci.sleep(5)
+    raise CIError('The adopted traffic pool was not ready; no candidate was staged.')
+
+
+def verify_baseline_identity(ci, profile, identifier, current, revision):
+    """Bind an adopted immutable baseline to its fixed runtime/preview owner."""
+    import secret_bundle_preview_inventory as inventory
+    full = scope(profile, identifier)[3]
+    service = ci.request('GET', '/v2/' + full, inventory.SERVICE_FIELDS)
+    fields = 'name,uid,service,createTime,serviceAccount,' + inventory.CONFIG_FIELDS
+    name = revision['name'].rsplit('/', 1)[-1]
+    immutable = ci.request('GET', '/v2/' + full + '/revisions/' + name, fields)
+    if (any(service.get(key) != current.get(key) for key in ('name', 'uid', 'etag', 'generation'))
+            or service.get('template', {}).get('serviceAccount') != RUNTIME_IDENTITIES[profile]
+            or immutable.get('serviceAccount') != RUNTIME_IDENTITIES[profile]
+            or any(immutable.get(key) != revision.get(key) for key in ('name', 'uid', 'service', 'createTime'))):
+        fail()
+    if profile in ('branch-preview', 'pr-preview'):
+        if ci.inventory._ownership(profile, identifier, 'backend', full.rsplit('/', 1)[-1], [0]) != current['uid']:
+            fail()
+    if ci.request('GET', '/v2/' + full, DEPLOY_SERVICE_FIELDS) != current:
+        fail()
+
+
+def completed_journal_evictions(ci, profile, preview_id):
+    """Freshly verified, replaceable operational cache entries in this boundary.
+
+    Actual revisions and versions remain untouched. Incomplete transactions and
+    rolled-back zero-traffic-template witnesses are never cache entries.
+    """
+    from secret_bundle_preview_inventory import _identity
+    import secret_bundle_preview_plan as preview_plan
+    target_boundary, _, target_service, _ = scope(profile, preview_id)
+    container = DeploymentJournal(ci, profile, preview_id)
+    annotations = container.request('GET').get('annotations', {})
+    evictions = []
+    for key in sorted(annotations):
+        kind = next((kind for kind in ('deploy', 'rollout') if key.startswith('modtale-' + kind + '-')), None)
+        if kind is None:
+            continue
+        service = key[len('modtale-' + kind + '-'):]
+        if service == target_service:
+            continue
+        if target_boundary == 'shared':
+            if service not in ('modtale-backend', 'modtale-backend-dev'):
+                continue
+            source_profile, identifier = ('prod' if service == 'modtale-backend' else 'dev'), None
+        else:
+            identity = _identity(target_boundary, service)
+            if identity is None or identity[1] != 'backend':
+                continue
+            source_profile, identifier = target_boundary, identity[0]
+        source = (DeploymentJournal(ci, source_profile, identifier) if kind == 'deploy'
+                  else SecretManagerJournal(ci.transport, source_profile, identifier))
+        decode = source.decode if kind == 'deploy' else source._decode
+        record, checksum = decode(annotations[key])
+        if record is None or record['phase'] != 'complete':
+            continue
+        full = scope(source_profile, identifier)[3]
+        current = ci.request('GET', '/v2/' + full, DEPLOY_SERVICE_FIELDS, allow_404=True)
+        if current is None:
+            # Closed/deleted completed caches are also dispensable, but absence
+            # is authoritative for both service components and fresh lifecycle.
+            if target_boundary == 'shared':
+                continue
+            owners = preview_plan._lifecycle(source_profile, ci.inventory.github_lifecycle(source_profile))
+            if identifier in owners and owners[identifier]['state'] == 'open':
+                continue
+            if any(ci.inventory.observe_service_absence(source_profile, identifier, component)['observation'] != 'not_found'
+                   for component in ('backend', 'frontend')):
+                continue
+        elif kind == 'deploy':
+            verify_completed_deployment(ci, record, current)
+        else:
+            handoff = RolloutExecutor(ci.transport, source, ci.inventory.github_lifecycle).terminal_handoff(use_persisted_activation=True, **LOCK)
+            if handoff['phase'] != 'complete' or handoff['service'] != current or handoff['journal_checksum'] != checksum:
+                fail()
+        if source.load()[1] != checksum:
+            fail()
+        def validate(encoded, next_record, *, decode=decode, saved=copy.deepcopy(record), expected=checksum):
+            found, actual = decode(encoded)
+            if (actual != expected or found != saved or found['phase'] != 'complete'
+                    or next_record['phase'] != 'stage_intent' or next_record['profile'] != profile
+                    or next_record['preview_id'] != preview_id):
+                fail()
+            return actual
+        evictions.append({'key': key, 'checksum': checksum, 'validate': validate})
+    return evictions
+
+
+def run_attempt(env):
+    value = env.get('GITHUB_RUN_ATTEMPT', '1')
+    if not isinstance(value, str) or re.fullmatch(r'[1-9][0-9]{0,8}', value) is None:
+        fail()
+    return value
+
+
+def ordinary_terminal_transfer(ci, profile, preview_id):
+    """Verify same-service terminal provenance and supply a pure atomic CAS hook."""
+    journal = DeploymentJournal(ci, profile, preview_id)
+    record, checksum = journal.load()
+    if record is None:
+        return None
+    if record['phase'] != 'complete':
+        raise CIError('A backend deployment is pending; finish it before a mount rollout.')
+    full = scope(profile, preview_id)[3]
+    current = ci.request('GET', '/v2/' + full, DEPLOY_SERVICE_FIELDS)
+    verify_completed_deployment(ci, record, current)
+    if journal.load()[1] != checksum:
+        fail()
+
+    def validate(encoded, next_record):
+        source, actual = journal.decode(encoded)
+        if (actual != checksum or source is None or source['phase'] != 'complete'
+                or source != record or next_record['profile'] != profile
+                or next_record['preview_id'] != preview_id or next_record['phase'] != 'stage_intent'
+                or next_record['base'] != current or next_record['base_revision'] != source['candidate']):
+            fail()
+        return actual
+    return {'key': journal.key, 'checksum': checksum, 'validate': validate}
+
+
 def reconcile_prior_promotion(ci, journal, record, checksum, current):
     """Settle an accepted old-head result using reads and journal metadata only."""
     if record is None or record['phase'] not in ('promote_intent', 'promote_wait'):
@@ -435,6 +688,9 @@ def deploy(ci, args):
         fail()
     pin = numeric_version(ci.env.get('MODTALE_SECRET_BUNDLE_VERSION', ''))
     args = list(args)
+    intent_kind = 'fanout_refresh' if ci.env.get('MODTALE_SECRET_BUNDLE_FANOUT_REFRESH') == 'true' else 'workflow'
+    if intent_kind == 'fanout_refresh' and (len(args) != 2 or args[0] != '--image' or '@sha256:' not in args[1]):
+        fail()
     if '--image' in args:
         index = args.index('--image') + 1
         image = args[index]
@@ -449,14 +705,15 @@ def deploy(ci, args):
             args[index] = prefix + '@' + digest_value
     args = deployment_args(profile, boundary, identifier, pin, args)
     head = ci.env['PR_HEAD_SHA'] if profile == 'pr-preview' else ci.env['GITHUB_SHA']
-    digest = hashlib.sha256(json.dumps([ci.env['GITHUB_RUN_ID'], head, pin, args], separators=(',', ':')).encode()).hexdigest()
+    digest = hashlib.sha256(json.dumps([ci.env['GITHUB_RUN_ID'], run_attempt(ci.env), intent_kind, head, pin, args], separators=(',', ':')).encode()).hexdigest()
     suffix = 'bd-' + digest[:12]
     revision = service + '-' + suffix
     if len(revision) > 63:
         fail()
     journal = DeploymentJournal(ci)
     record, checksum = journal.load()
-    rollout, _ = SecretManagerJournal(ci.transport, profile, identifier).load()
+    mount_journal = SecretManagerJournal(ci.transport, profile, identifier)
+    rollout, _ = mount_journal.load()
     if rollout is not None and rollout['phase'] not in ('complete', 'rolled_back'):
         raise CIError('A mount rollout is pending; resume it before deploying another backend revision.')
     current = ci.request('GET', '/v2/' + full, DEPLOY_SERVICE_FIELDS, allow_404=True)
@@ -465,6 +722,14 @@ def deploy(ci, args):
     # This path never sends a runtime PATCH or promotes a stale-head candidate.
     record, checksum, current = reconcile_prior_promotion(ci, journal, record, checksum, current)
     ci.lifecycle()
+    handoff = None
+    if rollout is not None:
+        if record is not None and record['phase'] != 'complete':
+            raise CIError('Overlapping deployment and mount journals require explicit recovery.')
+        if record is None or record['digest'] != digest:
+            handoff = RolloutExecutor(ci.transport, mount_journal, ci.inventory.github_lifecycle).terminal_handoff(use_persisted_activation=True, **LOCK)
+            if handoff['service'] != current:
+                fail()
     superseded = None
     if record is not None and record['phase'] != 'complete' and record['digest'] != digest:
         # A fresh push may replace an observed, settled no-traffic candidate.
@@ -476,7 +741,7 @@ def deploy(ci, args):
         staged = parse_service(raw_service(current), profile, identifier)
         if (staged['reconciling'] or staged['observed'] != staged['generation']
                 or staged['traffic'] != stage_distribution(record)
-                or remove_owned_tags(staged['actual'], record, [record['temporary_tag']] if record['schema'] == 2 else []) != previous['actual']):
+                or remove_owned_tags(staged['actual'], record, [record['temporary_tag']] if record['schema'] in (2, 3) else []) != previous['actual']):
             fail()
         abandoned = ci.request('GET', '/v2/' + full + '/revisions/' + record['revision'], REVISION_FIELDS)
         old_pin, old_volumes, old_containers = parse_revision(abandoned, profile, identifier, record['revision'])
@@ -488,8 +753,11 @@ def deploy(ci, args):
             fail()
         superseded = {**record, 'candidate': abandoned}
     if record is None or record['digest'] != digest:
+        if ci.request('GET', '/v2/' + full + '/revisions/' + revision, REVISION_FIELDS, allow_404=True) is not None:
+            raise CIError('This attempt already used the candidate revision; rerun with a fresh workflow attempt.')
         serving_revision = None
         serving_metadata = None
+        baseline_provenance = 'no_service'
         # Keep immediate rollback evidence in serving_metadata. Only the most
         # recent superseded, unresolved candidate needs an additional reference;
         # older Cloud Run revisions and Secret Manager versions remain untouched.
@@ -497,35 +765,62 @@ def deploy(ci, args):
         obsolete_tags = []
         if superseded is not None:
             serving_revision, serving_metadata = record['serving_revision'], record['serving_metadata']
+            baseline_provenance = record.get('baseline_provenance', 'activation_event')
             retained = [superseded['candidate']]
-            if record['schema'] == 2:
+            if record['schema'] in (2, 3):
                 obsolete_tags = record['obsolete_tags'] + [record['temporary_tag']]
                 if len(obsolete_tags) > MAX_OBSOLETE_TAGS:
                     raise CIError('Too many interrupted tagged candidates; explicit recovery is required.')
+        elif handoff is not None:
+            serving_revision, serving_metadata = handoff['serving_revision'], handoff['serving_metadata']
+            baseline_provenance = 'mount_handoff'
         elif current is not None:
             state = parse_service(raw_service(current), profile, identifier)
             if not ready(state, state['created']) or any(not any(target['revision'] == state['created'] and target.get('percent', 0) > 0
                     for target in distribution) for distribution in (state['traffic'], state['actual'])):
                 raise CIError('Current latest revision must be verified serving before ordinary deployment adoption.')
             base_revision = ci.request('GET', '/v2/' + full + '/revisions/' + state['created'], REVISION_FIELDS)
-            if verify_activation(ci.transport, profile, state['created'], base_revision['createTime'], identifier).get('verified_active') is not True:
+            if parse_revision(base_revision, profile, identifier, state['created']) != (state['pin'], state['volumes'], state['containers']):
                 fail()
+            verify_baseline_identity(ci, profile, identifier, current, base_revision)
+            if record is not None and record['phase'] == 'complete':
+                verify_completed_deployment(ci, record, current)
+                baseline_provenance = 'completed_checkpoint'
+            else:
+                evidence = verify_activation(ci.transport, profile, state['created'], base_revision['createTime'], identifier)
+                if evidence.get('verified_active') is True:
+                    baseline_provenance = 'activation_event'
+                elif evidence.get('reason') == 'activation_not_observed':
+                    healthy_baseline_fallback(ci, profile, identifier, current, base_revision)
+                    baseline_provenance = 'healthy_fallback_unverified'
+                else:
+                    fail()
             serving_revision, serving_metadata = state['created'], base_revision
         elif ci.env.get('MODTALE_SECRET_BUNDLE_NEW_SERVICE_APPROVED') != service:
             raise CIError('New bundle service requires explicit approval for its controlled ingress activation.')
         expected_image = args[args.index('--image') + 1] if '--image' in args else current['template']['containers'][0]['image'] if current is not None else None
         if not isinstance(expected_image, str) or re.fullmatch(r'[A-Za-z0-9._:/-]+@sha256:[a-f0-9]{64}', expected_image) is None:
             fail()
-        temporary_tag = 'sb-' + digest[:12]
+        if intent_kind == 'fanout_refresh' and (current is None or expected_image != current['template']['containers'][0]['image']):
+            fail()
+        temporary_tag = 'b' + digest[:9]
+        if current is not None:
+            public_origin(current['uri'], service)
+            public_origin('https://' + temporary_tag + '---' + current['uri'].removeprefix('https://'), service, temporary_tag)
         if current is not None and any(row.get('tag') == temporary_tag for row in parse_service(raw_service(current), profile, identifier)['traffic']):
             raise CIError('Candidate tag already exists; it was not adopted or overwritten.')
-        record = {'schema': 2, 'profile': profile, 'preview_id': identifier, 'digest': digest,
+        record = {'schema': 3, 'profile': profile, 'preview_id': identifier, 'digest': digest,
                   'revision': revision, 'pin': pin, 'head': head, 'base': current, 'phase': 'stage_intent',
                   'staged': None, 'candidate': None, 'desired': None, 'serving_revision': serving_revision,
                   'serving_metadata': serving_metadata, 'retained_revisions': retained,
                   'expected_image': expected_image, 'reservation_bytes': 0, 'operation': None,
-                  'temporary_tag': temporary_tag, 'obsolete_tags': obsolete_tags}
+                  'temporary_tag': temporary_tag, 'obsolete_tags': obsolete_tags, 'baseline_provenance': baseline_provenance, 'intent_kind': intent_kind}
         record['reservation_bytes'] = deployment_reservation_bytes(record)
+        if handoff is not None:
+            if ci.request('GET', '/v2/' + full, DEPLOY_SERVICE_FIELDS) != current:
+                fail()
+            journal.consume_terminal = handoff
+        journal.evict_completed = completed_journal_evictions(ci, profile, identifier)
         checksum = journal.save(record, checksum)
     if record['phase'] == 'complete':
         return verify_completed_deployment(ci, record, current)
@@ -537,7 +832,7 @@ def deploy(ci, args):
             # The official CLI preserves resourceVersion in its v1 ReplaceService.
             # Existing traffic stays pinned while the candidate boots.
             command += ['--no-traffic'] if current is not None else ['--ingress', 'internal']
-            if record['schema'] == 2:
+            if record['schema'] in (2, 3):
                 command += ['--tag', record['temporary_tag']]
             ci.runner(command)
         current = ci.request('GET', '/v2/' + full, DEPLOY_SERVICE_FIELDS)
@@ -576,7 +871,7 @@ def deploy(ci, args):
             old = parse_service(raw_service(record['base']), profile, identifier)
             if state['traffic'] != stage_distribution(record):
                 fail()
-            if state['actual'] is not None and remove_owned_tags(state['actual'], record, [record['temporary_tag']] if record['schema'] == 2 else []) != old['actual']:
+            if state['actual'] is not None and remove_owned_tags(state['actual'], record, [record['temporary_tag']] if record['schema'] in (2, 3) else []) != old['actual']:
                 fail()
         if state['condition'] == 'CONDITION_FAILED':
             raise CIError('Candidate failed readiness; previous traffic is retained and deployment remains recoverable.')
@@ -611,7 +906,7 @@ def deploy(ci, args):
                 desired = [{'type': REVISION_TYPE, 'revision': revision, 'percent': 100}]
             else:
                 old = parse_service(raw_service(record['base']), profile, identifier)
-                desired = remove_owned_tags(old['traffic'], record, record['obsolete_tags'] if record['schema'] == 2 else [])
+                desired = remove_owned_tags(old['traffic'], record, record['obsolete_tags'] if record['schema'] in (2, 3) else [])
                 moved = 0
                 for target in desired:
                     if target['revision'] == record['serving_revision'] and target.get('percent', 0) > 0:

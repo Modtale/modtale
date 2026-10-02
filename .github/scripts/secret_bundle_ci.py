@@ -32,6 +32,10 @@ class CIError(RuntimeError):
     pass
 
 
+class ActivationRefreshRequired(CIError):
+    pass
+
+
 def fail():
     raise CIError('Bundle CI preconditions failed; credentials and old versions were retained.')
 
@@ -177,13 +181,59 @@ class BundleCI:
                     pass
         return True
 
-    def provision(self, *, replacement=False):
+    def require_provision_approval(self, *, replacement=False):
+        self.validate_preview_targets()
+        if self.env.get('RUNTIME_SERVICE_ACCOUNT') != RUNTIME_ACCOUNTS[self.boundary]:
+            raise CIError('Preview credential provisioning requires the fixed isolated runtime identity.')
         service = plan.service_name(self.boundary, self.preview_id, 'backend')
         approved = self.env.get('MODTALE_SECRET_BUNDLE_CREDENTIAL_PROVISION_APPROVED') == service
-        if not replacement and self.env.get('MODTALE_SECRET_BUNDLE_NEW_SERVICE_APPROVED') == service:
+        if not approved and not replacement and self.env.get('MODTALE_SECRET_BUNDLE_NEW_SERVICE_APPROVED') == service:
             approved = self.inventory.observe_service_absence(self.boundary, self.preview_id, 'backend')['observation'] == 'not_found'
         if not approved:
             raise CIError('Preview credential provisioning needs explicit approval for this exact service.')
+        self.lifecycle()
+
+    def require_legacy_provision_approval(self, *, replacement=False):
+        self.require_provision_approval(replacement=replacement)
+        service = plan.service_name(self.boundary, self.preview_id, 'backend')
+        if replacement or self.env.get('MODTALE_SECRET_BUNDLE_CREDENTIAL_PROVISION_APPROVED') == service:
+            return
+        # A missing token-id payload never proves that retained credential
+        # resources are absent. Metadata list failures are fatal, not absence.
+        project = TARGETS[self.boundary][0]
+        names = plan.credential_keys(self.boundary, self.preview_id)
+        query = 'name~"/(' + '|'.join(re.escape(name) for name in names) + ')$"'
+        resources = json.loads(self.runner(['gcloud', 'secrets', 'list', '--project', project,
+                                           '--filter', query, '--format=json(name)', '--quiet']))
+        if not isinstance(resources, list) or len(resources) > 4:
+            fail()
+        number = {'gen-lang-client-0244308719':'145553429208','modtale-pr-preview':'759035195996'}[project]
+        allowed = {f'projects/{alias}/secrets/{name}' for alias in (project, number) for name in names}
+        if any(not isinstance(item, dict) or set(item) != {'name'} or item['name'] not in allowed for item in resources):
+            fail()
+        if resources:
+            raise CIError('Retained original credential resources require exact replacement approval.')
+        self.lifecycle()
+
+    def ensure_legacy_accessor(self, name):
+        self.validate_preview_targets()
+        runtime = RUNTIME_ACCOUNTS[self.boundary]
+        if self.env.get('RUNTIME_SERVICE_ACCOUNT') != runtime or name not in plan.credential_keys(self.boundary, self.preview_id):
+            fail()
+        project = TARGETS[self.boundary][0]
+        policy = json.loads(self.runner(['gcloud', 'secrets', 'get-iam-policy', name, '--project', project, '--format=json', '--quiet']))
+        member = 'serviceAccount:' + runtime
+        if any(binding.get('role') == 'roles/secretmanager.secretAccessor'
+               and member in binding.get('members', []) and not binding.get('condition')
+               for binding in policy.get('bindings', [])):
+            return
+        self.require_provision_approval()
+        self.lifecycle()
+        self.runner(['gcloud', 'secrets', 'add-iam-policy-binding', name, '--project', project,
+                     '--member', member, '--role', 'roles/secretmanager.secretAccessor', '--quiet'])
+
+    def provision(self, *, replacement=False):
+        self.require_provision_approval(replacement=replacement)
         # The existing provisioner retains all old tokens. Its mask/output data
         # is captured, never printed or appended to the job-wide environment.
         self.lifecycle()
@@ -213,8 +263,19 @@ class BundleCI:
         self.lifecycle()
         if self.boundary == 'shared':
             pin = numeric_version(self.env.get('MODTALE_SECRET_BUNDLE_SHARED_VERSION', ''))
-            # Validate fixed numeric pin without ever accessing original values.
-            self.store.read(pin)
+            # Validate only the fixed version's metadata. The runtime validates
+            # bundle contents; shared CI never needs this credential payload.
+            project, secret = TARGETS['shared']
+            name = f'projects/{project}/secrets/{secret}/versions/{pin}'
+            canonical = name.replace('/gen-lang-client-0244308719/', '/145553429208/')
+            response = self.transport({'api': 'secret-manager-metadata',
+                'origin': 'https://secretmanager.googleapis.com', 'method': 'GET',
+                'path': '/v1/' + name, 'params': {'fields': 'name,state'}})
+            if (not isinstance(response, dict) or set(response) != {'status', 'body'}
+                    or type(response['status']) is not int or response['status'] != 200
+                    or not isinstance(response['body'], dict) or set(response['body']) != {'name', 'state'}
+                    or response['body']['name'] not in (name, canonical) or response['body']['state'] != 'ENABLED'):
+                fail()
             self.write_metadata_env(MODTALE_SECRET_BUNDLE_VERSION=pin)
             return
         before = self.lifecycle()
@@ -238,9 +299,10 @@ class BundleCI:
         result = self.store.update(preview_updates(self.boundary, self.preview_id, credentials), lock_held=True)
         # Publication is one complete four-key snapshot. A retried run fans out
         # even when it reuses credentials, so interrupted consumers are resumed.
-        self.fanout(result['version'])
+        fanout = self.fanout(result['version'], allow_own_pending=True)
         self.write_metadata_env(MODTALE_SECRET_BUNDLE_VERSION=result['version'],
-                                R2_RUNTIME_CREDENTIALS_REPLACED=str(result['changed']).lower())
+                                R2_RUNTIME_CREDENTIALS_REPLACED=str(result['changed']).lower(),
+                                MODTALE_SECRET_BUNDLE_DEPLOYMENT_PENDING=str(fanout['status'] == 'deferred_own_deployment').lower())
 
     def proof(self, profile, identifier, service, raw):
         full = raw['name']
@@ -259,15 +321,80 @@ class BundleCI:
             fail()
         active = verify_activation(self.transport, profile, revision, candidate['createTime'], identifier)
         if active.get('verified_active') is not True:
+            if active.get('reason') == 'activation_not_observed':
+                raise ActivationRefreshRequired('An old activation event is unavailable; controlled refresh is required.')
             fail()
         return {'verified_active': True, 'ownership_verified': True, 'profile': profile, 'preview_id': identifier,
                 'service_uid': raw['uid'], 'revision_uid': candidate['uid'], 'bundle_version': pin}
 
-    def fanout(self, target):
+    def refresh_preview_activation(self, identifier, owner, target):
+        """Re-establish a fresh marker through the ordinary zero-traffic gates.
+
+        The old baseline is never relabeled active. Fixed scope/account controls
+        and the exact existing immutable image are reapplied to a NEW candidate.
+        No credential provisioning, publication, or image build occurs here.
+        """
+        from secret_bundle_ci_deploy import deploy, DEPLOY_SERVICE_FIELDS, RUNTIME_IDENTITIES
+        service = plan.service_name(self.boundary, identifier, 'backend')
+        full = f'projects/{TARGETS[self.boundary][0]}/locations/{plan.REGION}/services/{service}'
+        current = self.request('GET', '/v2/' + full, DEPLOY_SERVICE_FIELDS)
+        image = current['template']['containers'][0]['image']
+        env = {key: self.env[key] for key in ('GITHUB_RUN_ID', 'GITHUB_RUN_ATTEMPT') if key in self.env}
+        env.update(MODTALE_SECRET_BUNDLE_FANOUT_REFRESH='true', MODTALE_SECRET_BUNDLES_ENABLED='true', MODTALE_SECRET_BUNDLE_LOCK_GROUP=plan.LOCK_GROUP,
+                   MODTALE_SECRET_BUNDLE_VERSION=target, PROJECT_ID=TARGETS[self.boundary][0], REGION=plan.REGION,
+                   ENV_TYPE=self.boundary, BACKEND_SERVICE=service, RUNTIME_SERVICE_ACCOUNT=RUNTIME_IDENTITIES[self.boundary])
+        if self.boundary == 'branch-preview':
+            env.update(BRANCH_SLUG=identifier, GIT_BRANCH_NAME=owner['name'], GITHUB_SHA=owner['head_sha'])
+        else:
+            env.update(PR_NUMBER=identifier, PR_HEAD_SHA=owner['head_sha'])
+        refreshed = BundleCI(self.transport, env, runner=self.runner, sleeper=self.sleep)
+        deploy(refreshed, ['--image', image])
+
+    def finalize_preview(self):
+        if self.boundary == 'shared':
+            fail()
+        self.lifecycle()
+        target = numeric_version(self.env.get('MODTALE_SECRET_BUNDLE_VERSION', ''))
+        if self.store.backend.latest_enabled() != target:
+            fail()
+        self.fanout(target)
+
+    def fanout(self, target, *, allow_own_pending=False):
         from secret_bundle_rollout import RolloutExecutor, SecretManagerJournal
         root = f'projects/{TARGETS[self.boundary][0]}/locations/{plan.REGION}'
         names = self.inventory._service_names(root, [0])
         owners = plan._lifecycle(self.boundary, self.inventory.github_lifecycle(self.boundary))
+        from secret_bundle_ci_deploy import DeploymentJournal, defer_own_pending_deployment
+        pending = []
+        for full in sorted(names):
+            identity = _identity(self.boundary, full.rsplit('/', 1)[-1])
+            if identity is None or identity[1] != 'backend':
+                continue
+            identifier = identity[0]
+            ordinary, _ = DeploymentJournal(self, self.boundary, identifier).load()
+            if ordinary is not None and ordinary['phase'] != 'complete':
+                if ordinary.get('intent_kind') == 'fanout_refresh':
+                    owner = owners.get(identifier)
+                    if owner is None or owner['state'] != 'open':
+                        raise CIError('A closed preview has pending ordinary refresh evidence; cleanup or explicit recovery is required.')
+                    self.refresh_preview_activation(identifier, owner, target)
+                    continue
+                if not allow_own_pending or identifier != self.preview_id:
+                    raise CIError('Another or unresolved backend deployment must finish before strict fanout.')
+                if defer_own_pending_deployment(self, self.boundary, identifier):
+                    pending.append(identifier)
+        if pending:
+            # Do not reserve a second active journal while the own ordinary
+            # checkpoint holds recovery capacity. Nothing is called complete;
+            # deployment is forced and a later strict pass covers every service.
+            for full in sorted(names):
+                identity = _identity(self.boundary, full.rsplit('/', 1)[-1])
+                if identity is None or identity[1] != 'backend':
+                    continue
+                mounted, _ = SecretManagerJournal(self.transport, self.boundary, identity[0]).load()
+                if mounted is not None and mounted['phase'] not in ('complete', 'rolled_back'):
+                    raise CIError('Overlapping pending mount and ordinary deployments need recovery.')
+            return {'status': 'deferred_own_deployment', 'preview_id': pending[0], 'version': target}
         # A pending journal reserves recovery capacity on the shared container.
         # Resume it before preparing any new service journal, regardless of name
         # order, so a canceled fanout cannot starve its own recovery space.
@@ -300,7 +427,7 @@ class BundleCI:
             if identifier not in owners or owners[identifier]['state'] != 'open':
                 # Orphans keep their exact pins and versions until explicit cleanup.
                 continue
-            from secret_bundle_ci_deploy import assert_no_pending_deployment
+            from secret_bundle_ci_deploy import assert_no_pending_deployment, ordinary_terminal_transfer, completed_journal_evictions, run_attempt
             assert_no_pending_deployment(self, self.boundary, identifier)
             journal = SecretManagerJournal(self.transport, self.boundary, identifier)
             executor = RolloutExecutor(self.transport, journal, self.inventory.github_lifecycle)
@@ -309,17 +436,27 @@ class BundleCI:
                 if saved['phase'] not in ('complete', 'rolled_back'):
                     self.finish_rollout(executor)
                 raw = self.request('GET', '/v2/' + full, SERVICE_FIELDS)
-            proof = self.proof(self.boundary, identifier, service, raw)
+            try:
+                proof = self.proof(self.boundary, identifier, service, raw)
+            except ActivationRefreshRequired:
+                self.refresh_preview_activation(identifier, owners[identifier], target)
+                raw = self.request('GET', '/v2/' + full, SERVICE_FIELDS)
+                proof = self.proof(self.boundary, identifier, service, raw)
             if proof['bundle_version'] == target:
                 continue
+            transfer = ordinary_terminal_transfer(self, self.boundary, identifier)
+            evictions = completed_journal_evictions(self, self.boundary, identifier)
+            journal = SecretManagerJournal(self.transport, self.boundary, identifier, consume_terminal=transfer, evict_completed=evictions)
+            executor = RolloutExecutor(self.transport, journal, self.inventory.github_lifecycle)
             owner = owners[identifier]
-            transaction = hashlib.sha256((self.env['GITHUB_RUN_ID'] + service + target).encode()).hexdigest()[:12]
+            transaction = hashlib.sha256((self.env['GITHUB_RUN_ID'] + ':' + run_attempt(self.env) + ':' + service + ':' + target).encode()).hexdigest()[:12]
             outcome = executor.begin(self.boundary, target, transaction, proof, preview_id=identifier,
                 raw_branch=owner.get('name'), head_sha=owner['head_sha'], replace_terminal=saved is not None, **LOCK)
             if outcome['status'] != 'unchanged':
                 self.finish_rollout(executor)
         if self.inventory._service_names(root, [0]) != names:
             fail()
+        return {'status': 'complete', 'version': target}
 
     def finish_rollout(self, executor):
         deadline = time.monotonic() + 900
@@ -360,6 +497,31 @@ class BundleCI:
         if self.env.get('SEEDING_SOURCE_R2_BUCKET_NAME') in ('modtale-binaries', bucket):
             fail()
 
+    def release_absent_preview_padding(self):
+        """Keep exact recovery records but release obsolete physical reservations."""
+        from secret_bundle_ci_deploy import DeploymentJournal
+        from secret_bundle_rollout import SecretManagerJournal
+        ordinary = DeploymentJournal(self)
+        mounted = SecretManagerJournal(self.transport, self.profile, self.preview_id)
+        metadata = ordinary.request('GET')
+        annotations = dict(metadata.get('annotations', {}))
+        changed = False
+        for journal, decode in ((ordinary, ordinary.decode), (mounted, mounted._decode)):
+            encoded = annotations.get(journal.key)
+            if encoded is None:
+                continue
+            decode(encoded)  # Malformed or foreign-scope evidence is never discarded.
+            compact = encoded.split('.', 1)[0]
+            if compact != encoded:
+                annotations[journal.key] = compact
+                changed = True
+        if not changed:
+            return
+        self.lifecycle(cleanup=True)
+        self.absence()
+        self.lifecycle(cleanup=True)
+        ordinary.request('PATCH', body={'name': ordinary.name, 'etag': metadata['etag'], 'annotations': annotations})
+
     def cleanup(self, *, legacy=False):
         if self.boundary == 'shared':
             fail()
@@ -382,6 +544,8 @@ class BundleCI:
                         fail()
                     self.sleep(5)
         self.absence()
+        if not legacy:
+            self.release_absent_preview_padding()
         presence = json.loads(self.runner(['node', str(SCRIPTS / 'cloudflare-r2-preview.mjs'), 'inspect-bucket'], env=self.env))
         if set(presence) != {'exists'} or type(presence['exists']) is not bool:
             fail()
@@ -439,6 +603,13 @@ class BundleCI:
         result = self.store.update({}, plan.credential_keys(self.boundary, self.preview_id), lock_held=True)
         self.fanout(result['version'])
 
+    def require_template_provision_approval(self):
+        if (self.boundary != 'branch-preview' or self.env.get('R2_BUCKET_NAME') != 'modtale-preview-template'
+                or self.env.get('R2_TOKEN_NAME') != 'modtale-preview-template-reader'
+                or self.env.get('RUNTIME_SERVICE_ACCOUNT') != RUNTIME_ACCOUNTS['branch-preview']
+                or self.env.get('MODTALE_SECRET_BUNDLE_CREDENTIAL_PROVISION_APPROVED') != 'modtale-preview-template-reader'):
+            raise CIError('Template-reader provisioning needs explicit approval for that exact reader.')
+
     def validate_source(self):
         pin = numeric_version(self.store.backend.latest_enabled())
         source_credentials(self.boundary, self.store.read(pin)['secrets'], self.env)
@@ -473,13 +644,16 @@ def resolve_settings(env):
               'MODTALE_SECRET_BUNDLE_NEW_SERVICE_APPROVED': '',
               'MODTALE_SECRET_BUNDLE_CREDENTIAL_PROVISION_APPROVED': ''}
     for key in ('NEW_SERVICE_APPROVED', 'CREDENTIAL_PROVISION_APPROVED'):
-        value = env.get(prefix + key, '') if enabled == 'true' else ''
+        value = env.get(prefix + key, '')
         if value:
             if environment in ('production', 'develop'):
                 expected = 'modtale-backend' + ('-dev' if environment == 'develop' else '')
                 if value != expected:
                     fail()
             elif environment == 'branch-preview':
+                if key == 'CREDENTIAL_PROVISION_APPROVED' and value == 'modtale-preview-template-reader':
+                    result['MODTALE_SECRET_BUNDLE_' + key] = value
+                    continue
                 if not value.startswith('modtale-backend-'):
                     fail()
                 plan._preview_id('branch-preview', value[len('modtale-backend-'):])
@@ -525,7 +699,7 @@ def validate_mode(transport, env):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('operation', choices=('prepare', 'cleanup', 'deploy', 'validate-source', 'check-lifecycle', 'check-cleanup', 'validate-mode', 'cleanup-legacy', 'resolve-settings'))
+    parser.add_argument('operation', choices=('prepare', 'finalize-preview', 'cleanup', 'deploy', 'validate-source', 'check-lifecycle', 'check-cleanup', 'validate-mode', 'cleanup-legacy', 'resolve-settings', 'guard-legacy-provision', 'guard-template-provision', 'ensure-legacy-accessor'))
     parser.add_argument('args', nargs=argparse.REMAINDER)
     args = parser.parse_args()
     try:
@@ -540,14 +714,26 @@ def main():
         context = dict(os.environ)
         if args.operation == 'cleanup-legacy' and context.get('MODTALE_SECRET_BUNDLES_ENABLED', 'false') != 'false':
             fail()
-        if args.operation in ('cleanup-legacy', 'check-cleanup'):
+        if args.operation in ('cleanup-legacy', 'check-cleanup', 'guard-legacy-provision', 'guard-template-provision', 'ensure-legacy-accessor', 'check-lifecycle'):
             if context.get('MODTALE_SECRET_BUNDLES_ENABLED', 'false') not in ('true', 'false'):
                 fail()
             context['MODTALE_SECRET_BUNDLES_ENABLED'] = 'true'
         ci = BundleCI(transport, context)
-        if args.operation == 'cleanup-legacy':
+        if args.operation == 'ensure-legacy-accessor':
+            if len(args.args) != 1:
+                fail()
+            ci.ensure_legacy_accessor(args.args[0])
+        elif args.operation == 'guard-legacy-provision':
+            if args.args not in (['new'], ['replacement']):
+                fail()
+            ci.require_legacy_provision_approval(replacement=args.args == ['replacement'])
+        elif args.operation == 'guard-template-provision':
+            ci.require_template_provision_approval()
+        elif args.operation == 'cleanup-legacy':
             ci.cleanup(legacy=True)
         elif args.operation in ('check-lifecycle', 'check-cleanup', 'validate-mode'):
+            if ci.boundary != 'shared':
+                ci.validate_preview_targets(cleanup=args.operation == 'check-cleanup')
             ci.lifecycle(cleanup=args.operation == 'check-cleanup')
             if args.operation == 'check-cleanup':
                 ci.validate_preview_targets(cleanup=True)

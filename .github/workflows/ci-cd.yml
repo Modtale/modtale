@@ -46,6 +46,7 @@ jobs:
     permissions:
       contents: 'read'
       actions: 'read'
+      pull-requests: 'read'
       id-token: 'write'
     outputs:
       launcher_build: ${{ steps.filter.outputs.launcher_build }}
@@ -304,11 +305,7 @@ jobs:
           ensure_secret_accessor() {
             local name="$1"
 
-            gcloud secrets add-iam-policy-binding "$name" \
-              --project "$PROJECT_ID" \
-              --member="serviceAccount:$RUNTIME_SERVICE_ACCOUNT" \
-              --role="roles/secretmanager.secretAccessor" \
-              --quiet >/dev/null
+            python3 .github/scripts/secret_bundle_ci.py ensure-legacy-accessor "$name"
           }
 
           write_secret() {
@@ -405,11 +402,17 @@ jobs:
           else
             echo "Existing branch preview R2 runtime credentials are missing or invalid; provisioning a replacement."
             : "${CLOUDFLARE_API_TOKEN_PROVISIONER:?Set secret CLOUDFLARE_API_TOKEN_PROVISIONER.}"
+            provisioning_kind=new
+            if [ -n "$existing_token_id$existing_r2_access_key$existing_r2_secret_key$existing_r2_endpoint" ]; then
+              provisioning_kind=replacement
+            fi
+            python3 .github/scripts/secret_bundle_ci.py guard-legacy-provision "$provisioning_kind"
             export EXISTING_R2_RUNTIME_TOKEN_ID="$existing_token_id"
             runtime_env_file="$(mktemp)"
             trap 'rm -f "$runtime_env_file"' EXIT
             export R2_RUNTIME_ENV_FILE="$runtime_env_file"
-            node .github/scripts/cloudflare-r2-preview.mjs provision
+            R2_BUNDLE_LIFECYCLE_SCRIPT="$GITHUB_WORKSPACE/.github/scripts/secret_bundle_ci.py" \
+              node .github/scripts/cloudflare-r2-preview.mjs provision
             set -a
             . "$runtime_env_file"
             set +a
@@ -459,18 +462,18 @@ jobs:
       # Cache API v2 needs Buildx >=0.21 / BuildKit >=0.20. The container driver
       # supports exporting intermediate layers without changing the runner.
       - name: Set up Docker Buildx
-        if: steps.filter.outputs.backend == 'true' || steps.filter.outputs.frontend == 'true' || env.BACKEND_EXISTS == 'false' || env.FRONTEND_EXISTS == 'false' || env.R2_RUNTIME_CREDENTIALS_REPLACED == 'true'
+        if: steps.filter.outputs.backend == 'true' || steps.filter.outputs.frontend == 'true' || env.BACKEND_EXISTS == 'false' || env.FRONTEND_EXISTS == 'false' || env.R2_RUNTIME_CREDENTIALS_REPLACED == 'true' || env.MODTALE_SECRET_BUNDLE_DEPLOYMENT_PENDING == 'true'
         uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
         with:
           version: latest
           driver: docker-container
 
       - name: Expose GitHub Actions cache runtime
-        if: steps.filter.outputs.backend == 'true' || steps.filter.outputs.frontend == 'true' || env.BACKEND_EXISTS == 'false' || env.FRONTEND_EXISTS == 'false' || env.R2_RUNTIME_CREDENTIALS_REPLACED == 'true'
+        if: steps.filter.outputs.backend == 'true' || steps.filter.outputs.frontend == 'true' || env.BACKEND_EXISTS == 'false' || env.FRONTEND_EXISTS == 'false' || env.R2_RUNTIME_CREDENTIALS_REPLACED == 'true' || env.MODTALE_SECRET_BUNDLE_DEPLOYMENT_PENDING == 'true'
         uses: crazy-max/ghaction-github-runtime@04d248b84655b509d8c44dc1d6f990c879747487 # v4
 
       - name: Install pinned Trivy scanner
-        if: steps.filter.outputs.backend == 'true' || steps.filter.outputs.frontend == 'true' || env.BACKEND_EXISTS == 'false' || env.FRONTEND_EXISTS == 'false' || env.R2_RUNTIME_CREDENTIALS_REPLACED == 'true'
+        if: steps.filter.outputs.backend == 'true' || steps.filter.outputs.frontend == 'true' || env.BACKEND_EXISTS == 'false' || env.FRONTEND_EXISTS == 'false' || env.R2_RUNTIME_CREDENTIALS_REPLACED == 'true' || env.MODTALE_SECRET_BUNDLE_DEPLOYMENT_PENDING == 'true'
         uses: aquasecurity/setup-trivy@81e514348e19b6112ce2a7e3ecbafe19c1e1f567 # v0.3.1
         with:
           version: v0.75.0
@@ -478,7 +481,7 @@ jobs:
 
       - name: Build and Deploy Backend
         id: deploy_backend
-        if: steps.filter.outputs.backend == 'true' || env.BACKEND_EXISTS == 'false' || env.R2_RUNTIME_CREDENTIALS_REPLACED == 'true'
+        if: steps.filter.outputs.backend == 'true' || env.BACKEND_EXISTS == 'false' || env.R2_RUNTIME_CREDENTIALS_REPLACED == 'true' || env.MODTALE_SECRET_BUNDLE_DEPLOYMENT_PENDING == 'true'
         run: |
           cd backend
 
@@ -871,6 +874,10 @@ jobs:
             fi
           fi
 
+      - name: Finish pinned preview fanout
+        if: env.ENV_TYPE == 'preview' && env.MODTALE_SECRET_BUNDLES_ENABLED == 'true'
+        run: python3 .github/scripts/secret_bundle_ci.py finalize-preview
+
       - name: Export launcher build metadata
         id: launcher_metadata
         run: |
@@ -1172,6 +1179,7 @@ jobs:
             echo "Template reader is already provisioned."
             exit 0
           fi
+          python3 .github/scripts/secret_bundle_ci.py guard-template-provision
           runtime_env_file=$(mktemp)
           trap 'rm -f "$runtime_env_file"' EXIT
           export R2_RUNTIME_ENV_FILE="$runtime_env_file"
@@ -1234,6 +1242,7 @@ jobs:
       CLOUDFLARE_R2_JURISDICTION: ${{ vars.CLOUDFLARE_R2_JURISDICTION }}
     permissions:
       contents: read
+      pull-requests: read
       id-token: write
 
     steps:
