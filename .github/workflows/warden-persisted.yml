@@ -7,6 +7,7 @@ on:
       - 'backend/**'
       - '.github/workflows/warden-persisted.yml'
       - '.github/scripts/warden-persisted-tests.py'
+      - '.github/scripts/warden-persisted-test-resources.gradle'
       - '.github/tests/warden-persisted-tests.test.mjs'
 
 permissions:
@@ -20,7 +21,7 @@ jobs:
   persisted:
     name: MongoDB ${{ matrix.version }} persisted review
     runs-on: ubuntu-24.04
-    timeout-minutes: 25
+    timeout-minutes: 35
     strategy:
       fail-fast: false
       matrix:
@@ -99,6 +100,7 @@ jobs:
           [[ "$primary" == true ]]
 
       - name: Run every persisted Warden suite
+        timeout-minutes: 30
         run: |
           set -euo pipefail
           python3 .github/scripts/warden-persisted-tests.py list > "$RUNNER_TEMP/warden-suites.txt"
@@ -106,7 +108,8 @@ jobs:
           (( ${#suites[@]} > 0 ))
           selectors=()
           for suite in "${suites[@]}"; do selectors+=(--tests "$suite"); done
-          bash backend/gradlew -p backend cleanTest test "${selectors[@]}" \
+          bash backend/gradlew -p backend -I "$PWD/.github/scripts/warden-persisted-test-resources.gradle" \
+            cleanTest test "${selectors[@]}" \
             --no-daemon --max-workers=2 -Dorg.gradle.jvmargs='-Xmx1g -XX:MaxMetaspaceSize=512m'
           python3 .github/scripts/warden-persisted-tests.py verify
 

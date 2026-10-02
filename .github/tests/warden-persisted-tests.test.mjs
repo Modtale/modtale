@@ -77,3 +77,14 @@ test('fixture commands use supported mongosh results rather than legacy shell as
   }
   assert.doesNotMatch(workflow, /assert\.(?:commandWorked|soon)/);
 });
+
+test('large persisted fixtures receive bounded independent test workers', () => {
+  const workflow = fs.readFileSync(new URL('../workflows/warden-persisted.yml', import.meta.url), 'utf8');
+  const resources = fs.readFileSync(new URL('../scripts/warden-persisted-test-resources.gradle', import.meta.url), 'utf8');
+  assert.match(workflow, /-I "\$PWD\/\.github\/scripts\/warden-persisted-test-resources\.gradle"/);
+  assert.match(resources, /maxHeapSize = '2g'/);
+  assert.match(resources, /maxParallelForks = 1/);
+  assert.match(resources, /forkEvery = 1/);
+  assert.match(workflow, /timeout-minutes: 35/);
+  assert.match(workflow, /name: Run every persisted Warden suite\n        timeout-minutes: 30/);
+});
