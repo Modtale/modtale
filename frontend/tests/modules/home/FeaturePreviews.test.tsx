@@ -218,6 +218,7 @@ describe('Modpack builder preview', () => {
         expect(container.querySelector('input[placeholder="Search for projects..."]')).not.toBeNull();
         const config = Array.from(container.querySelectorAll('button')).find(button => button.textContent?.includes('Config'))!;
         expect(config.disabled).toBe(true);
+        expect(api.get).not.toHaveBeenCalled();
         await act(async () => config.click());
         expect(document.querySelector('[role="dialog"]')).toBeNull();
     });
@@ -243,14 +244,61 @@ describe('Modpack builder preview', () => {
         expect(container.textContent).toContain('Arcane Toolkit');
     });
 
+    it('renders project metadata on the first render without waiting for release requests', () => {
+        const markup = renderToStaticMarkup(
+            <MemoryRouter><ToastProvider><InlineModpackBuilderUI projects={[{ ...projects[0], versions: [] }]} /></ToastProvider></MemoryRouter>
+        );
+        expect(markup).toContain('Modpack Contents');
+        expect(markup).toContain('Arcane Toolkit');
+        expect(markup).toContain('by Ada');
+        expect(markup).toContain('/images/arcane.png');
+        expect(markup).toContain('BetterMap');
+        expect(markup).not.toContain('Loading projects');
+        expect(api.get).not.toHaveBeenCalled();
+    });
+
+    it('uses one lightweight batch request and preserves edits while versions load', async () => {
+        let resolveBatch!: (value: any) => void;
+        vi.mocked(api.get).mockImplementation((() => new Promise(resolve => { resolveBatch = resolve; })) as any);
+        await render([{ ...projects[0], versions: [] }, { ...projects[0], id: 'other', title: 'Other Project', versions: [] }]);
+        expect(container.textContent).toContain('Selected (3)');
+        expect(container.textContent).toContain('by Ada');
+        expect(api.get).toHaveBeenCalledTimes(1);
+        expect(api.get).toHaveBeenCalledWith('/projects/preview-versions', {
+            params: { ids: 'arcane,other' }, timeout: 1800
+        });
+        const remove = container.querySelector('.group button:last-child') as HTMLButtonElement;
+        await act(async () => remove.click());
+        await act(async () => resolveBatch({ data: {
+            arcane: { versionNumber: '2.4.0', incompatibleProjectIds: [] },
+            other: { versionNumber: '3.0.0', incompatibleProjectIds: [] }
+        } }));
+        expect(container.textContent).toContain('Selected (2)');
+        expect(container.textContent).not.toContain('Arcane Toolkit');
+        expect(container.textContent).toContain('v3.0.0');
+        expect(api.get).toHaveBeenCalledTimes(1);
+    });
+
+    it('shows incompatibilities from the batch response without project-detail requests', async () => {
+        vi.mocked(api.get).mockResolvedValue({ data: {
+            arcane: { versionNumber: '2.4.0', incompatibleProjectIds: ['other'] },
+            other: { versionNumber: '3.0.0', incompatibleProjectIds: [] }
+        } });
+        await render([{ ...projects[0], versions: [] }, { ...projects[0], id: 'other', title: 'Other Project', versions: [] }]);
+        expect(container.textContent).toContain('marks');
+        expect(container.textContent).toContain('as incompatible');
+        expect(api.get).toHaveBeenCalledTimes(1);
+    });
+
     it('offers a retry after a failed release lookup without inventing versions', async () => {
         vi.mocked(api.get).mockRejectedValue(new Error('Unavailable'));
         await render([{ ...projects[0], versions: [] }]);
-        expect(container.textContent).toContain('Projects couldn’t load.');
+        expect(container.textContent).toContain('Some versions couldn’t load.');
+        expect(container.textContent).toContain('Selected (2)');
         expect(container.textContent).not.toContain('vlatest');
-        vi.mocked(api.get).mockImplementation(async (url: any) => ({ data: String(url).endsWith('/versions')
-            ? { versions: projects[0].versions }
-            : { ...projects[0], icon: projects[0].imageUrl } }) as any);
+        vi.mocked(api.get).mockResolvedValue({ data: {
+            arcane: { versionNumber: '2.4.0', incompatibleProjectIds: [] }
+        } });
         const retry = Array.from(container.querySelectorAll('button')).find(button => button.textContent === 'Try again')!;
         await act(async () => retry.click());
         expect(container.textContent).toContain('Selected (2)');

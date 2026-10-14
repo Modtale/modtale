@@ -96,6 +96,16 @@ class ProjectControllerTest {
     }
 
     @Test
+    void previewVersionsNormalizeBatchIdsAndArePubliclyCacheable() {
+        when(projectResponseCacheService.getPublicPreviewVersionsByIds(List.of("a", "b"))).thenReturn(Map.of());
+        var response = controller.getProjectPreviewVersions(" a, b, a, ,");
+        assertEquals(Map.of(), response.getBody());
+        assertEquals("max-age=300, public", response.getHeaders().getCacheControl());
+        verify(projectResponseCacheService).getPublicPreviewVersionsByIds(List.of("a", "b"));
+        verify(projectService, never()).getProjectVersionsByRouteKey(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
     void getProjectsUsesAuthorIdAndDisablesCachingForFavorites() {
         User currentUser = user("user-1", "ada");
         Page<Project> page = new PageImpl<>(List.of(project("project-1", "Sky Tools", ProjectStatus.PUBLISHED)));
