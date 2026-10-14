@@ -7,7 +7,7 @@ import { OptimizedImage } from '@/components/ui/OptimizedImage';
 import { api, BACKEND_URL } from '@/utils/api';
 import { SiteRoutes } from '@/utils/routes';
 import { ProjectCard, ProjectCardSkeleton } from '@/modules/project/components/ProjectCard';
-import type { Project, ProjectDependency, User } from '@/types';
+import type { Project, ProjectDependency, ProjectVersion, User } from '@/types';
 import { theme } from '@/styles/theme';
 import { GLASS_CARD, GLASS_HEADER } from '../styles';
 import { getClassificationIcon, toTitleCase, formatTimeAgo } from '@/utils/modHelpers';
@@ -170,56 +170,65 @@ export const InlineModpackBuilderUI = ({ randomProject, projects, loading = fals
             .filter(project => project?.id && project?.title && project.classification !== 'MODPACK' && project.allowModpacks !== false)
             .map(project => [project.id, project])
     ).values()).slice(0, 3), [projects, randomProject]);
-    const [dependencies, setDependencies] = useState<ProjectDependency[]>([]);
+    const [selection, setSelection] = useState<ProjectDependency[] | null>(null);
     const [configs, setConfigs] = useState<Record<string, ModConfig[]>>({});
-    const [preparing, setPreparing] = useState(true);
-    const initialized = useRef(false);
+    const [resolvedVersions, setResolvedVersions] = useState<Record<string, Pick<ProjectVersion, 'versionNumber' | 'incompatibleProjectIds'>>>({});
+    const [failedVersions, setFailedVersions] = useState<string[]>([]);
     const [retry, setRetry] = useState(0);
+    // Preserve the demo selection when the homepage refreshes its project pool.
+    const [previewProjects, setPreviewProjects] = useState(candidates);
+    useEffect(() => {
+        if (!previewProjects.length && candidates.length) setPreviewProjects(candidates);
+    }, [candidates, previewProjects]);
+
+    const initialDependencies = useMemo<ProjectDependency[]>(() => previewProjects.length ? [
+        ...previewProjects.map(project => ({
+            projectId: project.id, projectTitle: project.title,
+            versionNumber: project.versions?.length ? getPreviewVersionNumberFromVersions(project.versions) : '',
+            source: 'MODTALE' as const, dependencyType: 'REQUIRED' as const,
+            isOptional: false, isEmbedded: false
+        })),
+        { ...CURSEFORGE_PREVIEW_DEPENDENCY }
+    ] : [], [previewProjects]);
+    const dependencies = useMemo(() => (selection ?? initialDependencies).map(dependency => ({
+        ...dependency,
+        versionNumber: dependency.versionNumber || resolvedVersions[dependency.projectId]?.versionNumber || ''
+    })), [selection, initialDependencies, resolvedVersions]);
+    const initialMetaCache = useMemo(() => Object.fromEntries(previewProjects.map(project => [project.id, {
+        title: project.title, author: project.author || 'Unknown', icon: project.imageUrl || ''
+    }])), [previewProjects]);
+
+    const knownProjects = useMemo(() => previewProjects.map(project => ({
+        ...project,
+        versions: resolvedVersions[project.id] ? [resolvedVersions[project.id]] : project.versions
+    })), [previewProjects, resolvedVersions]);
 
     useEffect(() => {
-        if (initialized.current || (!candidates.length && loading)) return;
-        if (!candidates.length) {
-            setPreparing(false);
-            return;
-        }
+        const missing = previewProjects.filter(project => !project.versions?.length);
+        if (!missing.length) return;
         let cancelled = false;
-        setPreparing(true);
-        const prepare = async () => {
-            const entries = await Promise.all(candidates.map(async project => {
-                try {
-                    const versions = project.versions?.length ? project.versions :
-                        (await api.get<{ versions?: Project['versions'] }>(`/projects/${project.id}/versions`, {
-                            timeout: DEPENDENCY_PREVIEW_VERSION_TIMEOUT_MS
-                        })).data.versions;
-                    if (!versions?.length) return null;
-                    return {
-                        projectId: project.id, projectTitle: project.title,
-                        versionNumber: getPreviewVersionNumberFromVersions(versions),
-                        source: 'MODTALE', dependencyType: 'REQUIRED',
-                        isOptional: false, isEmbedded: false
-                    } as ProjectDependency;
-                } catch {
-                    return null;
-                }
-            }));
+        setFailedVersions([]);
+        void api.get<Record<string, Pick<ProjectVersion, 'versionNumber' | 'incompatibleProjectIds'>>>('/projects/preview-versions', {
+            params: { ids: missing.map(project => project.id).sort().join(',') },
+            timeout: DEPENDENCY_PREVIEW_VERSION_TIMEOUT_MS
+        }).then(({ data }) => {
             if (cancelled) return;
-            const resolved = entries.filter((entry): entry is ProjectDependency => entry !== null);
-            setDependencies(resolved.length ? [...resolved, { ...CURSEFORGE_PREVIEW_DEPENDENCY }] : []);
-            initialized.current = resolved.length > 0;
-            setPreparing(false);
-        };
-        void prepare();
+            setResolvedVersions(data);
+            setFailedVersions(missing.filter(project => !data[project.id]?.versionNumber).map(project => project.id));
+        }).catch(() => {
+            if (!cancelled) setFailedVersions(missing.map(project => project.id));
+        });
         return () => { cancelled = true; };
-    }, [candidates, loading, retry]);
+    }, [previewProjects, retry]);
 
     return (
         <div className="relative">
-            {preparing ? (
+            {!previewProjects.length && loading ? (
                 <div className={`${GLASS_CARD} p-6 space-y-4`} role="status">
                     <span className="sr-only">Loading projects</span>
                     {[0, 1, 2].map(index => <div key={index} className="h-20 animate-pulse rounded-xl bg-slate-200/60 dark:bg-white/5" />)}
                 </div>
-            ) : !initialized.current ? (
+            ) : !previewProjects.length ? (
                 <div className={`${GLASS_CARD} p-6 flex items-center justify-between gap-4`} role="status">
                     <span className="text-sm text-slate-500 dark:text-slate-400">Projects couldn’t load.</span>
                     <button type="button" onClick={() => setRetry(value => value + 1)} className={theme.components.buttonPrimary}>Try again</button>
@@ -227,7 +236,9 @@ export const InlineModpackBuilderUI = ({ randomProject, projects, loading = fals
             ) : (
                 <DependencySelector
                     selectedDeps={dependencies}
-                    onChange={setDependencies}
+                    onChange={setSelection}
+                    initialMetaCache={initialMetaCache}
+                    knownProjects={knownProjects}
                     isModpack
                     disableExternalReferences
                     label="Modpack Contents"
@@ -243,6 +254,12 @@ export const InlineModpackBuilderUI = ({ randomProject, projects, loading = fals
                         />
                     )}
                 />
+            )}
+            {failedVersions.length > 0 && (
+                <div className="mt-2 flex items-center justify-between gap-4 text-sm text-slate-500 dark:text-slate-400" role="status">
+                    <span>Some versions couldn’t load.</span>
+                    <button type="button" onClick={() => setRetry(value => value + 1)} className={theme.components.buttonPrimary}>Try again</button>
+                </div>
             )}
         </div>
     );

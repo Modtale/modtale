@@ -20,6 +20,7 @@ import net.modtale.model.dto.project.ProjectGalleryDTO;
 import net.modtale.model.dto.project.ProjectMarqueeDTO;
 import net.modtale.model.dto.project.ProjectMetaDTO;
 import net.modtale.model.dto.project.ProjectPageDTO;
+import net.modtale.model.dto.project.ProjectPreviewVersionDTO;
 import net.modtale.model.dto.project.ProjectSummaryDTO;
 import net.modtale.model.dto.project.ProjectTeamDTO;
 import net.modtale.model.dto.project.ProjectVersionsDTO;
@@ -428,6 +429,16 @@ public class ProjectController {
             throw new ResourceNotFoundException("We couldn't find a project with that ID.");
         }
         return ResponseEntity.ok(ProjectMapper.toMetaDTO(project));
+    }
+
+    @GetMapping("/projects/preview-versions")
+    @PreAuthorize("@apiSecurity.hasAnyPerm('PROJECT_READ', authentication)")
+    public ResponseEntity<Map<String, ProjectPreviewVersionDTO>> getProjectPreviewVersions(@RequestParam String ids) {
+        List<String> projectIds = Arrays.stream(ids.split(","))
+                .map(String::trim).filter(id -> !id.isEmpty()).distinct().limit(50).toList();
+        return ResponseEntity.ok()
+                .cacheControl(CacheControl.maxAge(5, TimeUnit.MINUTES).cachePublic())
+                .body(projectResponseCacheService.getPublicPreviewVersionsByIds(projectIds));
     }
 
     @GetMapping("/projects/meta")

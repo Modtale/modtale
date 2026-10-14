@@ -1,5 +1,6 @@
 package net.modtale.service.project.query;
 
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -10,12 +11,14 @@ import net.modtale.model.dto.project.ProjectGalleryDTO;
 import net.modtale.model.dto.project.ProjectMarqueeDTO;
 import net.modtale.model.dto.project.ProjectMetaDTO;
 import net.modtale.model.dto.project.ProjectPageDTO;
+import net.modtale.model.dto.project.ProjectPreviewVersionDTO;
 import net.modtale.model.dto.project.ProjectSummaryDTO;
 import net.modtale.model.dto.project.ProjectTeamDTO;
 import net.modtale.model.dto.project.ProjectVersionsDTO;
 import net.modtale.model.project.Project;
 import net.modtale.model.project.ProjectClassification;
 import net.modtale.model.project.ProjectSort;
+import net.modtale.model.project.ProjectVersion;
 import net.modtale.model.project.ProjectViewCategory;
 import net.modtale.repository.project.ProjectRepository;
 import net.modtale.util.MongoIdUtils;
@@ -217,6 +220,38 @@ public class ProjectResponseCacheService {
             metas.put(project.getId(), ProjectMapper.toMetaDTO(project));
         }
         return metas;
+    }
+
+    /** One indexed query for demo versions, without release payloads or dependency enrichment. */
+    public Map<String, ProjectPreviewVersionDTO> getPublicPreviewVersionsByIds(List<String> ids) {
+        if (ids == null || ids.isEmpty()) return Map.of();
+        List<String> normalizedIds = ids.stream()
+                .filter(id -> id != null && !id.isBlank())
+                .map(String::trim).distinct().limit(50).toList();
+        if (normalizedIds.isEmpty()) return Map.of();
+
+        Query query = Query.query(Criteria.where("_id").in(MongoIdUtils.expandIds(normalizedIds))
+                .and("status").in("PUBLISHED", "UNLISTED", "ARCHIVED")
+                .and("deletedAt").is(null));
+        query.fields().include("_id")
+                .include("versions.versionNumber")
+                .include("versions.releaseDate")
+                .include("versions.reviewStatus")
+                .include("versions.incompatibleProjectIds");
+
+        Map<String, ProjectPreviewVersionDTO> versions = new LinkedHashMap<>();
+        for (Project project : mongoTemplate.find(query, Project.class)) {
+            if (project.getVersions() == null) continue;
+            project.getVersions().stream()
+                    .filter(version -> version.getReviewStatus() == ProjectVersion.ReviewStatus.APPROVED)
+                    .filter(version -> version.getVersionNumber() != null && !version.getVersionNumber().isBlank())
+                    .max(Comparator.comparing(ProjectVersion::getReleaseDate, Comparator.nullsFirst(Comparator.naturalOrder())))
+                    .ifPresent(version -> versions.put(project.getId(), new ProjectPreviewVersionDTO(
+                            version.getVersionNumber(),
+                            version.getIncompatibleProjectIds() == null ? List.of() : version.getIncompatibleProjectIds()
+                    )));
+        }
+        return versions;
     }
 
     private Project resolvePublicMetaByRouteKey(String routeKey) {

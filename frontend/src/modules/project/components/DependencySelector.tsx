@@ -15,10 +15,13 @@ import { dependencyProjectKey, getDependencyType, isExternalDependency, normaliz
 import { useToast } from '@/components/ui/Toast';
 import { ModalPortal } from '@/components/ui/ModalPortal';
 
+type DependencyProject = Pick<Project, 'id' | 'title'> & { versions?: Pick<ProjectVersion, 'versionNumber' | 'incompatibleProjectIds'>[] };
 type DependencyMeta = { title: string; author: string; icon: string; source?: string; url?: string };
 type DropdownOption<T extends string> = { value: T; label: string; detail?: string };
 interface DependencySelectorProps {
     selectedDeps: ProjectDependency[] | string[];
+    initialMetaCache?: Record<string, DependencyMeta>;
+    knownProjects?: DependencyProject[];
     onChange: (deps: any[]) => void;
     targetGameVersion?: string;
     label?: string;
@@ -248,6 +251,8 @@ const DependencyPrompt = ({
 
 export const DependencySelector: React.FC<DependencySelectorProps> = ({
     selectedDeps,
+    initialMetaCache = {},
+    knownProjects,
     onChange,
     targetGameVersion,
     label,
@@ -269,8 +274,12 @@ export const DependencySelector: React.FC<DependencySelectorProps> = ({
     const [dependencyType, setDependencyType] = useState<DependencyType>('REQUIRED');
     const [showPreviousImport, setShowPreviousImport] = useState(false);
     const [pendingPrompt, setPendingPrompt] = useState<{ projectTitle: string; dependencies: ProjectDependency[]; baseDeps: ProjectDependency[] } | null>(null);
-    const [projectCache, setProjectCache] = useState<Record<string, Project>>({});
-    const [metaCache, setMetaCache] = useState<Record<string, DependencyMeta>>({});
+    const [fetchedProjects, setProjectCache] = useState<Record<string, Project>>({});
+    const projectCache = useMemo(() => ({
+        ...Object.fromEntries((knownProjects || []).map(project => [project.id, project])),
+        ...fetchedProjects
+    }), [knownProjects, fetchedProjects]);
+    const [metaCache, setMetaCache] = useState<Record<string, DependencyMeta>>(initialMetaCache);
     const [showExternalModal, setShowExternalModal] = useState(false);
     const externalDialogRef = useRef<HTMLDivElement>(null);
     useDialogFocus(showExternalModal, externalDialogRef);
@@ -886,7 +895,7 @@ export const DependencySelector: React.FC<DependencySelectorProps> = ({
                                                 <div className={`text-xs ${theme.colors.textMuted} flex items-center gap-1.5 min-w-0`}>
                                                     <span className="truncate max-w-[110px]">{isExternal && dependency?.externalUrl ? <a href={dependency.externalUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 hover:underline">{getSourceLabel(dependency.source)}<ExternalLink className="w-3 h-3" /></a> : `by ${meta?.author || '...'}`}</span>
                                                     <span className="w-1 h-1 rounded-full bg-slate-300 dark:bg-white/20"></span>
-                                                    <span title={dependency?.versionNumber} className={`${theme.colors.bgSurfaceAlt} px-1.5 py-0.5 rounded truncate`}>{isExternal ? dependency?.versionNumber : `v${dependency?.versionNumber}`}</span>
+                                                    <span title={dependency?.versionNumber} className={`${theme.colors.bgSurfaceAlt} px-1.5 py-0.5 rounded truncate`}>{dependency?.versionNumber ? (isExternal ? dependency.versionNumber : `v${dependency.versionNumber}`) : 'Version unavailable'}</span>
                                                 </div>
                                             )}
                                         </div>
