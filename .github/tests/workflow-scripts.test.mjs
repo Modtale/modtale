@@ -25,6 +25,7 @@ function run(script, overrides = {}) {
       GITHUB_REPOSITORY: 'Modtale/modtale',
       GITHUB_REPOSITORY_OWNER: 'Modtale',
       GITHUB_REF_NAME: 'audit',
+      GITHUB_SHA: 'a'.repeat(40),
       GH_TOKEN: 'test-token',
       ...overrides,
     },
@@ -42,14 +43,46 @@ test('PR creation and synchronization always retain their own test coverage', ()
   }
 });
 
-test('push skips only when the GitHub API confirms an open PR', () => {
+function mockPullRequestApi() {
   const bin = path.join(directory, 'bin');
   fs.mkdirSync(bin);
   const gh = path.join(bin, 'gh');
-  fs.writeFileSync(gh, '#!/bin/sh\nprintf "1\\n"\n', { mode: 0o755 });
-  const env = { GITHUB_EVENT_NAME: 'push', PATH: `${bin}${path.delimiter}${process.env.PATH}` };
+  fs.writeFileSync(gh, `#!/bin/sh
+case "$*" in
+  *"/pulls/"*)
+    [ "\${MOCK_PR_ERROR:-}" = "yes" ] && exit 1
+    printf '%s\\t%s\\n' "\${MOCK_MERGEABLE:-true}" "\${MOCK_HEAD:-$GITHUB_SHA}"
+    ;;
+  *) printf '%s\\n' "\${MOCK_PR_NUMBERS-25}" ;;
+esac
+`, { mode: 0o755 });
+  return { GITHUB_EVENT_NAME: 'push', PATH: `${bin}${path.delimiter}${process.env.PATH}` };
+}
+
+test('push skips only when an open PR is positively mergeable at the same head', () => {
+  const env = mockPullRequestApi();
   assert.match(run('should-run-tests-workflow.sh', env), /^should_run=false$/m);
-  fs.writeFileSync(gh, '#!/bin/sh\nexit 1\n', { mode: 0o755 });
+});
+
+test('conflicted, unknown, stale, and absent PRs keep push tests enabled', () => {
+  const env = mockPullRequestApi();
+  for (const scenario of [
+    { MOCK_MERGEABLE: 'false' },
+    { MOCK_MERGEABLE: 'null' },
+    { MOCK_MERGEABLE: 'unexpected' },
+    { MOCK_HEAD: 'b'.repeat(40) },
+    { MOCK_PR_NUMBERS: '' },
+    { MOCK_PR_NUMBERS: 'not-a-number' },
+    { MOCK_PR_ERROR: 'yes' },
+    { GITHUB_SHA: '' },
+  ]) {
+    assert.match(run('should-run-tests-workflow.sh', { ...env, ...scenario }), /^should_run=true$/m);
+  }
+});
+
+test('PR-list API failure keeps push tests enabled', () => {
+  const env = mockPullRequestApi();
+  fs.writeFileSync(path.join(directory, 'bin', 'gh'), '#!/bin/sh\nexit 1\n', { mode: 0o755 });
   assert.match(run('should-run-tests-workflow.sh', env), /^should_run=true$/m);
 });
 

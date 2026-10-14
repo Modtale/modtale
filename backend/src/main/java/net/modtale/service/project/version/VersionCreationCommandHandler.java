@@ -16,7 +16,8 @@ import net.modtale.model.project.Project;
 import net.modtale.model.project.ProjectClassification;
 import net.modtale.model.project.ProjectVersion;
 import net.modtale.model.user.User;
-import net.modtale.repository.project.ProjectRepository;
+import net.modtale.service.admin.review.ProjectReviewPersistence;
+import net.modtale.service.admin.review.ProjectReviewSnapshot;
 import net.modtale.service.project.access.ProjectAccessService;
 import net.modtale.service.project.access.ProjectMutationGuard;
 import net.modtale.service.project.query.ProjectService;
@@ -26,7 +27,9 @@ import org.springframework.web.multipart.MultipartFile;
 @Service
 public class VersionCreationCommandHandler {
 
-    private final ProjectRepository projectRepository;
+    private final ProjectReviewPersistence reviewPersistence;
+    @org.springframework.beans.factory.annotation.Autowired(required=false)
+    private net.modtale.service.admin.review.ProjectMutationOwnerAccess retainedMutations;
     private final ProjectService projectService;
     private final ProjectAccessService projectAccessService;
     private final ProjectMutationGuard projectMutationGuard;
@@ -34,14 +37,14 @@ public class VersionCreationCommandHandler {
     private final int maxVersionsPerDay;
 
     public VersionCreationCommandHandler(
-            ProjectRepository projectRepository,
+            ProjectReviewPersistence reviewPersistence,
             ProjectService projectService,
             ProjectAccessService projectAccessService,
             ProjectMutationGuard projectMutationGuard,
             VersionMutationOrchestrationService versionMutationOrchestrationService,
             AppLimitProperties limitProperties
     ) {
-        this.projectRepository = projectRepository;
+        this.reviewPersistence = reviewPersistence;
         this.projectService = projectService;
         this.projectAccessService = projectAccessService;
         this.projectMutationGuard = projectMutationGuard;
@@ -64,6 +67,8 @@ public class VersionCreationCommandHandler {
         Project project = projectAccessService.requireVersionPermission(projectId, user, "VERSION_CREATE",
                 "You do not have permission to add a version to this project.");
         projectMutationGuard.ensureEditable(project);
+        var snapshot = reviewPersistence.capture(project.getId(), ProjectReviewSnapshot.token(project));
+        project = snapshot.project();
 
         ensureProjectVersionList(project);
         versionMutationOrchestrationService.validateVersionNumber(versionNumber);
@@ -74,6 +79,10 @@ public class VersionCreationCommandHandler {
         ensureProjectIsWithinDailyVersionLimit(project);
         ensureVersionNumberIsUnique(duplicateTargets, replaceExisting);
 
+        if(retainedMutations==null && duplicateTargets.stream().anyMatch(version->version.getRetainedRemoteReview()!=null || version.getVersionMutation()!=null
+                || version.getReviewReplacement()!=null || version.getReviewIsolation()!=null || version.getReplacementSecurityHold()!=null
+                || version.getScanResult()!=null && version.getScanResult().getRemoteReview()!=null))
+            throw new InvalidVersionRequestException("Retained review history must be available before replacing this version.");
         VersionArtifactService.PreparedVersionArtifact preparedArtifact =
                 versionMutationOrchestrationService.prepareVersionArtifact(project, file);
         boolean modpack = preparedArtifact.classification() == ProjectClassification.MODPACK;
@@ -107,13 +116,20 @@ public class VersionCreationCommandHandler {
             project.setChildProjectIds(simpleProjectIds);
         }
 
+        List<ProjectVersion> changedTargets = new ArrayList<>();
         List<ProjectVersion> replacedVersions = replaceExisting
-                ? replaceMatchingVersionTargets(project, versionNumber, gameVersions)
+                ? replaceMatchingVersionTargets(project, versionNumber, gameVersions, changedTargets)
                 : List.of();
         project.getVersions().add(0, version);
-        projectRepository.save(project);
+        if(retainedMutations!=null) {
+            var outcome=retainedMutations.editVersion(snapshot.raw(),reviewPersistence.versionUploadProposal(snapshot));
+            if(!"APPLIED".equals(outcome.state()))throw ProjectReviewSnapshot.conflict();
+            projectService.evictProjectCache(project);return;
+        }
+        if (!reviewPersistence.applyVersionList(snapshot)) throw ProjectReviewSnapshot.conflict();
         projectService.evictProjectCache(project);
         versionMutationOrchestrationService.enqueueInitialScan(project, version, file, modpack, preparedArtifact.filePath());
+        for (var changed : changedTargets) versionMutationOrchestrationService.enqueueContextChangeScan(project, changed);
         replacedVersions.forEach(versionMutationOrchestrationService::deleteVersionFile);
     }
 
@@ -186,7 +202,7 @@ public class VersionCreationCommandHandler {
                 .toList();
     }
 
-    private List<ProjectVersion> replaceMatchingVersionTargets(Project project, String versionNumber, List<String> gameVersions) {
+    private List<ProjectVersion> replaceMatchingVersionTargets(Project project, String versionNumber, List<String> gameVersions, List<ProjectVersion> changedTargets) {
         List<ProjectVersion> replacedVersions = new ArrayList<>();
         for (ProjectVersion existing : new ArrayList<>(project.getVersions())) {
             if (existing.getVersionNumber() == null
@@ -201,7 +217,11 @@ public class VersionCreationCommandHandler {
                 continue;
             }
 
+            var previousScan = existing.getScanResult();
             existing.setGameVersions(removeRequestedGameVersions(existing.getGameVersions(), gameVersions));
+            existing.setReviewStatus(ProjectVersion.ReviewStatus.PENDING);
+            existing.setScheduledPublishDate(null); existing.setScanResult(null);
+            if (retainedMutations==null && versionMutationOrchestrationService.prepareContextChangeScan(project, existing, previousScan)) changedTargets.add(existing);
         }
         return replacedVersions;
     }

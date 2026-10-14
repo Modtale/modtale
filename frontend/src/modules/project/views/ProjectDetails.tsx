@@ -539,7 +539,7 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
             return gameVersions.includes(gameVersion);
         });
 
-        return extractFileNameFromUrl(matchedVersion?.fileUrl);
+        return matchedVersion?.fileName || extractFileNameFromUrl(matchedVersion?.fileUrl);
     };
 
     const finishVersionDownload = async (versionNumber: string, gameVersion: string, selectedDeps: string[], channel: DownloadChannel = 'RELEASE') => {
@@ -594,7 +594,7 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
         throw new Error('The server did not return a usable download link for this file.');
     };
 
-    const handleDownloadClick = async (url: string, versionNumber: string, gameVersion: string, deps: any[], channel: string) => {
+    const handleDownloadClick = async (_displayName: string, versionNumber: string, gameVersion: string, deps: any[], channel: string) => {
         try {
             if (project?.classification === 'MODPACK' && hasCurseForgeDependencies(deps)) {
                 if (project) openLauncherInstallOrFallback({ projectId: project.id, versionNumber, gameVersion }, () => { window.location.href = SiteRoutes.launcher(); });
@@ -603,28 +603,7 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
             const downloadChannel = normalizeDownloadChannel(channel);
 
             if (!versionNumber) {
-                const baseUrl = (api.defaults.baseURL || '').replace(/\/$/, '');
-                const targetUrl = baseUrl + '/files/download/' + encodeURI(url);
-                setLastDownloadedFileName(extractFileNameFromUrl(url));
-                setLastDownloadChannel(downloadChannel);
-                window.open(targetUrl, '_blank');
-                setShowDownloadFx(true);
-                if (downloadFxTimeoutRef.current) window.clearTimeout(downloadFxTimeoutRef.current);
-                downloadFxTimeoutRef.current = window.setTimeout(() => setShowDownloadFx(false), 900);
-
-                if (project && !downloadedSessionIds.has(project.id)) {
-                    setProject(prev => prev ? { ...prev, downloadCount: (prev.downloadCount || 0) + 1 } : null);
-                    onDownload(project.id);
-                }
-                setIsDownloadOpen(false);
-                setIsHistoryOpen(false);
-                setLastDownloadWasBundle(false);
-
-                if (localStorage.getItem('hideInstallInstructions') !== 'true') {
-                    setShowPostDownloadModal(true);
-                }
-                if (location.pathname.endsWith('/download')) navigate(SiteRoutes.project(project), { replace: true });
-                return;
+                throw new Error('Select a version before downloading this file.');
             }
 
             // A modpack download is already a complete, validated pack plan. Routing it

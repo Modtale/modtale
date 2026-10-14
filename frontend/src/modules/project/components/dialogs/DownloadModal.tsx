@@ -304,7 +304,7 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
         for (const gameVersion of activeSelectedGameVersions) {
             const builds = versionsByGame[gameVersion] || [];
             for (const version of builds) {
-                const key = version?.id || `${version?.versionNumber || 'unknown'}-${version?.fileUrl || ''}-${version?.releaseDate || ''}`;
+                const key = version?.id || `${version?.versionNumber || 'unknown'}-${version?.fileName || version?.fileUrl || ''}-${version?.releaseDate || ''}`;
                 if (!entries.has(key)) {
                     entries.set(key, { version, gameVersion });
                 }
@@ -456,7 +456,7 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
 
     const download = (ver: any, gameVersion: string) => {
         if (isModpack && hasCurseForgeDependencies(ver?.dependencies)) return;
-        onDownload(ver.fileUrl, ver.versionNumber, gameVersion, ver.dependencies, ver.channel);
+        onDownload(ver.fileName || ver.fileUrl || '', ver.versionNumber, gameVersion, ver.dependencies, ver.channel);
     };
 
     const latestRequiresLauncher = isModpack && hasCurseForgeDependencies(latestVer?.dependencies);
@@ -558,7 +558,7 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
                         {isListExpanded && (
                             <div className="mt-2 space-y-2 animate-in fade-in slide-in-from-top-2 duration-200">
                                 {sortedVersionEntries.map(({ version: ver, gameVersion }) => (
-                                    <div key={ver.id || `${ver.versionNumber}-${ver.fileUrl}-${gameVersion}`} className={`flex items-center justify-between p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 shadow-sm hover:border-slate-300 dark:hover:border-white/20 transition-colors`}>
+                                    <div key={ver.id || `${ver.versionNumber}-${ver.fileName || ver.fileUrl || ''}-${gameVersion}`} className={`flex items-center justify-between p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 shadow-sm hover:border-slate-300 dark:hover:border-white/20 transition-colors`}>
                                         <div className="flex items-center gap-3">
                                             <div className={`w-10 h-10 rounded-lg ${theme.colors.bgSurfaceAlt} border ${theme.colors.border} flex items-center justify-center ${theme.colors.textMuted}`}><FileText className="w-5 h-5" /></div>
                                             <div>

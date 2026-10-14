@@ -3,12 +3,9 @@ package net.modtale.service.admin.review;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Optional;
-import com.mongodb.client.result.UpdateResult;
-import org.bson.Document;
 import net.modtale.model.project.Project;
 import net.modtale.model.project.ProjectStatus;
 import net.modtale.model.project.ProjectVersion;
-import net.modtale.exception.VersionStateConflictException;
 import net.modtale.model.user.User;
 import net.modtale.repository.project.ProjectRepository;
 import net.modtale.repository.user.UserRepository;
@@ -22,12 +19,7 @@ import net.modtale.service.project.query.ProjectService;
 import net.modtale.service.security.issue.SecurityIssueAnalysisService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentCaptor;
-import org.springframework.data.mongodb.core.MongoTemplate;
-import org.springframework.data.mongodb.core.aggregation.Aggregation;
-import org.springframework.data.mongodb.core.aggregation.AggregationResults;
-import org.springframework.data.mongodb.core.query.Query;
-import org.springframework.data.mongodb.core.query.Update;
+import org.springframework.web.server.ResponseStatusException;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -52,7 +44,7 @@ class ProjectReviewDecisionServiceTest {
     private SecurityIssueAnalysisService securityIssueAnalysisService;
     private ProjectVersionAccessService projectVersionAccessService;
     private AdminAuditLogger adminAuditLogger;
-    private MongoTemplate mongoTemplate;
+    private VersionReviewPersistence persistence;
 
     @BeforeEach
     void setUp() {
@@ -65,16 +57,17 @@ class ProjectReviewDecisionServiceTest {
         securityIssueAnalysisService = mock(SecurityIssueAnalysisService.class);
         projectVersionAccessService = mock(ProjectVersionAccessService.class);
         adminAuditLogger = mock(AdminAuditLogger.class);
-        mongoTemplate = mock(MongoTemplate.class);
 
+        persistence=mock(VersionReviewPersistence.class);
+        when(persistence.apply(any(),any())).thenReturn(true);
         ProjectReviewTransitionService transitionService = new ProjectReviewTransitionService(
-                projectRepository,
                 projectService,
                 lifecycleService,
                 mock(ScoringService.class),
                 securityIssueAnalysisService,
                 projectVersionAccessService,
-                mongoTemplate
+                persistence,
+                mock(ProjectReviewPersistence.class)
         );
         ProjectReviewEffectService effectService = new ProjectReviewEffectService(
                 userRepository,
@@ -93,28 +86,18 @@ class ProjectReviewDecisionServiceTest {
         version.setReviewStatus(ProjectVersion.ReviewStatus.PENDING);
         version.setRejectionReason("Old reason");
         version.setScheduledPublishDate("2026-06-09T12:00:00");
-        project.getVersions().add(version);
 
         when(projectService.getRawProjectById("project-1")).thenReturn(project);
-        when(mongoTemplate.aggregate(any(Aggregation.class), eq("projects"), eq(Project.class)))
-                .thenReturn(new AggregationResults<>(java.util.List.of(project), new Document()));
-        when(mongoTemplate.updateFirst(any(Query.class), any(Update.class), eq(Project.class)))
-                .thenReturn(UpdateResult.acknowledged(1, 1L, null));
         when(projectVersionAccessService.requireById(eq(project), eq("version-1"), any())).thenReturn(version);
 
-        service.approveVersion(admin, "project-1", "version-1");
+        service.approveVersion(admin, "project-1", "version-1", VersionReviewSnapshot.token(version));
 
         assertEquals(ProjectVersion.ReviewStatus.APPROVED, version.getReviewStatus());
         assertNull(version.getRejectionReason());
         assertNull(version.getScheduledPublishDate());
         assertNotNull(project.getUpdatedAt());
 
-        verify(securityIssueAnalysisService).pruneApprovedScanResults(project);
-        verify(mongoTemplate).updateFirst(any(Query.class), any(Update.class), eq(Project.class));
-        ArgumentCaptor<Update> updateCaptor = ArgumentCaptor.forClass(Update.class);
-        verify(mongoTemplate).updateFirst(any(Query.class), updateCaptor.capture(), eq(Project.class));
-        org.junit.jupiter.api.Assertions.assertTrue(updateCaptor.getValue().getUpdateObject()
-                .get("$set", Document.class).containsKey("versions.$[review0]"));
+        verify(securityIssueAnalysisService).markIssuesAcceptedForApprovedVersion(version);
         verify(projectService).evictProjectCache(project);
         verify(projectNotificationService).notifyUpdates(project, "1.0.0");
         verify(projectNotificationService).notifyDependents(project, "1.0.0");
@@ -122,41 +105,77 @@ class ProjectReviewDecisionServiceTest {
     }
 
     @Test
-    void repeatedApprovalDoesNotRewriteOrRenotify() {
+    void repeatedApprovalWithCurrentTokenDoesNotRewriteOrRenotify() {
         User admin = user("admin-1", "Ada");
         Project project = project("project-1", "author-1");
         ProjectVersion version = version("version-1", "1.0.0");
         version.setReviewStatus(ProjectVersion.ReviewStatus.APPROVED);
         project.getVersions().add(version);
         when(projectService.getRawProjectById("project-1")).thenReturn(project);
-        when(mongoTemplate.aggregate(any(Aggregation.class), eq("projects"), eq(Project.class)))
-                .thenReturn(new AggregationResults<>(java.util.List.of(project), new Document()));
         when(projectVersionAccessService.requireById(eq(project), eq("version-1"), any())).thenReturn(version);
+        String token = VersionReviewSnapshot.token(version);
 
-        service.approveVersion(admin, "project-1", "version-1");
+        service.approveVersion(admin, "project-1", "version-1", token);
 
+        verify(persistence).capture("project-1", "version-1", token);
+        verify(persistence, never()).apply(any(), any());
         verify(projectRepository, never()).save(any());
-        verify(mongoTemplate, never()).updateFirst(any(Query.class), any(Update.class), eq(Project.class));
+        verify(securityIssueAnalysisService, never()).markIssuesAcceptedForApprovedVersion(any());
         verify(projectNotificationService, never()).notifyUpdates(any(), any());
+        verify(projectNotificationService, never()).notifyDependents(any(), any());
         verify(adminAuditLogger, never()).logAction(any(), any(), any(), any(), any());
     }
 
     @Test
-    void approvalFailsWhenScanOrVersionStateChangedBeforeWrite() {
+    void repeatedApprovalStillRejectsAStaleReviewToken() {
+        User admin = user("admin-1", "Ada");
+        Project project = project("project-1", "author-1");
+        ProjectVersion version = version("version-1", "1.0.0");
+        version.setReviewStatus(ProjectVersion.ReviewStatus.APPROVED);
+        String stale = VersionReviewSnapshot.token(version);
+        version.setChangelog("Changed after inspection");
+        when(projectService.getRawProjectById("project-1")).thenReturn(project);
+        when(projectVersionAccessService.requireById(eq(project), eq("version-1"), any())).thenReturn(version);
+
+        assertThrows(ResponseStatusException.class,
+                () -> service.approveVersion(admin, "project-1", "version-1", stale));
+        verify(persistence, never()).apply(any(), any());
+        verify(projectNotificationService, never()).notifyUpdates(any(), any());
+    }
+
+    @Test
+    void repeatedApprovalStillRequiresAnAuthoritativeCurrentSnapshot() {
+        User admin = user("admin-1", "Ada");
+        Project project = project("project-1", "author-1");
+        ProjectVersion version = version("version-1", "1.0.0");
+        version.setReviewStatus(ProjectVersion.ReviewStatus.APPROVED);
+        when(projectService.getRawProjectById("project-1")).thenReturn(project);
+        when(projectVersionAccessService.requireById(eq(project), eq("version-1"), any())).thenReturn(version);
+        String token = VersionReviewSnapshot.token(version);
+        when(persistence.capture("project-1", "version-1", token)).thenThrow(VersionReviewPersistence.conflict());
+
+        assertThrows(ResponseStatusException.class,
+                () -> service.approveVersion(admin, "project-1", "version-1", token));
+        verify(persistence, never()).apply(any(), any());
+        verify(projectNotificationService, never()).notifyUpdates(any(), any());
+    }
+
+    @Test
+    void approvalFailsWhenTheBoundVersionChangesBeforeWrite() {
         User admin = user("admin-1", "Ada");
         Project project = project("project-1", "author-1");
         ProjectVersion version = version("version-1", "1.0.0");
         version.setReviewStatus(ProjectVersion.ReviewStatus.PENDING);
-        project.getVersions().add(version);
-        when(mongoTemplate.aggregate(any(Aggregation.class), eq("projects"), eq(Project.class)))
-                .thenReturn(new AggregationResults<>(java.util.List.of(project), new Document()));
+        when(projectService.getRawProjectById("project-1")).thenReturn(project);
         when(projectVersionAccessService.requireById(eq(project), eq("version-1"), any())).thenReturn(version);
-        when(mongoTemplate.updateFirst(any(Query.class), any(Update.class), eq(Project.class)))
-                .thenReturn(UpdateResult.acknowledged(0, 0L, null));
+        when(persistence.apply(any(), any())).thenReturn(false);
+        String token = VersionReviewSnapshot.token(version);
 
-        assertThrows(VersionStateConflictException.class,
-                () -> service.approveVersion(admin, "project-1", "version-1"));
+        assertThrows(ResponseStatusException.class,
+                () -> service.approveVersion(admin, "project-1", "version-1", token));
+        verify(projectRepository, never()).save(any());
         verify(projectNotificationService, never()).notifyUpdates(any(), any());
+        verify(adminAuditLogger, never()).logAction(any(), any(), any(), any(), any());
     }
 
     @Test
@@ -172,13 +191,13 @@ class ProjectReviewDecisionServiceTest {
         when(projectVersionAccessService.requireById(eq(project), eq("version-1"), any())).thenReturn(version);
         when(userRepository.findById("author-1")).thenReturn(Optional.of(author));
 
-        service.rejectVersion(admin, "project-1", "version-1", "Missing metadata");
+        service.rejectVersion(admin, "project-1", "version-1", "Missing metadata", VersionReviewSnapshot.token(version));
 
         assertEquals(ProjectVersion.ReviewStatus.REJECTED, version.getReviewStatus());
         assertEquals("Missing metadata", version.getRejectionReason());
         assertNull(version.getScheduledPublishDate());
 
-        verify(projectRepository).save(project);
+        verify(projectService).evictProjectCache(project);
         verify(projectService).evictProjectCache(project);
         verify(notificationService).sendNotifcation(
                 java.util.List.of("author-1"),

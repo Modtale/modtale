@@ -1,0 +1,292 @@
+package net.modtale.controller.admin;
+
+import java.util.*;
+import net.modtale.model.project.*;
+import net.modtale.service.project.query.ProjectService;
+import net.modtale.service.security.scan.WardenClientService;
+import net.modtale.service.storage.StorageService;
+import org.junit.jupiter.api.Test;
+import org.springframework.web.server.ResponseStatusException;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
+
+class ArtifactInspectionControllerTest {
+    private WardenClientService.InspectionWindow window(Fixture f, int start, String policy) {
+        return new WardenClientService.InspectionWindow(f.after.getHash(),"file.json","a".repeat(64),policy,"b".repeat(64),
+                "TEXT_RESOURCE",start,start+2,4,1,true,true,"{}",List.of());
+    }
+    @Test void windowContinuationsBindRepresentationAndReviewState() throws Exception {
+        var f=new Fixture();String token=net.modtale.service.admin.review.ProjectReviewSnapshot.token(f.project);
+        when(f.inspector.inspectWindow(any(),anyString(),anyInt(),anyInt(),anyInt())).thenReturn(window(f,0,"policy"));
+        var first=f.controller.window("project","2","file.json",0,2,0,null,token).getBody();
+        assertEquals(64,first.identity().length());
+        when(f.inspector.inspectWindow(any(),anyString(),anyInt(),anyInt(),anyInt())).thenReturn(window(f,2,"policy"));
+        assertEquals(2,f.controller.window("project","2","file.json",2,2,0,first.identity(),token).getBody().start());
+        when(f.inspector.inspectWindow(any(),anyString(),anyInt(),anyInt(),anyInt())).thenReturn(window(f,2,"changed-policy"));
+        assertEquals(409,assertThrows(ResponseStatusException.class,()->f.controller.window("project","2","file.json",2,2,0,first.identity(),token)).getStatusCode().value());
+        doAnswer(invocation->{f.after.setFindingReviewHead("new-head");return window(f,0,"policy");})
+                .when(f.inspector).inspectWindow(any(),anyString(),anyInt(),anyInt(),anyInt());
+        assertEquals(409,assertThrows(ResponseStatusException.class,()->f.controller.window("project","2","file.json",0,2,0,null,token)).getStatusCode().value());
+    }
+    @Test void inspectionAcceptsCurrentEvidenceKindsButNeverTreatsAudioSummaryAsComplete() throws Exception {
+        var f=new Fixture();String token=net.modtale.service.admin.review.ProjectReviewSnapshot.token(f.project);
+        for(String format:List.of("STRUCTURED_JSON","KOTLIN_MODULE","ICC_PROFILE")) {
+            var response=new WardenClientService.InspectionWindow(f.after.getHash(),"file.json","a".repeat(64),"policy","b".repeat(64),
+                    format,0,2,2,1,true,true,"{}",List.of());
+            when(f.inspector.inspectWindow(any(),anyString(),anyInt(),anyInt(),anyInt())).thenReturn(response);
+            assertEquals(format,f.controller.window("project","2","file.json",0,2,0,null,token).getBody().format());
+        }
+        var audio=new WardenClientService.InspectionWindow(f.after.getHash(),"file.json","a".repeat(64),"policy","b".repeat(64),
+                "AUDIO_SUMMARY",0,2,2,1,true,false,"{}",List.of("Decoded samples unavailable"));
+        when(f.inspector.inspectWindow(any(),anyString(),anyInt(),anyInt(),anyInt())).thenReturn(audio);
+        assertFalse(f.controller.window("project","2","file.json",0,2,0,null,token).getBody().representationComplete());
+        var forged=new WardenClientService.InspectionWindow(f.after.getHash(),"file.json","a".repeat(64),"policy","b".repeat(64),
+                "AUDIO_SUMMARY",0,2,2,1,true,true,"{}",List.of());
+        when(f.inspector.inspectWindow(any(),anyString(),anyInt(),anyInt(),anyInt())).thenReturn(forged);
+        assertEquals(409,assertThrows(ResponseStatusException.class,()->f.controller.window("project","2","file.json",0,2,0,null,token)).getStatusCode().value());
+    }
+    @Test void invalidWindowRequestsStopBeforeArtifactAccessAndMalformedRepliesAreRejected() throws Exception {
+        var f=new Fixture();String token=net.modtale.service.admin.review.ProjectReviewSnapshot.token(f.project);
+        assertEquals(409,assertThrows(ResponseStatusException.class,()->f.controller.window("project","2","file.json",0,2,0,null,"stale")).getStatusCode().value());
+        assertEquals(400,assertThrows(ResponseStatusException.class,()->f.controller.window("project","2","file.json",2,2,0,null,token)).getStatusCode().value());
+        assertEquals(400,assertThrows(ResponseStatusException.class,()->f.controller.window("project","2","file.json",0,32001,0,null,token)).getStatusCode().value());
+        verifyNoInteractions(f.storage,f.inspector);
+        when(f.inspector.inspectWindow(any(),anyString(),anyInt(),anyInt(),anyInt())).thenReturn(window(f,1,"policy"));
+        assertEquals(409,assertThrows(ResponseStatusException.class,()->f.controller.window("project","2","file.json",0,2,0,null,token)).getStatusCode().value());
+    }
+    @Test void windowHttpRouteRequiresTheOpenedReviewAndReturnsBoundedJsonWithoutCaching() throws Exception {
+        var f=new Fixture();String token=net.modtale.service.admin.review.ProjectReviewSnapshot.token(f.project);
+        when(f.inspector.inspectWindow(any(),anyString(),anyInt(),anyInt(),anyInt())).thenReturn(window(f,0,"policy"));
+        var mvc=org.springframework.test.web.servlet.setup.MockMvcBuilders.standaloneSetup(f.controller).build();
+        String route="/api/v1/admin/projects/project/versions/2/file-window";
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(route).param("path","file.json"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isConflict());
+        verifyNoInteractions(f.storage,f.inspector);
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(route).param("path","file.json").header("If-Match",token))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header().string("Cache-Control","no-store"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.content").value("{}"));
+    }
+    @Test void comparesFullCaseSensitiveNestedPathsAndRemovals() {
+        var before=Map.of("nested.jar!/A.class","a", "removed.class","b", "same.json","c");
+        var after=Map.of("nested.jar!/A.class","changed", "nested.jar!/a.class","a", "same.json","c");
+        var diff=ArtifactInspectionController.compare("snapshot","1.0",true,true,List.of("MANIFEST_VERSION"),before,after);
+        assertEquals(1,diff.added()); assertEquals(1,diff.modified()); assertEquals(1,diff.removed()); assertEquals(1,diff.unchanged());
+        assertTrue(diff.contextChanged());
+        assertEquals(List.of("MANIFEST_VERSION"),diff.contextChanges());
+        assertTrue(diff.files().contains(new ArtifactInspectionController.FileChange("nested.jar!/a.class","ADDED")));
+    }
+    @Test void refusesStoredArtifactMismatchBeforeRequestingInspection() {
+        var projects=mock(ProjectService.class); var storage=mock(StorageService.class); var inspector=mock(WardenClientService.class);
+        var project=new Project();var version=new ProjectVersion();version.setVersionNumber("1.0");version.setHash("a".repeat(64));
+        version.setFileUrl("stored.zip");project.setVersions(List.of(version));
+        when(projects.getRawProjectById("project")).thenReturn(project);
+        when(storage.downloadBounded("stored.zip",StorageService.MAX_REVIEW_ARTIFACT_BYTES)).thenReturn("different".getBytes());
+        var controller=new ArtifactInspectionController(projects,storage,inspector);
+        assertEquals(409,assertThrows(ResponseStatusException.class,()->controller.structure("project","1.0",net.modtale.service.admin.review.ProjectReviewSnapshot.token(project))).getStatusCode().value());
+        verifyNoInteractions(inspector);
+    }
+    @Test void everyInspectionRouteReadsOnlyWithinTheArtifactLimit() throws Exception {
+        var f=new Fixture();
+        String token=net.modtale.service.admin.review.ProjectReviewSnapshot.token(f.project);
+        when(f.inspector.inspectWindow(any(),anyString(),anyInt(),anyInt(),anyInt())).thenReturn(window(f,0,"policy"));
+        f.controller.structure("project","2",token);
+        f.controller.file("project","2","file.json",token);
+        f.controller.window("project","2","file.json",0,2,0,null,token);
+        verify(f.storage,times(3)).downloadBounded("after.zip",StorageService.MAX_REVIEW_ARTIFACT_BYTES);
+        verify(f.storage,never()).download(anyString());
+    }
+    private static final class Fixture {
+        final ProjectService projects=mock(ProjectService.class);
+        final StorageService storage=mock(StorageService.class);
+        final WardenClientService inspector=mock(WardenClientService.class);
+        final Project project=new Project();
+        final ProjectVersion before=new ProjectVersion(), after=new ProjectVersion();
+        final byte[] bytes="fixture artifact".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        final ArtifactInspectionController controller=new ArtifactInspectionController(projects,storage,inspector);
+        final WardenClientService.InspectionResponse response;
+        Fixture() throws Exception {
+            String hash=HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(bytes));
+            before.setId("before");before.setVersionNumber("1");before.setHash(hash);before.setFileUrl("before.zip");
+            before.setReviewStatus(ProjectVersion.ReviewStatus.APPROVED);before.setSecurityApprovedAt(1);
+            before.setApprovedSecurityContextSha256(net.modtale.service.security.scan.ArtifactReviewContext.fingerprint(before));
+            after.setId("after");after.setVersionNumber("2");after.setHash(hash);after.setFileUrl("after.zip");
+            project.setId("project");project.setVersions(List.of(before,after));
+            response=new WardenClientService.InspectionResponse(hash,List.of("file.json"),"{}","TEXT",Map.of("file.json","a".repeat(64)),"policy");
+            when(projects.getRawProjectById("project")).thenReturn(project);
+            when(storage.downloadBounded(anyString(),eq(StorageService.MAX_REVIEW_ARTIFACT_BYTES))).thenReturn(bytes);
+            when(inspector.inspectFile(any(),anyString(),nullable(String.class))).thenReturn(response);
+        }
+    }
+    @Test void comparisonRejectsReviewAndContextChangesDuringInspection() throws Exception {
+        for (int scenario=0;scenario<4;scenario++) {
+            var f=new Fixture();String token=net.modtale.service.admin.review.ProjectReviewSnapshot.token(f.project);final int change=scenario;
+            doAnswer(invocation->{
+                switch(change) {
+                    case 0 -> f.before.setReviewStatus(ProjectVersion.ReviewStatus.PENDING);
+                    case 1 -> f.before.setFindingReviewHead("new-head");
+                    case 2 -> f.after.setGameVersions(List.of("changed-runtime"));
+                    case 3 -> f.project.setVersions(List.of(f.after));
+                }
+                return f.response;
+            }).when(f.inspector).inspectFile(any(),anyString(),nullable(String.class));
+            assertEquals(409,assertThrows(ResponseStatusException.class,()->f.controller.changes("project","2",token)).getStatusCode().value());
+        }
+    }
+    @Test void fileAndStructureRejectChangesWhileArtifactIsInspected() throws Exception {
+        for(boolean content:new boolean[]{false,true}) {
+            var f=new Fixture();String token=net.modtale.service.admin.review.ProjectReviewSnapshot.token(f.project);
+            doAnswer(invocation->{f.after.setFindingReviewHead("new-review");return f.response;})
+                    .when(f.inspector).inspectFile(any(),anyString(),nullable(String.class));
+            assertEquals(409,assertThrows(ResponseStatusException.class,()->{
+                if(content)f.controller.file("project","2","file.json",token);else f.controller.structure("project","2",token);
+            }).getStatusCode().value());
+        }
+    }
+    @Test void ambiguousVersionNamesNeverSelectAnArbitraryArtifact() throws Exception {
+        var f=new Fixture();f.before.setVersionNumber("2");String token=net.modtale.service.admin.review.ProjectReviewSnapshot.token(f.project);
+        assertEquals(409,assertThrows(ResponseStatusException.class,()->f.controller.changes("project","2",token)).getStatusCode().value());
+        assertEquals(409,assertThrows(ResponseStatusException.class,()->f.controller.structure("project","2",token)).getStatusCode().value());
+        verifyNoInteractions(f.storage,f.inspector);
+    }
+    @Test void unchangedInspectionUsesOneCapturedSelectionAndIgnoresDownloadCounters() throws Exception {
+        var f=new Fixture();String token=net.modtale.service.admin.review.ProjectReviewSnapshot.token(f.project);
+        doAnswer(invocation->{f.after.setDownloadCount(2);return f.response;})
+                .when(f.inspector).inspectFile(any(),anyString(),nullable(String.class));
+        var result=f.controller.changes("project","2",token).getBody();
+        assertEquals("1",result.baselineVersion());assertEquals(1,result.unchanged());assertFalse(result.contextComparable());
+        verify(f.projects,times(2)).getRawProjectById("project");
+        verify(f.storage).downloadBounded("before.zip",StorageService.MAX_REVIEW_ARTIFACT_BYTES);
+        verify(f.storage).downloadBounded("after.zip",StorageService.MAX_REVIEW_ARTIFACT_BYTES);
+        verify(f.storage,never()).download(anyString());
+    }
+    @Test void approvedBoundManifestAvoidsReinspectingTheBaselineArtifact() throws Exception {
+        var f=new Fixture();String policy="warden-3.0.0:"+"f".repeat(64);
+        f.before.setSecurityApprovedAt(System.currentTimeMillis()-1000);
+        var entries=Map.of("file.json","a".repeat(64));
+        f.before.setSecurityApprovalProjectId("project");
+        f.before.setApprovedReviewOrigins(Map.of());
+        f.before.setApprovedSecurityEvidence(new ScanResult.SecurityEvidence(policy,f.before.getHash(),
+                SecurityManifest.identity(entries),true,false,"COMPLETED",entries));
+        assertNotNull(net.modtale.service.security.scan.ArtifactReviewLineage.extend(f.project,f.before));
+        var response=new WardenClientService.InspectionResponse(f.after.getHash(),List.of("file.json"),"{}","TEXT_RESOURCE",entries,policy);
+        when(f.inspector.inspectFile(any(),anyString(),nullable(String.class))).thenReturn(response);
+        String token=net.modtale.service.admin.review.ProjectReviewSnapshot.token(f.project);
+        var comparison=f.controller.changes("project","2",token).getBody();
+        assertEquals(1,comparison.unchanged());
+        assertTrue(comparison.contextComparable());
+        verify(f.inspector,times(1)).inspectFile(any(),anyString(),nullable(String.class));
+        verify(f.storage).downloadBounded("before.zip",StorageService.MAX_REVIEW_ARTIFACT_BYTES);
+        verify(f.storage).downloadBounded("after.zip",StorageService.MAX_REVIEW_ARTIFACT_BYTES);
+    }
+    @Test void prefersAnOlderCurrentApprovalOverANewerUnverifiableComparisonBaseline() throws Exception {
+        var f=new Fixture();String policy="warden-3.0.0:"+"f".repeat(64);
+        var entries=Map.of("file.json","a".repeat(64));
+        f.before.setSecurityApprovedAt(System.currentTimeMillis()-2000);
+        f.before.setSecurityApprovalProjectId("project");f.before.setApprovedReviewOrigins(Map.of());
+        f.before.setApprovedSecurityEvidence(new ScanResult.SecurityEvidence(policy,f.before.getHash(),
+                SecurityManifest.identity(entries),true,false,"COMPLETED",entries));
+        var stale=new ProjectVersion();stale.setId("stale");stale.setVersionNumber("1.5");
+        stale.setReviewStatus(ProjectVersion.ReviewStatus.APPROVED);stale.setSecurityApprovedAt(System.currentTimeMillis()-1000);
+        stale.setHash(f.before.getHash());stale.setFileUrl("stale.zip");
+        f.project.setVersions(List.of(f.before,stale,f.after));
+        when(f.inspector.inspectFile(any(),anyString(),nullable(String.class))).thenReturn(
+                new WardenClientService.InspectionResponse(f.after.getHash(),List.of("file.json"),"{}","TEXT_RESOURCE",entries,policy));
+        var changes=f.controller.changes("project","2",net.modtale.service.admin.review.ProjectReviewSnapshot.token(f.project)).getBody();
+        assertEquals("1",changes.baselineVersion());
+        assertTrue(changes.contextComparable());
+        verify(f.inspector,times(1)).inspectFile(any(),anyString(),nullable(String.class));
+        verify(f.storage,never()).downloadBounded("stale.zip",StorageService.MAX_REVIEW_ARTIFACT_BYTES);
+    }
+    @Test void verifiedComparisonNamesChangedRuntimeContextWithoutGrantingReuse() throws Exception {
+        var f=new Fixture();String policy="warden-3.0.0:"+"f".repeat(64);
+        f.before.setSecurityApprovedAt(System.currentTimeMillis()-1000);
+        var entries=Map.of("file.json","a".repeat(64));
+        f.before.setSecurityApprovalProjectId("project");f.before.setApprovedReviewOrigins(Map.of());
+        f.before.setApprovedSecurityEvidence(new ScanResult.SecurityEvidence(policy,f.before.getHash(),
+                SecurityManifest.identity(entries),true,false,"COMPLETED",entries));
+        f.after.setGameVersions(List.of("new-runtime"));
+        f.after.setManifestVersion("2");
+        when(f.inspector.inspectFile(any(),anyString(),nullable(String.class))).thenReturn(
+                new WardenClientService.InspectionResponse(f.after.getHash(),List.of("file.json"),"{}","TEXT_RESOURCE",entries,policy));
+        var changes=f.controller.changes("project","2",net.modtale.service.admin.review.ProjectReviewSnapshot.token(f.project)).getBody();
+        assertTrue(changes.contextComparable());
+        assertTrue(changes.contextChanged());
+        assertEquals(List.of("GAME_VERSIONS","MANIFEST_VERSION"),changes.contextChanges());
+        assertEquals(1,changes.unchanged());
+    }
+    @Test void contextChangesUseTheSameOrderIndependentGameVersionMeaningAsTheApprovalFingerprint() {
+        var before=new ProjectVersion();before.setGameVersions(List.of("game-b","game-a"));
+        var after=new ProjectVersion();after.setGameVersions(List.of("game-a","game-b"));
+        assertEquals(net.modtale.service.security.scan.ArtifactReviewContext.fingerprint(before),
+                net.modtale.service.security.scan.ArtifactReviewContext.fingerprint(after));
+        assertTrue(net.modtale.service.security.scan.ArtifactReviewContext.changedFields(before,after).isEmpty());
+        var first=ProjectDependency.modtale("first","First","1",ProjectDependency.DependencyType.REQUIRED);
+        var second=ProjectDependency.modtale("second","Second","1",ProjectDependency.DependencyType.OPTIONAL);
+        before.setDependencies(List.of(first,second));after.setDependencies(List.of(second,first));
+        assertTrue(net.modtale.service.security.scan.ArtifactReviewContext.changedFields(before,after).isEmpty());
+        var upgraded=ProjectDependency.modtale("second","Second","2",ProjectDependency.DependencyType.OPTIONAL);
+        after.setDependencies(List.of(upgraded,first));
+        assertEquals(List.of("DEPENDENCIES"),net.modtale.service.security.scan.ArtifactReviewContext.changedFields(before,after));
+        after.setDependencies(List.of(second,first));
+        before.setIncompatibleProjectIds(List.of("one","two"));after.setIncompatibleProjectIds(List.of("two","one"));
+        assertEquals(net.modtale.service.security.scan.ArtifactReviewContext.fingerprint(before),
+                net.modtale.service.security.scan.ArtifactReviewContext.fingerprint(after));
+        after.setIncompatibleProjectIds(List.of("two","other"));
+        assertEquals(List.of("INCOMPATIBLE_PROJECTS"),
+                net.modtale.service.security.scan.ArtifactReviewContext.changedFields(before,after));
+        after.setIncompatibleProjectIds(java.util.Arrays.asList("two",null));
+        assertNull(net.modtale.service.security.scan.ArtifactReviewContext.fingerprint(after));
+    }
+    @Test void changedOrUnaccountedApprovedManifestFallsBackToLiveInspection() throws Exception {
+        for(String scenario:List.of("policy","digest","revoked","expired")) {
+            var f=new Fixture();String policy="warden-3.0.0:"+"f".repeat(64);
+            f.before.setSecurityApprovedAt(System.currentTimeMillis()-1000);
+            var entries=Map.of("file.json","a".repeat(64));
+            f.before.setSecurityApprovalProjectId("project");f.before.setApprovedReviewOrigins(Map.of());
+            f.before.setApprovedSecurityEvidence(new ScanResult.SecurityEvidence(
+                    scenario.equals("policy") ? "warden-3.0.0:"+"e".repeat(64) : policy,
+                    f.before.getHash(),scenario.equals("digest") ? "b".repeat(64) : SecurityManifest.identity(entries),
+                    true,false,"COMPLETED",entries));
+            if(scenario.equals("revoked")) f.before.setFindingReviewHead("changed");
+            if(scenario.equals("expired")) f.before.setSecurityApprovedAt(1);
+            when(f.inspector.inspectFile(any(),anyString(),nullable(String.class))).thenReturn(
+                    new WardenClientService.InspectionResponse(f.after.getHash(),List.of("file.json"),"{}","TEXT_RESOURCE",entries,policy));
+            String token=net.modtale.service.admin.review.ProjectReviewSnapshot.token(f.project);
+            var comparison=f.controller.changes("project","2",token).getBody();
+            assertEquals(1,comparison.unchanged(),scenario);
+            assertFalse(comparison.contextComparable(),scenario);
+            verify(f.inspector,times(2)).inspectFile(any(),anyString(),nullable(String.class));
+        }
+    }
+    @Test void editedBaselineContextCannotBePresentedAsComparableApprovedContext() throws Exception {
+        var f=new Fixture();f.before.setGameVersions(List.of("edited-since-approval"));String token=net.modtale.service.admin.review.ProjectReviewSnapshot.token(f.project);
+        assertFalse(f.controller.changes("project","2",token).getBody().contextComparable());
+    }
+
+    @Test void comparisonTokenBindsLaterFileAndStructureReadsBeforeAnyDownload() throws Exception {
+        var f=new Fixture();String token=net.modtale.service.admin.review.ProjectReviewSnapshot.token(f.project);
+        assertEquals(token,f.controller.changes("project","2",token).getBody().reviewToken());
+        clearInvocations(f.storage,f.inspector);
+        f.before.setFindingReviewHead("revoked-after-comparison");
+        assertEquals(409,assertThrows(ResponseStatusException.class,()->f.controller.file("project","1","file.json",token)).getStatusCode().value());
+        assertEquals(409,assertThrows(ResponseStatusException.class,()->f.controller.structure("project","2",token)).getStatusCode().value());
+        verifyNoInteractions(f.storage,f.inspector);
+    }
+    @Test void httpInspectionRequiresTheOpenedProjectTokenOnEveryRoute() throws Exception {
+        var f=new Fixture();String token=net.modtale.service.admin.review.ProjectReviewSnapshot.token(f.project);
+        var mvc=org.springframework.test.web.servlet.setup.MockMvcBuilders.standaloneSetup(f.controller).build();
+        for(String route:List.of("changes","structure","file")) {
+            var path="/api/v1/admin/projects/project/versions/2/"+route;
+            mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(path).param("path","file.json"))
+                    .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isConflict());
+            mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(path).param("path","file.json").header("If-Match","stale"))
+                    .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isConflict());
+            verifyNoInteractions(f.storage,f.inspector);
+            mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(path).param("path","file.json").header("If-Match",token))
+                    .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
+                    .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header().string("Cache-Control","no-store"));
+            clearInvocations(f.storage,f.inspector);
+        }
+    }
+}

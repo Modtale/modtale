@@ -33,7 +33,7 @@ import static org.mockito.Mockito.when;
 class TeamServiceTest {
 
     private TeamService service;
-    private net.modtale.service.project.team.ProjectTeamPersistence reviewPersistence;
+    private net.modtale.service.admin.review.ProjectReviewPersistence reviewPersistence;
     private ProjectRepository projectRepository;
     private UserRepository userRepository;
     private ProjectService projectService;
@@ -46,9 +46,9 @@ class TeamServiceTest {
     @BeforeEach
     void setUp() {
         projectRepository = mock(ProjectRepository.class);
-        reviewPersistence = mock(net.modtale.service.project.team.ProjectTeamPersistence.class);
+        reviewPersistence = mock(net.modtale.service.admin.review.ProjectReviewPersistence.class);
         when(reviewPersistence.capture(anyString(), anyString())).thenAnswer(invocation ->
-                new net.modtale.service.project.team.ProjectTeamPersistence.Snapshot(new org.bson.Document(), projectService.getRawProjectById(invocation.getArgument(0))));
+                new net.modtale.service.admin.review.ProjectReviewPersistence.Snapshot(new org.bson.Document(), projectService.getRawProjectById(invocation.getArgument(0))));
         when(reviewPersistence.applyTeam(any())).thenReturn(true);
         userRepository = mock(UserRepository.class);
         projectService = mock(ProjectService.class);

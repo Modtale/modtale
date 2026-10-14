@@ -36,6 +36,10 @@ final class ModpackArchiveValidator {
     }
 
     static void validate(byte[] archive, boolean requireConfigOwners) throws IOException {
+        validatedLockfile(archive, requireConfigOwners);
+    }
+
+    static JsonNode validatedLockfile(byte[] archive, boolean requireConfigOwners) throws IOException {
         if (archive == null || archive.length == 0) {
             throw new IOException("Modpack archive is empty.");
         }
@@ -93,10 +97,10 @@ final class ModpackArchiveValidator {
         if (!entries.keySet().containsAll(METADATA_FILES)) {
             throw new IOException("Modpack archive is missing required metadata files.");
         }
-        validateMetadata(metadata, entries, requireConfigOwners);
+        return validateMetadata(metadata, entries, requireConfigOwners);
     }
 
-    private static void validateMetadata(
+    private static JsonNode validateMetadata(
             Map<String, byte[]> metadata,
             Map<String, EntryFingerprint> archiveEntries,
             boolean requireConfigOwners
@@ -195,6 +199,7 @@ final class ModpackArchiveValidator {
         if (!archiveEntries.keySet().equals(expectedFiles)) {
             throw new IOException("Modpack archive contains files that are not declared in the lockfile.");
         }
+        return lock;
     }
 
     private static void validateCurseForgeReference(JsonNode item) throws IOException {

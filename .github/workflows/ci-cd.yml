@@ -1,4 +1,4 @@
-name: Modtale CI/CD 
+name: Modtale CI/CD
 
 on:
   push:
@@ -105,7 +105,7 @@ jobs:
           fi
           echo "GIT_BRANCH_NAME=$BRANCH_NAME" >> $GITHUB_ENV
           echo "BRANCH_SLUG=$BRANCH_SLUG" >> $GITHUB_ENV
-          
+
           if [ "$BRANCH_NAME" = "main" ]; then
             echo "ENV_TYPE=prod" >> $GITHUB_ENV
             echo "BUILD_SERVICE_ACCOUNT=${{ vars.GCP_BUILD_SERVICE_ACCOUNT }}" >> $GITHUB_ENV
@@ -123,6 +123,7 @@ jobs:
             echo "FRONTEND_DOMAIN=https://modtale.net" >> $GITHUB_ENV
             echo "TAG=latest" >> $GITHUB_ENV
             echo "R2_BUCKET_NAME=modtale-binaries" >> $GITHUB_ENV
+            echo "R2_ARTIFACT_BUCKET_NAME=${{ vars.GCP_PRIVATE_R2_BUCKET_NAME }}" >> $GITHUB_ENV
             echo "R2_ACCESS_KEY_SECRET_NAME=R2_ACCESS_KEY" >> $GITHUB_ENV
             echo "R2_SECRET_KEY_SECRET_NAME=R2_SECRET_KEY" >> $GITHUB_ENV
             echo "R2_ENDPOINT_SECRET_NAME=R2_ENDPOINT" >> $GITHUB_ENV
@@ -130,7 +131,7 @@ jobs:
             echo "WARDEN_ENABLED=true" >> $GITHUB_ENV
             echo "OAUTH_ENABLED=true" >> $GITHUB_ENV
             echo "WARDEN_SECRET_NAME=WARDEN_API_KEY" >> $GITHUB_ENV
-          
+
           elif [ "$BRANCH_NAME" = "develop" ]; then
             echo "ENV_TYPE=dev" >> $GITHUB_ENV
             echo "BUILD_SERVICE_ACCOUNT=${{ vars.GCP_BUILD_SERVICE_ACCOUNT }}" >> $GITHUB_ENV
@@ -148,6 +149,7 @@ jobs:
             echo "FRONTEND_DOMAIN=https://dev.modtale.net" >> $GITHUB_ENV
             echo "TAG=dev" >> $GITHUB_ENV
             echo "R2_BUCKET_NAME=modtale-binaries" >> $GITHUB_ENV
+            echo "R2_ARTIFACT_BUCKET_NAME=${{ vars.GCP_PRIVATE_R2_BUCKET_NAME }}" >> $GITHUB_ENV
             echo "R2_ACCESS_KEY_SECRET_NAME=R2_ACCESS_KEY" >> $GITHUB_ENV
             echo "R2_SECRET_KEY_SECRET_NAME=R2_SECRET_KEY" >> $GITHUB_ENV
             echo "R2_ENDPOINT_SECRET_NAME=R2_ENDPOINT" >> $GITHUB_ENV
@@ -155,7 +157,7 @@ jobs:
             echo "WARDEN_ENABLED=true" >> $GITHUB_ENV
             echo "OAUTH_ENABLED=true" >> $GITHUB_ENV
             echo "WARDEN_SECRET_NAME=WARDEN_API_KEY" >> $GITHUB_ENV
-          
+
           else
             SLUG="$BRANCH_SLUG"
             BRANCH_PREVIEW_SOURCE_R2_BUCKET_NAME="${{ vars.GCP_BRANCH_PREVIEW_SOURCE_R2_BUCKET_NAME }}"
@@ -203,6 +205,7 @@ jobs:
             echo "MONGODB_SECRET_NAME=BRANCH_PREVIEW_MONGODB_URI" >> $GITHUB_ENV
             echo "TAG=$SLUG" >> $GITHUB_ENV
             echo "R2_BUCKET_NAME=modtale-branch-$SLUG" >> $GITHUB_ENV
+            echo "R2_ARTIFACT_BUCKET_NAME=" >> $GITHUB_ENV
             echo "R2_ACCESS_KEY_SECRET_NAME=branch-preview-$SLUG-r2-access-key" >> $GITHUB_ENV
             echo "R2_SECRET_KEY_SECRET_NAME=branch-preview-$SLUG-r2-secret-key" >> $GITHUB_ENV
             echo "R2_ENDPOINT_SECRET_NAME=branch-preview-$SLUG-r2-endpoint" >> $GITHUB_ENV
@@ -511,7 +514,7 @@ jobs:
           else
             echo "Reusing the existing backend image for a configuration-only rollout."
           fi
-          
+
           ARGS=(
             "--image" "gcr.io/$PROJECT_ID/modtale-backend:${{ env.TAG }}"
             "--region" "$REGION"
@@ -531,8 +534,16 @@ jobs:
             "--update-env-vars" "FRONTEND_URL=${FRONTEND_DOMAIN:-placeholder}"
             "--update-env-vars" "BACKEND_URL=${BACKEND_DOMAIN:-placeholder}"
             "--update-env-vars" "R2_BUCKET_NAME=${{ env.R2_BUCKET_NAME }}"
+            "--update-env-vars" "R2_ARTIFACT_BUCKET_NAME=${{ env.R2_ARTIFACT_BUCKET_NAME }}"
             "--update-env-vars" "R2_PUBLIC_DOMAIN=${{ env.R2_PUBLIC_DOMAIN }}"
           )
+
+          if [ "${{ env.ENV_TYPE }}" != "preview" ] && [ -n "${{ env.R2_PUBLIC_DOMAIN }}" ]; then
+            if [ -z "${{ env.R2_ARTIFACT_BUCKET_NAME }}" ] || [ "${{ env.R2_ARTIFACT_BUCKET_NAME }}" = "${{ env.R2_BUCKET_NAME }}" ]; then
+              echo "::error::A separate private R2 artifact bucket is required before this backend can deploy."
+              exit 1
+            fi
+          fi
 
           R2_ACCESS_KEY_SECRET_VERSION="${R2_ACCESS_KEY_SECRET_VERSION:-latest}"
           R2_SECRET_KEY_SECRET_VERSION="${R2_SECRET_KEY_SECRET_VERSION:-latest}"
@@ -857,7 +868,7 @@ jobs:
           else
             PUBLIC_BACKEND_URL=$B_URL
           fi
-          
+
           if [ "$MODTALE_SECRET_BUNDLES_ENABLED" = "true" ]; then
             python3 .github/scripts/secret_bundle_ci.py deploy -- \
               --update-env-vars "FRONTEND_URL=$FINAL_FRONTEND_URL,BACKEND_URL=$PUBLIC_BACKEND_URL" >/dev/null
@@ -953,7 +964,7 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Component | Status | Target Service | Service URL |" >> $GITHUB_STEP_SUMMARY
           echo "|---|---|---|---|" >> $GITHUB_STEP_SUMMARY
-          
+
           if [ -n "$PUBLIC_API_URL" ]; then
             echo "| **Backend API** | $BACKEND_STATUS | \`${{ env.BACKEND_SERVICE }}\` | [API Endpoint]($PUBLIC_API_URL) |" >> $GITHUB_STEP_SUMMARY
           elif [ -n "$B_URL" ]; then
@@ -961,13 +972,13 @@ jobs:
           else
             echo "| **Backend API** | $BACKEND_STATUS | \`${{ env.BACKEND_SERVICE }}\` | *N/A* |" >> $GITHUB_STEP_SUMMARY
           fi
-          
+
           if [ -n "$F_URL" ]; then
             echo "| **Frontend App** | $FRONTEND_STATUS | \`${{ env.FRONTEND_SERVICE }}\` | [App URL]($F_URL) |" >> $GITHUB_STEP_SUMMARY
           else
             echo "| **Frontend App** | $FRONTEND_STATUS | \`${{ env.FRONTEND_SERVICE }}\` | *N/A* |" >> $GITHUB_STEP_SUMMARY
           fi
-          
+
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "---" >> $GITHUB_STEP_SUMMARY
           echo "*View deployment details in [Google Cloud Console](https://console.cloud.google.com/run?project=${{ env.PROJECT_ID }}).* " >> $GITHUB_STEP_SUMMARY

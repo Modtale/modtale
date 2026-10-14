@@ -4,18 +4,22 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import net.modtale.model.project.Project;
 import net.modtale.model.project.ProjectDependency;
+import net.modtale.model.project.ProjectStatus;
 import net.modtale.model.project.ProjectVersion;
 import net.modtale.service.project.query.ProjectService;
+import net.modtale.service.security.access.AccessControlService;
 import org.springframework.web.multipart.MultipartFile;
 
 final class DownloadArchiveSupport {
 
     private final ProjectService projectService;
     private final StorageService storageService;
+    private final AccessControlService accessControlService;
 
-    DownloadArchiveSupport(ProjectService projectService, StorageService storageService) {
+    DownloadArchiveSupport(ProjectService projectService, StorageService storageService, AccessControlService accessControlService) {
         this.projectService = projectService;
         this.storageService = storageService;
+        this.accessControlService = accessControlService;
     }
 
     ResolvedDependency resolveDependency(ProjectDependency dependency) {
@@ -24,12 +28,13 @@ final class DownloadArchiveSupport {
         }
 
         Project project = projectService.getRawProjectById(dependency.getProjectId());
-        if (project == null) {
+        if (project == null || project.getDeletedAt() != null || project.getStatus() == ProjectStatus.DELETED
+                || !accessControlService.isPubliclyReadable(project)) {
             return null;
         }
 
         ProjectVersion version = findVersion(project, dependency.getVersionNumber());
-        if (version == null) {
+        if (version == null || version.getReviewStatus() != ProjectVersion.ReviewStatus.APPROVED) {
             return null;
         }
 
@@ -38,6 +43,15 @@ final class DownloadArchiveSupport {
 
     byte[] download(String fileUrl) {
         return storageService.download(fileUrl);
+    }
+
+    byte[] downloadBounded(String fileUrl) {
+        return storageService.downloadBounded(fileUrl, StorageService.MAX_REVIEW_ARTIFACT_BYTES);
+    }
+
+    byte[] downloadApproved(ProjectVersion version) throws IOException {
+        return ApprovedArtifactBytes.requireExact(version,
+                storageService.downloadBounded(version.getFileUrl(), StorageService.MAX_REVIEW_ARTIFACT_BYTES));
     }
 
     String upload(MultipartFile file, String directory) {

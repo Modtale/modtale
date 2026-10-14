@@ -15,7 +15,7 @@ public class ProjectVersionDTO {
     private String id;
     private String versionNumber;
     private List<String> gameVersions;
-    private String fileUrl;
+    private String fileName;
     private int downloadCount;
     private String releaseDate;
     private String changelog;
@@ -29,8 +29,8 @@ public class ProjectVersionDTO {
     public void setVersionNumber(String versionNumber) { this.versionNumber = versionNumber; }
     public List<String> getGameVersions() { return gameVersions; }
     public void setGameVersions(List<String> gameVersions) { this.gameVersions = gameVersions; }
-    public String getFileUrl() { return fileUrl; }
-    public void setFileUrl(String fileUrl) { this.fileUrl = fileUrl; }
+    public String getFileName() { return fileName; }
+    public void setFileName(String fileName) { this.fileName = fileName; }
     public int getDownloadCount() { return downloadCount; }
     public void setDownloadCount(int downloadCount) { this.downloadCount = downloadCount; }
     public String getReleaseDate() { return releaseDate; }

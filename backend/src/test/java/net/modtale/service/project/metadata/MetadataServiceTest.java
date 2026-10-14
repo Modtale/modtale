@@ -20,6 +20,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.*;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -28,6 +29,7 @@ import static org.mockito.Mockito.when;
 class MetadataServiceTest {
 
     private MetadataService service;
+    private net.modtale.service.admin.review.ProjectReviewPersistence reviewPersistence;
     private ProjectRepository projectRepository;
     private ProjectService projectService;
     private ValidationService validationService;
@@ -38,6 +40,11 @@ class MetadataServiceTest {
     @BeforeEach
     void setUp() {
         projectRepository = mock(ProjectRepository.class);
+        reviewPersistence = mock(net.modtale.service.admin.review.ProjectReviewPersistence.class);
+        when(reviewPersistence.capture(anyString(), anyString())).thenAnswer(invocation ->
+                new net.modtale.service.admin.review.ProjectReviewPersistence.Snapshot(new org.bson.Document(),
+                        projectService.getRawProjectById(invocation.getArgument(0))));
+        when(reviewPersistence.applyPresentation(any(), anyBoolean())).thenReturn(true);
         projectService = mock(ProjectService.class);
         validationService = mock(ValidationService.class);
         accessControlService = mock(AccessControlService.class);
@@ -46,6 +53,7 @@ class MetadataServiceTest {
 
         service = new MetadataService(
                 projectRepository,
+                reviewPersistence,
                 projectService,
                 validationService,
                 projectAccessService,
@@ -91,8 +99,14 @@ class MetadataServiceTest {
         assertEquals("MIT", existing.getLicense());
         assertFalse(existing.isCustomLicenseOpenSource());
         verify(validationService).validateSlug("new-slug");
-        verify(projectRepository).save(existing);
-        verify(projectService).evictProjectDetailsCaches(org.mockito.ArgumentMatchers.argThat(projects -> projects.size() == 2 && projects.contains(existing)), org.mockito.ArgumentMatchers.eq(List.of()));
+        verify(reviewPersistence).applyPresentation(any(), eq(false));
+        verify(projectRepository, never()).save(any(Project.class));
+        var order = inOrder(reviewPersistence, projectService);
+        order.verify(reviewPersistence).applyPresentation(any(), eq(false));
+        order.verify(projectService).evictProjectDetailsCaches(argThat(projects -> projects.size() == 2
+                && projects.stream().anyMatch(project -> "sky-tools".equals(project.getSlug())
+                        && project.getClassification() == ProjectClassification.DATA)
+                && projects.contains(existing)), eq(List.of()));
     }
 
     @Test
@@ -119,7 +133,7 @@ class MetadataServiceTest {
 
         assertEquals("Sky Public License", existing.getLicense());
         assertTrue(existing.isCustomLicenseOpenSource());
-        verify(projectRepository).save(existing);
+        verify(reviewPersistence).applyPresentation(any(), eq(false));
     }
 
     @Test
@@ -164,8 +178,9 @@ class MetadataServiceTest {
 
         assertThrows(InvalidProjectRequestException.class, () -> service.updateMetadata("project-1", updated, user));
 
-        verify(projectRepository, never()).save(existing);
+        verify(reviewPersistence, never()).applyPresentation(any(), anyBoolean());
         verify(projectService, never()).evictProjectCache(existing);
+        verify(projectService, never()).evictProjectDetailsCaches(any(), any());
         assertEquals("owned-image.png", existing.getImageUrl());
     }
 
@@ -184,8 +199,33 @@ class MetadataServiceTest {
 
         service.updateMetadata("project-1", updated, user);
 
-        verify(projectRepository).save(existing);
+        verify(reviewPersistence).applyPresentation(any(), eq(false));
         assertEquals("owned-image.png", existing.getImageUrl());
+    }
+
+    @Test
+    void metadataConflictDoesNotInvalidateOldOrNewRoutesOrSaveTheSnapshot() {
+        var existing = new Project();
+        existing.setId("project-1");
+        existing.setTitle("Old title");
+        existing.setSlug("old-slug");
+        existing.setClassification(ProjectClassification.DATA);
+        var updated = new Project();
+        updated.setTitle("New title");
+        updated.setSlug("new-slug");
+        var user = new User();
+        user.setId("user-1");
+        when(projectService.getRawProjectById("project-1")).thenReturn(existing);
+        when(accessControlService.hasProjectPermission(existing, user, "PROJECT_EDIT_METADATA")).thenReturn(true);
+        when(reviewPersistence.applyPresentation(any(), eq(false))).thenReturn(false);
+
+        assertThrows(org.springframework.web.server.ResponseStatusException.class,
+                () -> service.updateMetadata("project-1", updated, user));
+
+        verify(reviewPersistence).applyPresentation(any(), eq(false));
+        verify(projectService, never()).evictProjectDetailsCaches(any(), any());
+        verify(projectService, never()).evictProjectCache(any());
+        verify(projectRepository, never()).save(any(Project.class));
     }
 
 }

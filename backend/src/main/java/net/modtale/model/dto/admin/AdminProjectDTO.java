@@ -44,5 +44,6 @@ public record AdminProjectDTO(
         List<Project.ProjectRole> projectRoles,
         List<Project.ProjectMember> teamMembers,
         List<Project.ProjectMember> teamInvites,
-        List<AdminProjectVersionSummaryDTO> versions
+        List<AdminProjectVersionSummaryDTO> versions,
+        String reviewToken
 ) {}

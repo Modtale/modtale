@@ -8,6 +8,8 @@ import net.modtale.model.project.Project;
 import net.modtale.model.project.ProjectStatus;
 import net.modtale.model.project.ProjectVersion;
 import net.modtale.repository.project.ProjectRepository;
+import net.modtale.service.admin.review.ProjectReviewPersistence;
+import net.modtale.service.admin.review.ProjectReviewSnapshot;
 import net.modtale.service.analytics.ScoringService;
 import net.modtale.service.analytics.TrackingService;
 import net.modtale.service.project.query.ProjectService;
@@ -20,6 +22,7 @@ import org.springframework.stereotype.Service;
 @Service
 public class ProjectDeletionService {
 
+    private final ProjectReviewPersistence reviewPersistence;
     private final ProjectRepository projectRepository;
     private final ProjectService projectService;
     private final TrackingService trackingService;
@@ -33,9 +36,11 @@ public class ProjectDeletionService {
             TrackingService trackingService,
             ScoringService scoringService,
             ProjectArtifactDeletionService projectArtifactDeletionService,
-            MongoTemplate mongoTemplate
+            MongoTemplate mongoTemplate,
+            ProjectReviewPersistence reviewPersistence
     ) {
         this.projectRepository = projectRepository;
+        this.reviewPersistence = reviewPersistence;
         this.projectService = projectService;
         this.trackingService = trackingService;
         this.scoringService = scoringService;
@@ -44,11 +49,13 @@ public class ProjectDeletionService {
     }
 
     public void softDelete(Project project) {
+        var snapshot = reviewPersistence.capture(project.getId(), ProjectReviewSnapshot.token(project));
+        project = snapshot.project();
         ProjectStatus oldStatus = project.getStatus();
         project.setStatus(ProjectStatus.DELETED);
         project.setDeletedAt(LocalDateTime.now());
         scoringService.markProjectRankingDirty(project);
-        projectRepository.save(project);
+        if (!reviewPersistence.applyDeletionState(snapshot, false)) throw ProjectReviewSnapshot.conflict();
         projectService.evictProjectCache(project);
         if (oldStatus == ProjectStatus.PUBLISHED || oldStatus == ProjectStatus.UNLISTED || oldStatus == ProjectStatus.ARCHIVED) {
             trackingService.logDeletedProject(project.getId());
@@ -56,21 +63,29 @@ public class ProjectDeletionService {
     }
 
     public void restore(Project project, ProjectStatus targetStatus) {
+        var snapshot = reviewPersistence.capture(project.getId(), ProjectReviewSnapshot.token(project));
+        project = snapshot.project();
         project.setStatus(targetStatus);
         project.setDeletedAt(null);
         scoringService.markProjectRankingDirty(project);
-        projectRepository.save(project);
+        if (!reviewPersistence.applyDeletionState(snapshot, false)) throw ProjectReviewSnapshot.conflict();
         projectService.evictProjectCache(project);
     }
 
     public void hardDelete(Project project) {
+        var snapshot = reviewPersistence.capture(project.getId(), ProjectReviewSnapshot.token(project));
+        project = snapshot.project();
         if (!projectRepository.findByDependency(project.getId()).isEmpty()) {
+            var removedMedia = mediaSnapshot(project);
             scrubProjectForDependencyResolution(project);
-            projectRepository.save(project);
+            if (!reviewPersistence.applyDeletionState(snapshot, true)) throw ProjectReviewSnapshot.conflict();
             projectService.evictProjectCache(project);
+            projectArtifactDeletionService.deleteProjectMedia(removedMedia);
             return;
         }
 
+        if (!reviewPersistence.deleteProject(snapshot)) throw ProjectReviewSnapshot.conflict();
+        projectService.evictProjectCache(project);
         trackingService.deleteProjectAnalytics(project.getId());
         Set<String> dependencyIds = new HashSet<>();
         if (project.getVersions() != null) {
@@ -93,8 +108,6 @@ public class ProjectDeletionService {
 
         mongoTemplate.updateMulti(new Query(Criteria.where("likedModIds").is(project.getId())), new Update().pull("likedModIds", project.getId()), net.modtale.model.user.User.class);
         scoringService.markProjectRankingDirty(project.getId());
-        projectRepository.delete(project);
-        projectService.evictProjectCache(project);
         dependencyIds.forEach(this::cleanupOrphanedDependency);
     }
 
@@ -114,12 +127,20 @@ public class ProjectDeletionService {
         projectArtifactDeletionService.deleteStoredFile(fileUrl);
     }
 
+    private Project mediaSnapshot(Project project) {
+        var media = new Project(); media.setId(project.getId());
+        media.setImageUrl(project.getImageUrl()); media.setBannerUrl(project.getBannerUrl());
+        media.setGalleryImages(project.getGalleryImages() == null ? new ArrayList<>() : new ArrayList<>(project.getGalleryImages()));
+        return media;
+    }
+
     private void scrubProjectForDependencyResolution(Project project) {
         project.setTitle("Deleted Project");
         project.setDescription("This project has been deleted.");
         project.setAbout("This project was deleted by the author but is retained for dependency resolution.");
         project.setSlug(null);
-        projectArtifactDeletionService.deleteProjectMedia(project);
+        project.setImageUrl(null); project.setBannerUrl(null);
+        project.setGalleryImages(new ArrayList<>()); project.setGalleryImageCaptions(new java.util.HashMap<>());
         project.setTeamMembers(new ArrayList<>());
         project.setTeamInvites(new ArrayList<>());
         project.setProjectRoles(new ArrayList<>());

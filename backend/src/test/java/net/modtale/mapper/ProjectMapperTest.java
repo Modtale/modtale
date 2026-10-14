@@ -3,6 +3,7 @@ package net.modtale.mapper;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import net.modtale.model.dto.admin.AdminProjectVersionSummaryDTO;
 import net.modtale.model.dto.admin.AdminVerificationQueueItemDTO;
 import net.modtale.model.dto.project.ProjectCommentDTO;
@@ -157,6 +158,26 @@ class ProjectMapperTest {
     }
 
     @Test
+    void publicVersionMappingExposesOnlyTheDisplayNameNotStorageKeys() throws Exception {
+        ProjectVersion version = version("v3");
+        String key = "files/plugin/123e4567-e89b-42d3-a456-426614174000-sample.jar";
+        version.setFileUrl(key);
+        ProjectDependency dependency = new ProjectDependency("modtale:child", "Child", "1.0.0",
+                ProjectDependency.DependencyType.REQUIRED);
+        dependency.setCachedFileUrl("files/plugin/private-dependency.jar");
+        version.setDependencies(List.of(dependency));
+
+        var dto = ProjectMapper.toVersionDTO(version);
+        String json = new ObjectMapper().writeValueAsString(dto);
+        assertEquals("sample.jar", dto.getFileName());
+        assertTrue(json.contains("\"fileName\":\"sample.jar\""));
+        assertFalse(json.contains("fileUrl"));
+        assertFalse(json.contains("cachedFileUrl"));
+        assertFalse(json.contains(key));
+        assertFalse(json.contains("private-dependency.jar"));
+    }
+
+    @Test
     void verificationQueueMappingSelectsPendingVersionAndKeepsScanPayloadSmall() {
         Project project = baseProject();
         ProjectVersion approvedVersion = version("approved");
@@ -165,6 +186,7 @@ class ProjectMapperTest {
         pendingVersion.setChangelog("Needs review");
         pendingVersion.getScanResult().setStatus(ScanStatus.SUSPICIOUS);
         pendingVersion.getScanResult().setVerdict("REVIEW");
+        pendingVersion.getScanResult().setScanState("REMOTE_HELD");
         pendingVersion.getScanResult().setRiskScore(73);
         pendingVersion.getScanResult().setKnownIssueCount(2);
         pendingVersion.getScanResult().setNewIssueCount(3);
@@ -177,6 +199,7 @@ class ProjectMapperTest {
         assertEquals("Needs review", item.pendingVersion().changelog());
         assertEquals(ScanStatus.SUSPICIOUS, item.pendingVersion().scan().status());
         assertEquals("REVIEW", item.pendingVersion().scan().verdict());
+        assertEquals("REMOTE_HELD", item.pendingVersion().scan().scanState());
         assertEquals(73, item.pendingVersion().scan().riskScore());
         assertEquals(3, item.pendingVersion().scan().newIssueCount());
         assertEquals(1, item.pendingVersion().scan().escalatedIssueCount());

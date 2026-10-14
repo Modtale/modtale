@@ -8,7 +8,7 @@ public record AppWardenProperties(
         @DefaultValue("http://localhost:8081") String url,
         @DefaultValue("") String apiKey,
         @DefaultValue("true") boolean enabled,
-        @DefaultValue("3") int maxAttempts,
-        @DefaultValue("75") long requestTimeoutSeconds
+        @DefaultValue("1") int maxAttempts,
+        @DefaultValue("600") long requestTimeoutSeconds
 ) {
 }

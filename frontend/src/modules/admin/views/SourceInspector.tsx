@@ -1,7 +1,7 @@
 import { SkeletonSurface } from '@/components/ui/Skeleton';
-import React, { useMemo, useState, useCallback, useRef, useEffect } from 'react';
+import React, { useMemo, useState, useCallback, useRef, useEffect, useId } from 'react';
 import { Search, FileCode, Terminal, FileText, X, Folder, FolderOpen, ChevronRight, ChevronDown, ShieldAlert, CheckCircle2, Square, RefreshCw } from 'lucide-react';
-import { adminClient } from '../api/adminClient';
+import { adminClient, type InspectionWindow } from '../api/adminClient';
 import { extractApiErrorMessage } from '@/utils/api';
 import type { ScanIssue } from '@/types';
 import { ModalPortal } from '@/components/ui/ModalPortal';
@@ -9,7 +9,9 @@ import { ModalPortal } from '@/components/ui/ModalPortal';
 interface SourceInspectorProps {
     modId: string;
     versionId: string;
+    canRescan?: boolean;
     version: string;
+    reviewToken: string;
     structure: string[];
     issues?: ScanIssue[];
     initialFile?: string;
@@ -25,47 +27,52 @@ interface TreeNode {
     children: TreeNode[];
 }
 
+const FILES_PER_PAGE = 200;
+
 const buildFileTree = (paths: string[]): TreeNode[] => {
     const root: TreeNode[] = [];
-
-    paths.forEach(path => {
+    const levels = new Map<TreeNode[], Map<string, TreeNode>>();
+    levels.set(root, new Map());
+    for (const path of paths) {
         const parts = path.split('/');
-        let currentLevel = root;
-
-        parts.forEach((part, index) => {
-            const isFile = index === parts.length - 1;
-            const existingNode = currentLevel.find(n => n.name === part && n.type === (isFile ? 'file' : 'folder'));
-
-            if (existingNode) {
-                currentLevel = existingNode.children;
-            } else {
-                const newNode: TreeNode = {
-                    name: part,
-                    path: isFile ? path : parts.slice(0, index + 1).join('/'),
-                    type: isFile ? 'file' : 'folder',
-                    children: []
-                };
-                currentLevel.push(newNode);
-                currentLevel = newNode.children;
+        let children = root;
+        let prefix = '';
+        for (let index = 0; index < parts.length; index++) {
+            const name = parts[index];
+            const type = index === parts.length - 1 ? 'file' : 'folder';
+            prefix += (index ? '/' : '') + name;
+            const level = levels.get(children)!;
+            const key = `${type}:${name}`;
+            let node = level.get(key);
+            if (!node) {
+                node = { name, path: prefix, type, children: [] };
+                level.set(key, node); children.push(node);
+                levels.set(node.children, new Map());
             }
-        });
-    });
-
-    const sortNodes = (nodes: TreeNode[]) => {
-        nodes.sort((a, b) => {
-            if (a.type === b.type) return a.name.localeCompare(b.name);
-            return a.type === 'folder' ? -1 : 1;
-        });
-        nodes.forEach(node => {
-            if (node.children.length > 0) sortNodes(node.children);
-        });
-    };
-
-    sortNodes(root);
+            children = node.children;
+        }
+    }
+    // Archive paths can be deeply nested; neither sorting nor rendering recurses.
+    for (const nodes of levels.keys()) nodes.sort((a, b) => a.type === b.type
+        ? a.name.localeCompare(b.name) : a.type === 'folder' ? -1 : 1);
     return root;
 };
 
-const FileTreeNode: React.FC<{
+const visibleFileRows = (tree: TreeNode[], expanded: Set<string>) => {
+    const rows: { node: TreeNode; depth: number }[] = [];
+    const pending = tree.map(node => ({ node, depth: 0 })).reverse();
+    while (pending.length) {
+        const row = pending.pop()!;
+        rows.push(row);
+        if (row.node.type === 'folder' && expanded.has(row.node.path)) {
+            for (let i = row.node.children.length - 1; i >= 0; i--)
+                pending.push({ node: row.node.children[i], depth: row.depth + 1 });
+        }
+    }
+    return rows;
+};
+
+const FileRow: React.FC<{
     node: TreeNode;
     depth: number;
     expanded: Set<string>;
@@ -73,63 +80,25 @@ const FileTreeNode: React.FC<{
     selectedFile: string | null;
     onSelectFile: (path: string) => void;
 }> = ({ node, depth, expanded, toggleFolder, selectedFile, onSelectFile }) => {
+    const folder = node.type === 'folder';
     const isExpanded = expanded.has(node.path);
-    const isSelected = selectedFile === node.path;
-
-    let Icon = FileText;
-    if (node.type === 'folder') Icon = isExpanded ? FolderOpen : Folder;
-    else if (node.name.endsWith('.class') || node.name.endsWith('.java')) Icon = FileCode;
-    else if (node.name.endsWith('.json') || node.name.endsWith('.yml')) Icon = FileText;
-
-    const handleClick = (e: React.MouseEvent) => {
-        e.stopPropagation();
-        if (node.type === 'folder') {
-            toggleFolder(node.path);
-        } else {
-            onSelectFile(node.path);
-        }
-    };
-
-    return (
-        <div>
-            <div
-                onClick={handleClick}
-                className={`flex items-center gap-1.5 py-1 pr-2 rounded-lg cursor-pointer transition-colors text-xs font-mono select-none
-                ${isSelected ? 'bg-indigo-500/20 text-indigo-300' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}
-                `}
-                style={{ paddingLeft: `${depth * 12 + 12}px` }}
-            >
-                {node.type === 'folder' && (
-                    <span className="opacity-50">
-                        {isExpanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
-                    </span>
-                )}
-                {node.type === 'file' && <span className="w-3" />}
-
-                <Icon className={`w-3.5 h-3.5 shrink-0 ${node.type === 'folder' ? 'text-blue-400' : ''}`} />
-                <span className="truncate">{node.name}</span>
-            </div>
-
-            {node.type === 'folder' && isExpanded && (
-                <div>
-                    {node.children.map(child => (
-                        <FileTreeNode
-                            key={child.path}
-                            node={child}
-                            depth={depth + 1}
-                            expanded={expanded}
-                            toggleFolder={toggleFolder}
-                            selectedFile={selectedFile}
-                            onSelectFile={onSelectFile}
-                        />
-                    ))}
-                </div>
-            )}
-        </div>
-    );
+    const isSelected = !folder && selectedFile === node.path;
+    const Icon = folder ? (isExpanded ? FolderOpen : Folder)
+        : /\.(class|java)$/.test(node.name) ? FileCode : FileText;
+    return <button type="button" title={node.path}
+        aria-label={`${folder ? 'Folder' : 'File'} ${node.path}`}
+        aria-expanded={folder ? isExpanded : undefined}
+        aria-current={isSelected ? 'true' : undefined}
+        onClick={() => folder ? toggleFolder(node.path) : onSelectFile(node.path)}
+        className={`w-full flex items-center gap-1.5 py-1 pr-2 rounded-lg text-left text-xs font-mono select-none focus-visible:outline focus-visible:outline-indigo-400 ${isSelected ? 'bg-indigo-500/20 text-indigo-300' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}
+        style={{ paddingLeft: `${Math.min(depth, 12) * 12 + 12}px` }}>
+        {folder ? (isExpanded ? <ChevronDown aria-hidden="true" className="w-3 h-3 shrink-0" /> : <ChevronRight aria-hidden="true" className="w-3 h-3 shrink-0" />) : <span className="w-3 shrink-0" />}
+        <Icon aria-hidden="true" className={`w-3.5 h-3.5 shrink-0 ${folder ? 'text-blue-400' : ''}`} />
+        <span className="truncate">{node.name}</span>
+    </button>;
 };
 
-const CodeViewer: React.FC<{ content: any; filename: string; startLine?: number; endLine?: number }> = ({ content, filename, startLine, endLine }) => {
+const CodeViewer: React.FC<{ content: any; filename: string; startLine?: number; endLine?: number; firstLine?: number; format?: string }> = ({ content, filename, startLine, endLine, firstLine = 1, format }) => {
     const scrollContainerRef = useRef<HTMLDivElement>(null);
 
     const safeContent = useMemo(() => {
@@ -141,24 +110,37 @@ const CodeViewer: React.FC<{ content: any; filename: string; startLine?: number;
     }, [content]);
 
     const lines = useMemo(() => safeContent.split('\n'), [safeContent]);
+    const displayedRange = useMemo(() => {
+        if (!startLine || startLine < 1) return undefined;
+        if (format !== 'JVM_BYTECODE') return startLine >= firstLine && startLine < firstLine + lines.length ? { start: startLine - firstLine + 1, end: (endLine || startLine) - firstLine + 1 } : undefined;
+        const matching = lines.flatMap((line, index) => {
+            const marker = line.match(/^\s*LINENUMBER (\d+) /);
+            const sourceLine = marker ? Number(marker[1]) : 0;
+            return sourceLine >= startLine && sourceLine <= (endLine || startLine) ? [index + 1] : [];
+        });
+        return matching.length ? { start: matching[0], end: matching[matching.length - 1] } : undefined;
+    }, [lines, safeContent, startLine, endLine, firstLine, format]);
+    const displayedStart = displayedRange?.start;
+
 
     useEffect(() => {
-        if (startLine && scrollContainerRef.current && startLine > 1) {
-            setTimeout(() => {
+        if (displayedStart && scrollContainerRef.current && displayedStart > 1) {
+            const timer = setTimeout(() => {
                 if (scrollContainerRef.current) {
                     const lineHeight = 20;
-                    scrollContainerRef.current.scrollTop = (startLine - 5) * lineHeight;
+                    scrollContainerRef.current.scrollTop = Math.max(0, displayedStart - 5) * lineHeight;
                 }
             }, 100);
+            return () => clearTimeout(timer);
         }
-    }, [startLine, content]);
+    }, [displayedStart, content]);
 
     return (
         <div ref={scrollContainerRef} className="flex h-full overflow-auto bg-[#0d1117] font-mono text-xs relative">
             <div className="sticky left-0 z-10 h-fit min-h-full w-12 select-none border-r border-white/5 bg-[#0d1117] py-4 pr-3 text-right leading-5 text-slate-600">
                 {lines.map((_, i) => (
-                    <div key={i} className={(startLine && endLine && (i+1) >= startLine && (i+1) <= endLine) ? 'text-yellow-500 font-bold bg-yellow-500/10 w-full pr-1' : ''}>
-                        {i + 1}
+                    <div key={i} className={(displayedRange && (i+1) >= displayedRange.start && (i+1) <= displayedRange.end) ? 'text-yellow-500 font-bold bg-yellow-500/10 w-full pr-1' : ''}>
+                        {i + firstLine}
                     </div>
                 ))}
             </div>
@@ -172,11 +154,31 @@ const CodeViewer: React.FC<{ content: any; filename: string; startLine?: number;
     );
 };
 
-export const SourceInspector: React.FC<SourceInspectorProps> = ({ modId, versionId, version, structure, issues = [], initialFile, initialLine, initialLineEnd, onClose }) => {
+export const SourceInspector: React.FC<SourceInspectorProps> = ({ modId, versionId, canRescan = false, version, reviewToken, structure, issues = [], initialFile, initialLine, initialLineEnd, onClose }) => {
+    const dialogRef = useRef<HTMLDialogElement>(null);
+    const searchInputRef = useRef<HTMLInputElement>(null);
+    const issuesTriggerRef = useRef<HTMLButtonElement>(null);
+    const dialogTitleId = useId();
+    useEffect(() => {
+        const opener = document.activeElement;
+        const dialog = dialogRef.current!;
+        dialog.showModal();
+        searchInputRef.current?.focus({ preventScroll: true });
+        return () => {
+            dialog.close();
+            if (opener instanceof HTMLElement && opener.isConnected) opener.focus({ preventScroll: true });
+        };
+    }, []);
+    const requestGeneration = useRef(0);
+    const fileListRef = useRef<HTMLElement>(null);
+    useEffect(() => () => { requestGeneration.current++; }, [modId, version, reviewToken]);
     const [inspectorFile, setInspectorFile] = useState<string | null>(null);
     const [inspectorContent, setInspectorContent] = useState<any>('');
+    const [window, setWindow] = useState<InspectionWindow | null>(null);
+    const [previousOffsets, setPreviousOffsets] = useState<number[]>([]);
     const [loadingFile, setLoadingFile] = useState(false);
     const [fileSearch, setFileSearch] = useState('');
+    const [filePage, setFilePage] = useState(0);
     const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
     const [showIssuesDropdown, setShowIssuesDropdown] = useState(false);
     const [resolvedIssues, setResolvedIssues] = useState<Set<number>>(new Set());
@@ -188,6 +190,12 @@ export const SourceInspector: React.FC<SourceInspectorProps> = ({ modId, version
         start: number;
         end: number;
     } | null>(null);
+
+    useEffect(() => {
+        setInspectorContent(''); setInspectorFile(null); setLoadingFile(false); setWindow(null); setPreviousOffsets([]);
+        setResolvedIssues(new Set()); setActiveHighlight(null); setActionError(null);
+        setFileSearch(''); setFilePage(0); setExpandedFolders(new Set());
+    }, [modId, version, reviewToken]);
 
     const fileTree = useMemo(() => buildFileTree(structure), [structure]);
 
@@ -221,19 +229,30 @@ export const SourceInspector: React.FC<SourceInspectorProps> = ({ modId, version
         });
     };
 
-    const loadInspectorFile = async (path: string) => {
+    const loadInspectorFile = async (path: string, offset = 0, identity?: string, previous: number[] = [], sourceLine = 0) => {
+        const generation = ++requestGeneration.current;
+        setInspectorContent(''); setWindow(null);
         setInspectorFile(path);
         setLoadingFile(true);
         try {
-            const data = await adminClient.getFileContent(modId, version, path);
-            setInspectorContent(data);
+            const data = await adminClient.getFileWindow(modId, version, path, reviewToken, offset, identity, sourceLine);
+            if (generation !== requestGeneration.current) return;
+            if (!data || typeof data.content !== 'string' || typeof data.format !== 'string' || !Array.isArray(data.gaps) || !data.gaps.every(gap => typeof gap === 'string')
+                || !Number.isInteger(data.firstLine) || data.firstLine < 1 || data.firstLine > data.start + 1
+                || typeof data.lineMatched !== 'boolean' || typeof data.representationComplete !== 'boolean' || !/^[0-9a-f]{64}$/.test(data.identity)
+                || (identity && identity !== data.identity) || !Number.isInteger(data.start) || !Number.isInteger(data.end)
+                || !Number.isInteger(data.totalCharacters) || data.start < 0 || data.end < data.start || data.end > data.totalCharacters
+                || data.totalCharacters > 4_000_000 || data.end - data.start !== data.content.length || data.content.length > 32000
+                || (sourceLine === 0 && data.start !== offset)) throw new Error('The inspection changed. Reopen this file.');
+            setInspectorContent(data.content); setWindow(data); setPreviousOffsets(previous);
             setActionError(null);
         } catch (e) {
+            if (generation !== requestGeneration.current) return;
             const message = extractApiErrorMessage(e, 'We could not load this file from the archive.');
             setActionError(message);
             setInspectorContent(`// ${message}`);
         } finally {
-            setLoadingFile(false);
+            if (generation === requestGeneration.current) setLoadingFile(false);
         }
     };
 
@@ -252,17 +271,20 @@ export const SourceInspector: React.FC<SourceInspectorProps> = ({ modId, version
         }
         setExpandedFolders(prev => new Set([...prev, ...foldersToExpand]));
 
+        setFileSearch('');
         setActiveHighlight({
             file: targetFile,
             start: lineStart,
             end: lineEnd,
         });
 
-        loadInspectorFile(targetFile);
+        loadInspectorFile(targetFile, 0, undefined, [], Math.max(0, lineStart || 0));
         setShowIssuesDropdown(false);
+        if (showIssuesDropdown) issuesTriggerRef.current?.focus();
     };
 
     const handleRescan = async () => {
+        if (!canRescan || !versionId) return;
         setIsScanning(true);
         try {
             await adminClient.scanVersion(modId, versionId);
@@ -280,7 +302,7 @@ export const SourceInspector: React.FC<SourceInspectorProps> = ({ modId, version
             const targetLineEnd = initialLineEnd || issue?.lineEnd || initialLine || 0;
             handleJumpToIssue(initialFile, initialLine || 0, targetLineEnd);
         }
-    }, [initialFile]);
+    }, [initialFile, modId, version, reviewToken]);
 
     const dynamicHighlight = useMemo(() => {
         if (!activeHighlight || activeHighlight.file !== inspectorFile) return undefined;
@@ -290,10 +312,23 @@ export const SourceInspector: React.FC<SourceInspectorProps> = ({ modId, version
         return undefined;
     }, [activeHighlight, inspectorFile]);
 
-    const filteredFiles = useMemo(() => {
-        if (!fileSearch) return [];
-        return structure.filter(f => f.toLowerCase().includes(fileSearch.toLowerCase()));
-    }, [structure, fileSearch]);
+    const fileRows = useMemo(() => {
+        const search = fileSearch.toLowerCase();
+        if (search) return structure.filter(path => path.toLowerCase().includes(search))
+            .map(path => ({ node: { name: path, path, type: 'file' as const, children: [] }, depth: 0 }));
+        return visibleFileRows(fileTree, expandedFolders);
+    }, [structure, fileSearch, fileTree, expandedFolders]);
+    const lastFilePage = Math.max(0, Math.ceil(fileRows.length / FILES_PER_PAGE) - 1);
+    const currentFilePage = Math.min(filePage, lastFilePage);
+    const firstFileRow = currentFilePage * FILES_PER_PAGE;
+    useEffect(() => {
+        // A finding jump reveals its file even when its ancestors span several pages.
+        const index = fileRows.findIndex(row => row.node.type === 'file' && row.node.path === inspectorFile);
+        if (index >= 0) setFilePage(Math.floor(index / FILES_PER_PAGE));
+    }, [inspectorFile, modId, version, reviewToken]);
+    useEffect(() => {
+        if (fileListRef.current) fileListRef.current.scrollTop = 0;
+    }, [currentFilePage, fileSearch]);
 
     const renderIssueItem = (issue: any, isResolved: boolean) => (
         <div
@@ -301,7 +336,7 @@ export const SourceInspector: React.FC<SourceInspectorProps> = ({ modId, version
             className={`w-full text-left p-3 hover:bg-white/5 rounded-lg group border border-transparent hover:border-white/5 transition-all mb-1 ${isResolved ? 'opacity-50' : ''}`}
         >
             <div className="flex items-start justify-between gap-3">
-                <div className="flex-1 cursor-pointer" onClick={() => handleJumpToIssue(issue.filePath, issue.lineStart, issue.lineEnd)}>
+                <button type="button" aria-label={`Inspect ${issue.type} in ${issue.filePath}`} className="flex-1 text-left rounded focus-visible:outline focus-visible:outline-indigo-400" onClick={() => handleJumpToIssue(issue.filePath, issue.lineStart, issue.lineEnd)}>
                     <div className="flex items-center gap-2 mb-1">
                         <span className={`font-black text-[10px] px-1.5 py-0.5 rounded uppercase
                                                         ${issue.severity === 'CRITICAL' ? 'bg-red-500 text-white' : 'bg-amber-500 text-white'}`}>
@@ -313,12 +348,13 @@ export const SourceInspector: React.FC<SourceInspectorProps> = ({ modId, version
                         {issue.filePath.split('/').pop()} {issue.lineStart > 0 ? `:${issue.lineStart} - ${issue.lineEnd}` : ''}
                     </div>
                     <p className="text-[10px] text-slate-400 line-clamp-2">{issue.description}</p>
-                </div>
+                </button>
 
                 <button
                     onClick={(e) => toggleResolved(issue.originalIndex, e)}
                     className={`shrink-0 p-1 rounded hover:bg-white/10 transition-colors ${isResolved ? 'text-emerald-500' : 'text-slate-600'}`}
                     title={isResolved ? "Mark as Unresolved" : "Mark as Resolved"}
+                    aria-label={`${isResolved ? "Mark unresolved" : "Mark resolved"}: ${issue.type} in ${issue.filePath}`}
                 >
                     {isResolved ? <CheckCircle2 className="w-5 h-5"/> : <Square className="w-5 h-5"/>}
                 </button>
@@ -328,18 +364,24 @@ export const SourceInspector: React.FC<SourceInspectorProps> = ({ modId, version
 
     return (
         <ModalPortal>
-        <div className="fixed inset-0 z-[160] bg-slate-950/90 backdrop-blur-md flex flex-col animate-in fade-in duration-200">
+        <dialog ref={dialogRef} aria-labelledby={dialogTitleId}
+            onCancel={event => {
+                event.preventDefault();
+                if (showIssuesDropdown) { setShowIssuesDropdown(false); issuesTriggerRef.current?.focus(); }
+                else onClose();
+            }}
+            className="fixed inset-0 m-0 border-0 p-0 w-screen h-dvh max-w-none max-h-none z-[160] bg-slate-950/90 backdrop-blur-md open:flex flex-col animate-in fade-in duration-200">
             <div className="h-14 border-b border-white/10 bg-slate-900 flex items-center justify-between px-4 shrink-0">
                 <div className="flex items-center gap-4">
                     <FileCode className="w-5 h-5 text-indigo-400" />
                     <div>
-                        <h3 className="text-sm font-bold text-white">Source Inspector</h3>
+                        <h3 id={dialogTitleId} className="text-sm font-bold text-white">Source Inspector</h3>
                         <p className="text-[10px] text-slate-400 font-mono">{modId} @ {version}</p>
                     </div>
 
                     {issues.length > 0 && (
                         <div className="relative ml-4">
-                            <button
+                            <button ref={issuesTriggerRef} aria-expanded={showIssuesDropdown}
                                 onClick={() => setShowIssuesDropdown(!showIssuesDropdown)}
                                 className="flex items-center gap-2 px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg text-xs font-bold transition-colors border border-red-500/20"
                             >
@@ -374,15 +416,15 @@ export const SourceInspector: React.FC<SourceInspectorProps> = ({ modId, version
                     )}
                 </div>
                 <div className="flex items-center gap-2">
-                    <button
+                    {canRescan && versionId && <button
                         onClick={handleRescan}
                         disabled={isScanning}
                         className="p-2 hover:bg-white/10 rounded-lg text-slate-400 hover:text-white transition-colors"
                         title="Rescan File"
                     >
                         <RefreshCw className={`w-5 h-5 ${isScanning ? 'animate-spin' : ''}`} />
-                    </button>
-                    <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-lg text-slate-400 hover:text-white">
+                    </button>}
+                    <button aria-label="Close source inspector" onClick={onClose} className="p-2 hover:bg-white/10 rounded-lg text-slate-400 hover:text-white">
                         <X className="w-5 h-5" />
                     </button>
                 </div>
@@ -402,57 +444,57 @@ export const SourceInspector: React.FC<SourceInspectorProps> = ({ modId, version
                             <input
                                 type="text"
                                 placeholder="Search files..."
+                                aria-label="Search files"
+                                ref={searchInputRef}
                                 className="w-full pl-9 pr-4 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-white placeholder:text-slate-500 focus:ring-1 focus:ring-indigo-500 outline-none"
                                 value={fileSearch}
-                                onChange={e => setFileSearch(e.target.value)}
+                                onChange={e => { setFileSearch(e.target.value); setFilePage(0); }}
                             />
                         </div>
                     </div>
 
-                    <div className="flex-1 overflow-y-auto p-2">
-                        {fileSearch ? (
-                            <div>
-                                {filteredFiles.length === 0 && (
-                                    <div className="p-4 text-center text-xs text-slate-500 italic">No files found</div>
-                                )}
-                                {filteredFiles.map((file, idx) => (
-                                    <button
-                                        key={idx}
-                                        onClick={() => loadInspectorFile(file)}
-                                        className={`w-full text-left px-3 py-2 rounded-lg text-xs font-mono truncate flex items-center gap-2 transition-colors ${inspectorFile === file ? 'bg-indigo-500/20 text-indigo-300' : 'text-slate-400 hover:bg-white/5 hover:text-white'}`}
-                                    >
-                                        <FileCode className="w-3 h-3 shrink-0" />
-                                        {file}
-                                    </button>
-                                ))}
-                            </div>
-                        ) : (
-                            <div>
-                                {fileTree.map(node => (
-                                    <FileTreeNode
-                                        key={node.path}
-                                        node={node}
-                                        depth={0}
-                                        expanded={expandedFolders}
-                                        toggleFolder={toggleFolder}
-                                        selectedFile={inspectorFile}
-                                        onSelectFile={loadInspectorFile}
-                                    />
-                                ))}
-                            </div>
-                        )}
+                    <nav ref={fileListRef} aria-label="Archive files" className="flex-1 overflow-y-auto p-2">
+                        {!fileRows.length && <p className="p-4 text-center text-xs text-slate-500">{fileSearch ? 'No files found' : 'No files available'}</p>}
+                        {fileRows.slice(firstFileRow, firstFileRow + FILES_PER_PAGE).map(({ node, depth }) => (
+                            <FileRow key={`${node.type}:${node.path}`} node={node} depth={depth}
+                                expanded={expandedFolders} toggleFolder={toggleFolder}
+                                selectedFile={inspectorFile} onSelectFile={loadInspectorFile} />
+                        ))}
+                    </nav>
+                    <div className="border-t border-white/10 p-3 text-xs text-slate-300">
+                        <p role="status">{fileRows.length ? `Entries ${firstFileRow + 1}–${Math.min(firstFileRow + FILES_PER_PAGE, fileRows.length)} of ${fileRows.length}` : '0 entries'}</p>
+                        <div className="flex flex-wrap gap-3 mt-2">
+                            <button disabled={currentFilePage === 0} onClick={() => setFilePage(0)} className="disabled:opacity-40">First files</button>
+                            <button disabled={currentFilePage === 0} onClick={() => setFilePage(currentFilePage - 1)} className="disabled:opacity-40">Previous files</button>
+                            <button disabled={currentFilePage === lastFilePage} onClick={() => setFilePage(currentFilePage + 1)} className="disabled:opacity-40">Next files</button>
+                            <button disabled={currentFilePage === lastFilePage} onClick={() => setFilePage(lastFilePage)} className="disabled:opacity-40">Last files</button>
+                        </div>
                     </div>
                 </div>
 
                 <div className="flex-1 bg-[#0d1117] overflow-hidden flex flex-col">
+                    {window && inspectorFile && <div className="border-b border-white/10 px-4 py-2 text-xs text-slate-300 space-y-2">
+                        <div className="flex items-center gap-3">
+                            <span>{window.totalCharacters ? `Characters ${window.start + 1}–${window.end} of ${window.totalCharacters}` : 'No text content'}</span>
+                            <button disabled={loadingFile || window.start === 0} onClick={() => loadInspectorFile(inspectorFile, 0, window.identity)} className="disabled:opacity-40">Start of file</button>
+                            <button disabled={loadingFile || !previousOffsets.length} onClick={() => loadInspectorFile(inspectorFile, previousOffsets[previousOffsets.length - 1], window.identity, previousOffsets.slice(0, -1))} className="disabled:opacity-40">Previous section</button>
+                            <button disabled={loadingFile || window.end >= window.totalCharacters} onClick={() => loadInspectorFile(inspectorFile, window.end, window.identity, [...previousOffsets, window.start])} className="disabled:opacity-40">Next section</button>
+                        </div>
+                        {window.format === 'JVM_BYTECODE' && <p>JVM bytecode of the uploaded class. LINENUMBER entries refer to original source lines.</p>}
+                        {!window.lineMatched && <p>The requested source line was not found in this representation.</p>}
+                        {!window.representationComplete && <p className="text-amber-300">This representation is incomplete. {window.gaps.join(' ')}</p>}
+                    </div>}
                     {loadingFile ? (
                         <SkeletonSurface className="h-full [&>.skeleton-layout]:h-full" label="Loading source file">
                             <CodeViewer filename={inspectorFile || 'source.txt'} content={Array.from({ length: 24 }, (_, index) => `${'    '.repeat(index % 3)}Source code line awaiting file content`).join('\n')} />
                         </SkeletonSurface>
                     ) : inspectorFile ? (
                         <CodeViewer
+                            key={`${inspectorFile}:${window?.start ?? 0}`}
                             content={inspectorContent}
                             filename={inspectorFile}
+                            firstLine={window?.firstLine}
+                            format={window?.format}
                             startLine={dynamicHighlight?.start}
                             endLine={dynamicHighlight?.end}
                         />
@@ -464,7 +506,7 @@ export const SourceInspector: React.FC<SourceInspectorProps> = ({ modId, version
                     )}
                 </div>
             </div>
-        </div>
+        </dialog>
         </ModalPortal>
     );
 };

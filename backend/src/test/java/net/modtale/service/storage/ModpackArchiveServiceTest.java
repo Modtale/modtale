@@ -13,13 +13,17 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
 import net.modtale.exception.StorageDownloadException;
+import net.modtale.exception.StorageUploadException;
 import net.modtale.model.project.Project;
 import net.modtale.model.project.ProjectClassification;
 import net.modtale.model.project.ProjectDependency;
 import net.modtale.model.project.ProjectVersion;
-import net.modtale.repository.project.ProjectRepository;
+import net.modtale.service.admin.review.ProjectReviewPersistence;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.web.multipart.MultipartFile;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
@@ -36,15 +40,18 @@ import static org.mockito.Mockito.when;
 
 class ModpackArchiveServiceTest {
 
-    private ProjectRepository projectRepository;
+    private ProjectReviewPersistence reviewPersistence;
     private DownloadArchiveSupport archiveSupport;
     private ModpackArchiveService service;
 
     @BeforeEach
-    void setUp() {
-        projectRepository = mock(ProjectRepository.class);
+    void setUp() throws Exception {
+        reviewPersistence = mock(ProjectReviewPersistence.class);
+        when(reviewPersistence.cacheModpackArchive(any(), any(), any(), any(), any())).thenReturn(true);
         archiveSupport = mock(DownloadArchiveSupport.class);
-        service = new ModpackArchiveService(projectRepository, archiveSupport);
+        when(archiveSupport.downloadApproved(any(ProjectVersion.class)))
+                .thenAnswer(invocation -> archiveSupport.download(((ProjectVersion) invocation.getArgument(0)).getFileUrl()));
+        service = new ModpackArchiveService(reviewPersistence, archiveSupport);
     }
 
     @Test
@@ -59,7 +66,9 @@ class ModpackArchiveServiceTest {
         version.setModpackConfigs(List.of(reference));
         version.setOverrideFileUrl("configs.zip");
         String manifest = new ObjectMapper().writeValueAsString(Map.of("format", "modtale-configs", "formatVersion", 1, "configs", List.of(reference)));
-        when(archiveSupport.download("configs.zip")).thenReturn(zip(Map.of(path, "{}", "modtale.configs.json", manifest)));
+        byte[] overrides = zip(Map.of(path, "{}", "modtale.configs.json", manifest));
+        version.setHash(sha256(overrides));
+        when(archiveSupport.downloadBounded("configs.zip")).thenReturn(overrides);
         when(archiveSupport.resolveDependency(dependency)).thenReturn(new DownloadArchiveSupport.ResolvedDependency(
                 dependencyProject("plugin", ProjectClassification.PLUGIN), version("2.0.0", "plugin.jar")));
         when(archiveSupport.download("plugin.jar")).thenReturn(bytes("plugin-binary"));
@@ -84,11 +93,194 @@ class ModpackArchiveServiceTest {
         Project pack = pack();
         ProjectVersion version = version("1.0.0", "modpacks/cached.zip");
 
-        byte[] cached = validEmptyArchive();
+        byte[] cached = validEmptyArchive(ModpackArchiveService.cacheBinding(pack, version));
         when(archiveSupport.download("modpacks/cached.zip")).thenReturn(cached);
 
         assertArrayEquals(cached, service.generateModpackZip(pack, version));
-        verify(projectRepository, never()).save(pack);
+        verify(reviewPersistence, never()).cacheModpackArchive(any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void cachedModpackCannotIgnoreAChangedExternalDependency() throws Exception {
+        Project pack = pack();
+        ProjectVersion version = version("1.0.0", "modpacks/cached.zip");
+        byte[] cached = validEmptyArchive(ModpackArchiveService.cacheBinding(pack, version));
+        ProjectDependency dependency = ProjectDependency.external(ProjectDependency.Source.GITHUB,
+                "example/repository", "External Tool", "2.0.0", "https://example.com/download",
+                ProjectDependency.DependencyType.REQUIRED);
+        version.setDependencies(List.of(dependency));
+        when(archiveSupport.download("modpacks/cached.zip")).thenReturn(cached);
+
+        Map<String, String> entries = unzip(service.generateModpackZip(pack, version));
+        JsonNode lock = new ObjectMapper().readTree(entries.get("modtale.lock.json"));
+
+        assertEquals(1, lock.path("entries").size());
+        assertEquals("GITHUB", lock.at("/entries/0/source").asText());
+    }
+
+    @Test
+    void legacyExternalCacheCannotBeShippedAsUnreviewedBytes() throws Exception {
+        Project pack = pack();
+        ProjectVersion version = version("1.0.0", null);
+        ProjectDependency external = ProjectDependency.external(ProjectDependency.Source.GITHUB,
+                "example/repository", "External Tool", "2.0.0", "https://github.com/example/repository",
+                ProjectDependency.DependencyType.REQUIRED);
+        external.setCachedFileUrl("external-dependencies/legacy.jar");
+        version.setDependencies(List.of(external));
+        when(archiveSupport.download("external-dependencies/legacy.jar")).thenReturn(bytes("unreviewed-binary"));
+
+        Map<String, String> entries = unzip(service.generateModpackZip(pack, version));
+        JsonNode lock = new ObjectMapper().readTree(entries.get("modtale.lock.json"));
+
+        assertEquals("REFERENCE_ONLY", lock.at("/entries/0/distribution").asText());
+        assertFalse(entries.values().contains("unreviewed-binary"));
+        verify(archiveSupport, never()).download("external-dependencies/legacy.jar");
+    }
+
+    @Test
+    void cacheBindingSurvivesCacheWriteButChangesWithPackageInputs() {
+        Project pack = pack();
+        ProjectVersion version = version("1.0.0", null);
+        String beforeCache = ModpackArchiveService.cacheBinding(pack, version);
+
+        version.setFileUrl("modpacks/cached.zip");
+        assertEquals(beforeCache, ModpackArchiveService.cacheBinding(pack, version));
+        pack.setTitle("Renamed Pack");
+        assertFalse(beforeCache.equals(ModpackArchiveService.cacheBinding(pack, version)));
+    }
+
+    @Test
+    void cachedModpackCannotServeAWithdrawnBundledDependency() throws Exception {
+        Project pack = pack();
+        ProjectVersion version = version("1.0.0", "modpacks/cached.zip");
+        ProjectDependency withdrawn = new ProjectDependency("plugin", "Plugin", "2.0.0");
+        version.setDependencies(List.of(withdrawn));
+        when(archiveSupport.download("modpacks/cached.zip")).thenReturn(validEmptyArchive());
+
+        assertThrows(IOException.class, () -> service.generateModpackZip(pack, version));
+        verify(archiveSupport, never()).download("modpacks/cached.zip");
+    }
+
+    @Test
+    void cachedModpackCannotServeAnOlderApprovedDependencyArtifact() throws Exception {
+        Project pack = pack();
+        ProjectVersion version = version("1.0.0", null);
+        ProjectDependency dependency = new ProjectDependency("plugin", "Plugin", "2.0.0");
+        version.setDependencies(List.of(dependency));
+        when(archiveSupport.resolveDependency(dependency)).thenReturn(new DownloadArchiveSupport.ResolvedDependency(
+                dependencyProject("plugin", ProjectClassification.PLUGIN), version("2.0.0", "plugin-old.jar")));
+        when(archiveSupport.download("plugin-old.jar")).thenReturn(bytes("old-approved-bytes"));
+        when(archiveSupport.extractOriginalFilename("plugin-old.jar")).thenReturn("plugin.jar");
+        byte[] cached = service.generateModpackZip(pack, version);
+
+        version.setFileUrl("modpacks/cached.zip");
+        when(archiveSupport.download("modpacks/cached.zip")).thenReturn(cached);
+        when(archiveSupport.resolveDependency(dependency)).thenReturn(new DownloadArchiveSupport.ResolvedDependency(
+                dependencyProject("plugin", ProjectClassification.PLUGIN), version("2.0.0", "plugin-new.jar")));
+        when(archiveSupport.download("plugin-new.jar")).thenReturn(bytes("new-approved-bytes"));
+        when(archiveSupport.extractOriginalFilename("plugin-new.jar")).thenReturn("plugin.jar");
+
+        Map<String, String> entries = unzip(service.generateModpackZip(pack, version));
+
+        assertEquals("new-approved-bytes", entries.get("plugin.jar"));
+    }
+
+    @Test
+    void dependencyChangingDuringBuildCannotBeCachedOrDelivered() throws Exception {
+        Project pack = pack();
+        ProjectVersion version = version("1.0.0", null);
+        ProjectDependency dependency = new ProjectDependency("plugin", "Plugin", "2.0.0");
+        version.setDependencies(List.of(dependency));
+        var old = new DownloadArchiveSupport.ResolvedDependency(
+                dependencyProject("plugin", ProjectClassification.PLUGIN), version("2.0.0", "plugin-old.jar"));
+        var replacement = new DownloadArchiveSupport.ResolvedDependency(
+                dependencyProject("plugin", ProjectClassification.PLUGIN), version("2.0.0", "plugin-new.jar"));
+        when(archiveSupport.resolveDependency(dependency)).thenReturn(old, old, replacement);
+        when(archiveSupport.download("plugin-old.jar")).thenReturn(bytes("old-approved-bytes"));
+        when(archiveSupport.extractOriginalFilename("plugin-old.jar")).thenReturn("plugin.jar");
+
+        assertThrows(IOException.class, () -> service.generateModpackZip(pack, version));
+        verify(archiveSupport, never()).upload(any(), any());
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void dependencyChangingDuringCachedDownloadCannotBeDelivered(boolean withdrawn) throws Exception {
+        Project pack = pack();
+        ProjectVersion version = version("1.0.0", null);
+        ProjectDependency dependency = new ProjectDependency("plugin", "Plugin", "2.0.0");
+        version.setDependencies(List.of(dependency));
+        var approved = new DownloadArchiveSupport.ResolvedDependency(
+                dependencyProject("plugin", ProjectClassification.PLUGIN), version("2.0.0", "plugin-old.jar"));
+        var replacement = new DownloadArchiveSupport.ResolvedDependency(
+                dependencyProject("plugin", ProjectClassification.PLUGIN), version("2.0.0", "plugin-new.jar"));
+        when(archiveSupport.resolveDependency(dependency)).thenReturn(approved);
+        when(archiveSupport.download("plugin-old.jar")).thenReturn(bytes("old-approved-bytes"));
+        when(archiveSupport.extractOriginalFilename("plugin-old.jar")).thenReturn("plugin.jar");
+        byte[] cached = service.generateModpackZip(pack, version);
+
+        org.mockito.Mockito.clearInvocations(archiveSupport, reviewPersistence);
+        version.setFileUrl("modpacks/cached.zip");
+        when(archiveSupport.download("modpacks/cached.zip")).thenReturn(cached);
+        when(archiveSupport.resolveDependency(dependency)).thenReturn(approved, withdrawn ? null : replacement);
+
+        assertThrows(IOException.class, () -> service.generateModpackZip(pack, version));
+        verify(archiveSupport).download("modpacks/cached.zip");
+        verify(archiveSupport, never()).upload(any(), any());
+        verify(reviewPersistence, never()).cacheModpackArchive(any(), any(), any(), any(), any());
+    }
+
+    @ParameterizedTest
+    @CsvSource({"true,false", "false,false", "true,true", "false,true"})
+    void dependencyChangingDuringCacheUploadCannotBeDelivered(boolean withdrawn, boolean uploadFails) throws Exception {
+        Project pack = pack();
+        ProjectVersion version = version("1.0.0", null);
+        ProjectDependency dependency = new ProjectDependency("plugin", "Plugin", "2.0.0");
+        version.setDependencies(List.of(dependency));
+        var approved = new DownloadArchiveSupport.ResolvedDependency(
+                dependencyProject("plugin", ProjectClassification.PLUGIN), version("2.0.0", "plugin-old.jar"));
+        var replacement = new DownloadArchiveSupport.ResolvedDependency(
+                dependencyProject("plugin", ProjectClassification.PLUGIN), version("2.0.0", "plugin-new.jar"));
+        when(archiveSupport.resolveDependency(dependency)).thenReturn(approved);
+        when(archiveSupport.download("plugin-old.jar")).thenReturn(bytes("old-approved-bytes"));
+        when(archiveSupport.extractOriginalFilename("plugin-old.jar")).thenReturn("plugin.jar");
+        when(archiveSupport.newZipMultipartFile(any(), any())).thenReturn(mock(MultipartFile.class));
+        when(archiveSupport.upload(any(), eq("modpacks"))).thenAnswer(invocation -> {
+            when(archiveSupport.resolveDependency(dependency)).thenReturn(withdrawn ? null : replacement);
+            if (uploadFails) throw new StorageUploadException("Upload failed", new IOException("unavailable"));
+            return "modpacks/generated.zip";
+        });
+
+        assertThrows(IOException.class, () -> service.generateModpackZip(pack, version));
+        verify(archiveSupport).upload(any(), eq("modpacks"));
+        verify(archiveSupport, never()).download("plugin-new.jar");
+        if (uploadFails) verify(reviewPersistence, never()).cacheModpackArchive(any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void localDependencyMutationCannotDeliverWhenRepositoryBindingIsUnchanged() throws Exception {
+        Project pack = pack();
+        ProjectVersion version = version("1.0.0", null);
+        ProjectDependency dependency = new ProjectDependency("plugin", "Plugin", "2.0.0");
+        version.setDependencies(List.of(dependency));
+        ProjectVersion persisted = version("2.0.0", "plugin.jar");
+        ProjectVersion prepared = version("2.0.0", "plugin.jar");
+        persisted.setHash(sha256(bytes("approved")));
+        prepared.setHash(persisted.getHash());
+        var authoritative = new DownloadArchiveSupport.ResolvedDependency(
+                dependencyProject("plugin", ProjectClassification.PLUGIN), persisted);
+        var local = new DownloadArchiveSupport.ResolvedDependency(
+                dependencyProject("plugin", ProjectClassification.PLUGIN), prepared);
+        when(archiveSupport.resolveDependency(dependency)).thenReturn(authoritative, local, authoritative);
+        when(archiveSupport.download("plugin.jar")).thenAnswer(invocation -> {
+            prepared.setHash(sha256(bytes("replacement")));
+            return bytes("replacement");
+        });
+        when(archiveSupport.extractOriginalFilename("plugin.jar")).thenReturn("plugin.jar");
+        when(archiveSupport.newZipMultipartFile(any(), any())).thenReturn(mock(MultipartFile.class));
+
+        assertThrows(IOException.class, () -> service.generateModpackZip(pack, version));
+        verify(archiveSupport, never()).upload(any(), any());
     }
 
     @Test
@@ -108,7 +300,7 @@ class ModpackArchiveServiceTest {
         assertTrue(entries.containsKey("manifest.json"));
         assertTrue(entries.containsKey("modtale.lock.json"));
         assertEquals("modpacks/rebuilt.zip", version.getFileUrl());
-        verify(projectRepository).save(pack);
+        verify(reviewPersistence).cacheModpackArchive(eq(pack.getId()), any(), any(), any(), any());
     }
 
     @Test
@@ -124,7 +316,7 @@ class ModpackArchiveServiceTest {
 
         assertEquals(true, entries.containsKey("modpack.json"));
         assertEquals("modpacks/rebuilt.zip", version.getFileUrl());
-        verify(projectRepository).save(pack);
+        verify(reviewPersistence).cacheModpackArchive(eq(pack.getId()), any(), any(), any(), any());
     }
 
     @Test
@@ -212,11 +404,26 @@ class ModpackArchiveServiceTest {
         Project pack = pack();
         ProjectVersion version = version("1.0.0", null);
         version.setOverrideFileUrl("modpack-overrides/source.zip");
-        when(archiveSupport.download("modpack-overrides/source.zip")).thenReturn(zip(Map.of(
+        byte[] overrides = zip(Map.of(
                 "overrides/Mods/example/game.json", "{}",
                 "overrides/Saves/My World/mods/Example_Plugin/config.json", "{}"
-        )));
+        ));
+        version.setHash(sha256(overrides));
+        when(archiveSupport.downloadBounded("modpack-overrides/source.zip")).thenReturn(overrides);
         assertThrows(java.io.IOException.class, () -> service.generateModpackZip(pack, version));
+    }
+
+    @Test
+    void changedOverrideBytesCannotBePackaged() throws Exception {
+        Project pack = pack();
+        ProjectVersion version = version("1.0.0", null);
+        version.setOverrideFileUrl("modpack-overrides/source.zip");
+        version.setHash(sha256(bytes("reviewed override")));
+        when(archiveSupport.downloadBounded("modpack-overrides/source.zip"))
+                .thenReturn(zip(Map.of("overrides/Universe/mods/Example_Plugin/config.json", "{}")));
+
+        assertThrows(IOException.class, () -> service.generateModpackZip(pack, version));
+        verify(archiveSupport, never()).upload(any(), any());
     }
 
     @Test
@@ -336,7 +543,67 @@ class ModpackArchiveServiceTest {
         assertTrue(entries.get("modpack.json").contains("\"externalId\" : \"1450386\""));
         assertTrue(entries.get("modpack.json").contains("\"distribution\" : \"REFERENCE_ONLY\""));
         assertTrue(entries.get("modpack.json").contains("https://www.curseforge.com/hytale/mods/external-mod/files/8227810"));
-        verify(projectRepository).save(pack);
+        verify(reviewPersistence).cacheModpackArchive(eq(pack.getId()), any(), any(), any(), any());
+    }
+
+    @Test
+    void cacheConflictDoesNotAttachOrReturnGeneratedArchive() throws Exception {
+        Project pack = pack(); ProjectVersion version = version("1.0.0", null);
+        when(archiveSupport.newZipMultipartFile(any(), any())).thenReturn(mock(MultipartFile.class));
+        when(archiveSupport.upload(any(), eq("modpacks"))).thenReturn("modpacks/new.zip");
+        when(reviewPersistence.cacheModpackArchive(any(), any(), any(), any(), any())).thenReturn(false);
+        org.junit.jupiter.api.Assertions.assertThrows(org.springframework.web.server.ResponseStatusException.class,
+                () -> service.generateModpackZip(pack, version));
+        org.junit.jupiter.api.Assertions.assertNull(version.getFileUrl());
+    }
+
+    @Test
+    void rebuildingInvalidCacheUsesTokensFromBeforeTheLocalReferenceWasCleared() throws Exception {
+        Project pack = pack(); ProjectVersion version = version("1.0.0", "modpacks/old.zip");
+        version.setId("v1"); pack.setVersions(List.of(version));
+        String projectToken = net.modtale.service.admin.review.ProjectReviewSnapshot.token(pack);
+        String versionToken = net.modtale.service.admin.review.VersionReviewSnapshot.token(version);
+        when(archiveSupport.download("modpacks/old.zip")).thenReturn(new byte[0]);
+        when(archiveSupport.newZipMultipartFile(any(), any())).thenReturn(mock(MultipartFile.class));
+        when(archiveSupport.upload(any(), eq("modpacks"))).thenReturn("modpacks/new.zip");
+        service.generateModpackZip(pack, version);
+        verify(reviewPersistence).cacheModpackArchive(pack.getId(), projectToken, "v1", versionToken, "modpacks/new.zip");
+        assertEquals("modpacks/new.zip", version.getFileUrl());
+    }
+
+    @Test
+    void generatedArchiveCannotSubstituteADifferentTemporarilyApprovedDependency() throws Exception {
+        Project pack = pack();
+        ProjectVersion parent = version("1.0.0", null);
+        ProjectDependency dependency = new ProjectDependency("plugin", "Plugin", "2.0.0");
+        parent.setDependencies(List.of(dependency));
+        var original = new DownloadArchiveSupport.ResolvedDependency(
+                dependencyProject("plugin", ProjectClassification.PLUGIN), version("2.0.0", "original.jar"));
+        var replacement = new DownloadArchiveSupport.ResolvedDependency(
+                dependencyProject("plugin", ProjectClassification.PLUGIN), version("2.0.0", "replacement.jar"));
+        when(archiveSupport.resolveDependency(dependency)).thenReturn(original, replacement, original, original);
+        when(archiveSupport.download("replacement.jar")).thenReturn(bytes("different-approved-bytes"));
+        when(archiveSupport.extractOriginalFilename("replacement.jar")).thenReturn("plugin.jar");
+
+        assertThrows(IOException.class, () -> service.generateModpackZip(pack, parent));
+        verify(archiveSupport, never()).upload(any(), any());
+        verify(reviewPersistence, never()).cacheModpackArchive(any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void cachedArchiveCannotAdoptChangedParentInputsDuringStorageRead() throws Exception {
+        Project pack = pack();
+        ProjectVersion parent = version("1.0.0", "modpacks/cached.zip");
+        pack.setTitle("Different pack inputs");
+        byte[] different = validEmptyArchive(ModpackArchiveService.cacheBinding(pack, parent));
+        pack.setTitle("Sky Pack");
+        when(archiveSupport.download("modpacks/cached.zip")).thenAnswer(call -> {
+            pack.setTitle("Different pack inputs");
+            return different;
+        });
+
+        assertThrows(IOException.class, () -> service.generateModpackZip(pack, parent));
+        verify(archiveSupport, never()).upload(any(), any());
     }
 
     private static Project pack() {
@@ -359,7 +626,12 @@ class ModpackArchiveServiceTest {
         ProjectVersion version = new ProjectVersion();
         version.setVersionNumber(versionNumber);
         version.setFileUrl(fileUrl);
+        version.setReviewStatus(ProjectVersion.ReviewStatus.APPROVED);
         return version;
+    }
+
+    private static String sha256(byte[] bytes) throws Exception {
+        return java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(bytes));
     }
 
     private static byte[] bytes(String value) {
@@ -371,6 +643,15 @@ class ModpackArchiveServiceTest {
                 "modpack.json", "{\"formatVersion\":1,\"game\":\"hytale\",\"files\":[]}",
                 "manifest.json", "{\"format\":\"modtale-pack\",\"schemaVersion\":1,\"pack\":{},\"game\":{\"id\":\"hytale\",\"versions\":[]},\"dependencies\":[]}",
                 "modtale.lock.json", "{\"format\":\"modtale-lock\",\"lockVersion\":1,\"game\":\"hytale\",\"pack\":{},\"gameVersions\":[],\"entries\":[]}"
+        ));
+    }
+
+    private static byte[] validEmptyArchive(String cacheBinding) throws IOException {
+        return zip(Map.of(
+                "modpack.json", "{\"formatVersion\":1,\"game\":\"hytale\",\"files\":[]}",
+                "manifest.json", "{\"format\":\"modtale-pack\",\"schemaVersion\":1,\"pack\":{},\"game\":{\"id\":\"hytale\",\"versions\":[]},\"dependencies\":[]}",
+                "modtale.lock.json", "{\"format\":\"modtale-lock\",\"lockVersion\":1,\"cacheBinding\":\""
+                        + cacheBinding + "\",\"game\":\"hytale\",\"pack\":{},\"gameVersions\":[],\"entries\":[]}"
         ));
     }
 

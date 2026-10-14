@@ -8,7 +8,8 @@ import net.modtale.model.project.ProjectVersion;
 import net.modtale.model.project.ScanResult;
 import net.modtale.model.project.ScanStatus;
 import net.modtale.model.user.User;
-import net.modtale.repository.project.ProjectRepository;
+import net.modtale.service.admin.review.VersionReviewPersistence;
+import static org.mockito.ArgumentMatchers.any;
 import net.modtale.service.project.access.ProjectVersionAccessService;
 import net.modtale.service.project.query.ProjectService;
 import org.junit.jupiter.api.BeforeEach;
@@ -23,8 +24,24 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class ScanRequestServiceTest {
+    @Test void conflictDoesNotQueueWorkOrMutateTheLoadedVersion() {
+        var project = new Project(); project.setId("project-1");
+        var version = new ProjectVersion(); version.setId("version-1"); version.setFileUrl("files/mod.jar");
+        version.setReviewStatus(ProjectVersion.ReviewStatus.APPROVED);
+        project.setVersions(List.of(version));
+        when(projectService.getRawProjectById("project-1")).thenReturn(project);
+        when(projectVersionAccessService.findById(project, "version-1")).thenReturn(version);
+        when(scanRoutingService.createQueuedScanResult(org.mockito.ArgumentMatchers.anyInt(), org.mockito.ArgumentMatchers.anyString())).thenReturn(new ScanResult());
+        when(reviewPersistence.queueRescan(any(), any())).thenReturn(false);
+        assertThrows(org.springframework.web.server.ResponseStatusException.class,
+                () -> service.triggerRescan("project-1", "version-1", new User()));
+        assertEquals(ProjectVersion.ReviewStatus.APPROVED, version.getReviewStatus());
+        assertNull(version.getScanResult());
+        org.mockito.Mockito.verifyNoInteractions(scanExecutionService);
+        org.mockito.Mockito.verify(projectService, org.mockito.Mockito.never()).evictProjectCache(any());
+    }
 
-    private ProjectRepository projectRepository;
+    private VersionReviewPersistence reviewPersistence;
     private ProjectService projectService;
     private ScanThrottleService scanThrottleService;
     private ScanRoutingService scanRoutingService;
@@ -34,14 +51,15 @@ class ScanRequestServiceTest {
 
     @BeforeEach
     void setUp() {
-        projectRepository = mock(ProjectRepository.class);
+        reviewPersistence = mock(VersionReviewPersistence.class);
+        when(reviewPersistence.queueRescan(any(), any())).thenReturn(true);
         projectService = mock(ProjectService.class);
         scanThrottleService = mock(ScanThrottleService.class);
         scanRoutingService = mock(ScanRoutingService.class);
         projectVersionAccessService = mock(ProjectVersionAccessService.class);
         scanExecutionService = mock(ScanExecutionService.class);
         service = new ScanRequestService(
-                projectRepository,
+                reviewPersistence,
                 projectService,
                 scanThrottleService,
                 scanRoutingService,
@@ -63,6 +81,7 @@ class ScanRequestServiceTest {
         version.setReviewStatus(ProjectVersion.ReviewStatus.SCHEDULED);
         project.setVersions(List.of(version));
         ScanResult queued = new ScanResult();
+        queued.setScanRequestId("queued-request");
         queued.setStatus(ScanStatus.SCANNING);
 
         when(projectService.getRawProjectById("project-1")).thenReturn(project);
@@ -74,12 +93,13 @@ class ScanRequestServiceTest {
         service.triggerRescan("project-1", "version-1", user);
 
         assertSame(queued, version.getScanResult());
+        org.junit.jupiter.api.Assertions.assertTrue(queued.isManualRescan());
         assertEquals(ProjectVersion.ReviewStatus.PENDING, version.getReviewStatus());
         assertNull(version.getScheduledPublishDate());
         verify(scanThrottleService).enforceRescanLimit(user);
-        verify(projectRepository).save(project);
+        verify(reviewPersistence).queueRescan(any(), any());
         verify(projectService).evictProjectCache(project);
-        verify(scanExecutionService).enqueueBackgroundScan("project-1", "version-1", "files/mod.jar", "mod.jar", true, 2);
+        verify(scanExecutionService).enqueueBackgroundScan("project-1", "version-1", "files/mod.jar", "mod.jar", true, 2, queued.getScanRequestId());
     }
 
     @Test

@@ -117,6 +117,7 @@ jobs:
       MONGODB_URI: mongodb://localhost:27017/modtale-test
       MONGODB_DATABASE_NAME: modtale-test
       R2_BUCKET_NAME: modtale-test
+      R2_ARTIFACT_BUCKET_NAME: modtale-test-artifacts
       R2_ACCESS_KEY: test-access-key
       R2_SECRET_KEY: test-secret-key
       R2_ENDPOINT: https://example.com

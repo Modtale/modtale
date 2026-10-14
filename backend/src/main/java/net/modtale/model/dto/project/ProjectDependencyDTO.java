@@ -16,7 +16,6 @@ public record ProjectDependencyDTO(
         String externalUrl,
         String externalFileUrl,
         String externalFileName,
-        String cachedFileUrl,
         boolean hytaleProjectConfirmed,
         String icon,
         String title,

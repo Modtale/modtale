@@ -6,8 +6,9 @@ import net.modtale.config.properties.AppLimitProperties;
 import net.modtale.model.project.Project;
 import net.modtale.model.project.ProjectVersion;
 import net.modtale.model.user.User;
-import net.modtale.repository.project.ProjectRepository;
+import net.modtale.service.admin.review.ProjectReviewPersistence;
 import net.modtale.service.project.query.ProjectService;
+import net.modtale.service.security.access.AccessControlService;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -18,20 +19,33 @@ public class DownloadService {
     private final BundlePackagingService bundlePackagingService;
 
     public DownloadService(
-            ProjectRepository projectRepository,
+            ProjectReviewPersistence reviewPersistence,
             ProjectService projectService,
             StorageService storageService,
+            AccessControlService accessControlService,
             AppLimitProperties limitProperties
     ) {
-        DownloadArchiveSupport archiveSupport = new DownloadArchiveSupport(projectService, storageService);
+        DownloadArchiveSupport archiveSupport = new DownloadArchiveSupport(projectService, storageService, accessControlService);
         this.rateLimitService = new DownloadRateLimitService(limitProperties.modpackGenPerHour());
-        this.modpackArchiveService = new ModpackArchiveService(projectRepository, archiveSupport);
+        this.modpackArchiveService = new ModpackArchiveService(reviewPersistence, archiveSupport);
         this.bundlePackagingService = new BundlePackagingService(archiveSupport);
     }
 
     public byte[] generateModpackZip(Project pack, ProjectVersion version, User user) throws IOException {
         rateLimitService.consumeModpackGeneration(user);
         return modpackArchiveService.generateModpackZip(pack, version);
+    }
+
+    public static String modpackCacheBinding(Project pack, ProjectVersion version) {
+        return ModpackArchiveService.cacheBinding(pack, version);
+    }
+
+    public byte[] generateModpackZip(Project pack, ProjectVersion version, User user,
+            String expectedCacheBinding, List<String> expectedDependencyBindings) throws IOException {
+        java.util.Objects.requireNonNull(expectedCacheBinding);
+        List<String> bindings = List.copyOf(expectedDependencyBindings);
+        rateLimitService.consumeModpackGeneration(user);
+        return modpackArchiveService.generateModpackZip(pack, version, expectedCacheBinding, bindings);
     }
 
     public byte[] generateBundleZip(Project mainProject, ProjectVersion mainVersion, List<String> selectedDependencies, User user) throws IOException {

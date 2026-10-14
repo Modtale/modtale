@@ -194,7 +194,7 @@ describe('DownloadModal Toggle Visibility', () => {
                     channel: 'RELEASE',
                     gameVersion: '0.5.4',
                     gameVersions: ['0.5.4'],
-                    fileUrl: '/files/skyforge.jar',
+                    fileName: 'skyforge.jar',
                     dependencies: [],
                     releaseDate: new Date().toISOString()
                 }
@@ -229,14 +229,14 @@ describe('DownloadModal Toggle Visibility', () => {
             latestButton.click();
         });
 
-        expect(onDownload).toHaveBeenCalledWith('/files/skyforge.jar', '1.0.0', '0.5.4', [], 'RELEASE');
+        expect(onDownload).toHaveBeenCalledWith('skyforge.jar', '1.0.0', '0.5.4', [], 'RELEASE');
     });
 
     it('downloads a modpack without an environment target', async () => {
         const onDownload = vi.fn();
         const version = {
             id: 'pack-v1', versionNumber: '1.0.0', channel: 'RELEASE',
-            gameVersions: ['0.5.4'], fileUrl: '/packs/sky.zip', dependencies: [],
+            gameVersions: ['0.5.4'], fileName: 'sky.zip', dependencies: [],
             releaseDate: new Date().toISOString()
         };
 
@@ -262,7 +262,7 @@ describe('DownloadModal Toggle Visibility', () => {
             .find(button => button.textContent?.includes('Download Latest')) as HTMLButtonElement;
         await act(async () => latestButton.click());
 
-        expect(onDownload).toHaveBeenCalledWith('/packs/sky.zip', '1.0.0', '0.5.4', [], 'RELEASE');
+        expect(onDownload).toHaveBeenCalledWith('sky.zip', '1.0.0', '0.5.4', [], 'RELEASE');
     });
 
     it('directs CurseForge modpacks to the launcher instead of browser download', async () => {
@@ -615,7 +615,7 @@ describe('DownloadModal Toggle Visibility', () => {
                         versionNumber: '1.0.0',
                         channel: 'RELEASE',
                         gameVersions: ['0.5.4'],
-                        fileUrl: '/files/skyforge.jar',
+                        fileName: 'skyforge.jar',
                         dependencies: [],
                         downloadCount: 0,
                         releaseDate: new Date().toISOString(),
@@ -637,7 +637,7 @@ describe('DownloadModal Toggle Visibility', () => {
             downloadButton.click();
         });
 
-        expect(onDownload).toHaveBeenCalledWith('/files/skyforge.jar', '1.0.0', '0.5.4', [], 'RELEASE');
+        expect(onDownload).toHaveBeenCalledWith('skyforge.jar', '1.0.0', '0.5.4', [], 'RELEASE');
     });
 
     it('warns when a modpack version includes external mods', async () => {

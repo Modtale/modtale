@@ -5,7 +5,8 @@ import java.util.List;
 import net.modtale.exception.ResourceNotFoundException;
 import net.modtale.model.project.Project;
 import net.modtale.model.project.ProjectStatus;
-import net.modtale.repository.project.ProjectRepository;
+import net.modtale.service.admin.review.ProjectReviewPersistence;
+import net.modtale.service.admin.review.ProjectReviewSnapshot;
 import net.modtale.service.admin.audit.AdminAuditLogger;
 import net.modtale.service.analytics.ScoringService;
 import net.modtale.service.communication.NotificationService;
@@ -19,7 +20,7 @@ import org.springframework.stereotype.Service;
 @Service
 public class ProjectModerationService {
 
-    private final ProjectRepository projectRepository;
+    private final ProjectReviewPersistence reviewPersistence;
     private final ProjectService projectService;
     private final ProjectRetentionService projectRetentionService;
     private final ProjectDeletionService projectDeletionService;
@@ -30,7 +31,7 @@ public class ProjectModerationService {
     private final AdminAuditLogger adminAuditLogger;
 
     public ProjectModerationService(
-            ProjectRepository projectRepository,
+            ProjectReviewPersistence reviewPersistence,
             ProjectService projectService,
             ProjectRetentionService projectRetentionService,
             ProjectDeletionService projectDeletionService,
@@ -40,7 +41,7 @@ public class ProjectModerationService {
             ProjectVersionAccessService projectVersionAccessService,
             AdminAuditLogger adminAuditLogger
     ) {
-        this.projectRepository = projectRepository;
+        this.reviewPersistence = reviewPersistence;
         this.projectService = projectService;
         this.projectRetentionService = projectRetentionService;
         this.projectDeletionService = projectDeletionService;
@@ -85,10 +86,12 @@ public class ProjectModerationService {
 
     public void unlistProject(net.modtale.model.user.User adminUser, String id, String reason) {
         Project targetProject = requireProject(id);
+        var snapshot = reviewPersistence.capture(id, ProjectReviewSnapshot.token(targetProject));
+        targetProject = snapshot.project();
         targetProject.setStatus(ProjectStatus.UNLISTED);
         targetProject.setExpiresAt(null);
         scoringService.markProjectRankingDirty(targetProject);
-        projectRepository.save(targetProject);
+        if (!reviewPersistence.unlist(snapshot)) throw ProjectReviewSnapshot.conflict();
         projectService.evictProjectCache(targetProject);
 
         notificationService.sendNotifcation(
@@ -103,18 +106,14 @@ public class ProjectModerationService {
 
     public void deleteProjectVersion(net.modtale.model.user.User adminUser, String id, String versionId) {
         Project project = requireProject(id);
-        projectVersionAccessService.requireById(project, versionId,
+        var snapshot = reviewPersistence.capture(id, ProjectReviewSnapshot.token(project));
+        project = snapshot.project();
+        var removed = projectVersionAccessService.requireById(project, versionId,
                 () -> new ResourceNotFoundException("Version not found."));
-        project.getVersions().removeIf(version -> {
-            if (!version.getId().equals(versionId)) {
-                return false;
-            }
-            projectDeletionService.deleteVersionFile(version);
-            return true;
-        });
-
-        projectRepository.save(project);
+        project.getVersions().removeIf(version -> version.getId().equals(versionId));
+        if (!reviewPersistence.applyVersionList(snapshot)) throw ProjectReviewSnapshot.conflict();
         projectService.evictProjectCache(project);
+        projectDeletionService.deleteVersionFile(removed);
         adminAuditLogger.logAction(adminUser.getId(), "DELETE_VERSION", id, "VERSION", "VerID: " + versionId);
     }
 

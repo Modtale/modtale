@@ -176,6 +176,65 @@ class WorldModListServiceTest {
     }
 
     @Test
+    void sharedListStopsPackagingAWithdrawnVersion() throws Exception {
+        WorldModList.Item item = new WorldModList.Item();
+        item.setProjectId("project-1");
+        item.setVersionNumber("1.2.3");
+        item.setSource(ProjectDependency.Source.MODTALE);
+        item.setFileUrl("storage/old-approved.jar");
+        item.setDownloadable(true);
+        WorldModList list = new WorldModList();
+        list.setId("list-1");
+        list.setExpiresAt(Instant.now().plusSeconds(3600));
+        list.setMods(List.of(item));
+        Project project = project();
+        ProjectVersion withdrawn = version("1.2.3", "storage/old-approved.jar");
+        withdrawn.setReviewStatus(ProjectVersion.ReviewStatus.PENDING);
+        project.setVersions(List.of(withdrawn));
+        when(repository.findById("list-1")).thenReturn(Optional.of(list));
+        when(projectService.getRawProjectById("project-1")).thenReturn(project);
+        when(accessControlService.isPubliclyReadable(project)).thenReturn(true);
+        when(versionAccessService.findByVersionNumber(project, "1.2.3", null)).thenReturn(withdrawn);
+        when(archiveService.generateZip(list)).thenReturn(new byte[]{1});
+
+        service.download("list-1");
+
+        assertEquals(false, item.isDownloadable());
+        assertEquals("", item.getFileUrl());
+        verify(archiveService).generateZip(list);
+    }
+
+    @Test
+    void sharedListDoesNotSubstituteAnOlderVersionAfterWithdrawal() throws Exception {
+        WorldModList.Item item = new WorldModList.Item();
+        item.setProjectId("project-1");
+        item.setVersionNumber("2.0.0");
+        item.setSource(ProjectDependency.Source.MODTALE);
+        item.setFileUrl("storage/withdrawn.jar");
+        item.setDownloadable(true);
+        WorldModList list = new WorldModList();
+        list.setId("list-1");
+        list.setExpiresAt(Instant.now().plusSeconds(3600));
+        list.setMods(List.of(item));
+        Project project = project();
+        ProjectVersion withdrawn = version("2.0.0", "storage/withdrawn.jar");
+        withdrawn.setReviewStatus(ProjectVersion.ReviewStatus.PENDING);
+        ProjectVersion older = version("1.0.0", "storage/older.jar");
+        project.setVersions(List.of(withdrawn, older));
+        when(repository.findById("list-1")).thenReturn(Optional.of(list));
+        when(projectService.getRawProjectById("project-1")).thenReturn(project);
+        when(accessControlService.isPubliclyReadable(project)).thenReturn(true);
+        when(versionAccessService.findByVersionNumber(project, "2.0.0", null)).thenReturn(withdrawn);
+        when(archiveService.generateZip(list)).thenReturn(new byte[]{1});
+
+        service.download("list-1");
+
+        assertEquals("2.0.0", item.getVersionNumber());
+        assertEquals(false, item.isDownloadable());
+        assertEquals("", item.getFileUrl());
+    }
+
+    @Test
     void viewHydratesStoredModtaleItemsWithCurrentProjectMetadata() {
         Instant oldExpiry = Instant.now().plusSeconds(3600);
         WorldModList.Item staleItem = new WorldModList.Item();

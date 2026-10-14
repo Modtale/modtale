@@ -15,5 +15,6 @@ public record AdminProjectVersionSummaryDTO(
         ProjectVersion.Channel channel,
         ProjectVersion.ReviewStatus reviewStatus,
         String rejectionReason,
-        ScanResult scanResult
+        ScanResult scanResult,
+        String reviewToken
 ) {}
