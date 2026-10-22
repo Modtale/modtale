@@ -179,7 +179,7 @@ test('workflow is manual, develop-only, credential-free and standard-runner with
   assert.ok(!/^  (push|pull_request|schedule):/m.test(workflow));
   assert.match(workflow, /github\.ref_name == 'develop'/);
   assert.match(workflow, /runs-on: ubuntu-latest/);
-  assert.match(workflow, /node-version: 22\.23\.3/);
+  assert.match(workflow, /node-version: 22\.23\.4/);
   assert.ok(!/DIAGNOSTIC_TOOL_ROOT: \$\{\{ runner\./.test(workflow));
   assert.match(workflow, /export DIAGNOSTIC_TOOL_ROOT="\$RUNNER_TEMP\/modtale-diagnostic-tools"/);
   assert.match(workflow, /contents: read/);
