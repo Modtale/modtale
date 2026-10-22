@@ -382,3 +382,22 @@ describe('production news and public shells', () => {
         it(`keeps private/account/token HTML ${route} no-store`, async () => { assertNoStore((await get(route)).response); });
     }
 });
+
+describe('production host validation', () => {
+    it('does not trust an arbitrary Host for public cache tags', async () => {
+        const response = await new Promise((resolve, reject) => {
+            http.get(new URL('/mod/sky', origin), { headers: { Host: 'untrusted.invalid' } }, res => {
+                res.resume();
+                resolve(res);
+            }).on('error', reject);
+        });
+        assert.equal(response.statusCode, 200);
+        assert.equal(response.headers['cache-tag'], 'modtale-html-localhost');
+    });
+
+    it('recognizes the configured public HTTPS host behind a proxy', async () => {
+        const { response } = await get('/mod/sky', { 'X-Forwarded-Host': 'modtale.net', 'X-Forwarded-Proto': 'https' });
+        assert.equal(response.status, 200);
+        assert.equal(response.headers.get('Cache-Tag'), 'modtale-html-modtale.net');
+    });
+});

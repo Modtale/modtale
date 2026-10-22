@@ -8,9 +8,9 @@ group = 'net.modtale'
 version = '0.0.1-SNAPSHOT'
 
 // Keep the embedded Tomcat family aligned while Boot 4.1.1 manages 11.0.24.
-// 11.0.26 includes the security fixes in 11.0.25 and the latest 11.0.x fixes:
+// 11.0.27 includes the HTTP/2 request/response isolation fixes disclosed in October:
 // https://tomcat.apache.org/security-11.html
-ext['tomcat.version'] = '11.0.26'
+ext['tomcat.version'] = '11.0.27'
 
 java {
     toolchain {
