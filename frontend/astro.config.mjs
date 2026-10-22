@@ -5,6 +5,14 @@ import tailwindcss from '@tailwindcss/vite';
 
 export default defineConfig({
     output: 'server',
+    security: {
+        allowedDomains: [
+            { hostname: 'modtale.net', protocol: 'https' },
+            { hostname: '*.modtale.net', protocol: 'https' },
+            { hostname: 'localhost', protocol: 'http' },
+            { hostname: '127.0.0.1', protocol: 'http' },
+        ],
+    },
     adapter: node({
         mode: 'middleware',
     }),
