@@ -399,9 +399,35 @@ fn acquire_setup_lock(state: &Path, timeout: Duration) -> Result<File> {
     }
     Ok(lock)
 }
+fn harden_runtime(java: &Path) -> Result<()> {
+    let root = java
+        .parent()
+        .and_then(Path::parent)
+        .ok_or("Java has no runtime directory")?;
+    let path = root.join("lib/security/blocked.certs");
+    let existing = fs::read_to_string(&path)?;
+    if !existing
+        .lines()
+        .any(|line| line.trim() == "Algorithm=SHA-256")
+    {
+        return Err("Java certificate blocklist does not use SHA-256".into());
+    }
+    let additional: Vec<_> = include_str!("../../security/blocked-certificates.properties")
+        .lines()
+        .filter(|line| !line.starts_with('#') && !line.is_empty())
+        .filter(|line| !existing.lines().any(|current| current.trim() == *line))
+        .collect();
+    if !additional.is_empty() {
+        let mut file = OpenOptions::new().append(true).open(path)?;
+        writeln!(file, "\n{}", additional.join("\n"))?;
+        file.sync_all()?;
+    }
+    Ok(())
+}
 fn install_runtime(state: &Path, cache: &Path, app: &Path, log: &File) -> Result<PathBuf> {
     let _lock = acquire_setup_lock(state, Duration::from_secs(660))?;
     if let Some(java) = find_java(cache, 4).filter(|j| probe(j, app, log)) {
+        harden_runtime(&java)?;
         return Ok(java);
     }
     // Only the lock holder can create download directories; remove debris from killed setup processes.
@@ -468,6 +494,7 @@ fn install_runtime(state: &Path, cache: &Path, app: &Path, log: &File) -> Result
     fs::create_dir(&extracted)?;
     extract(&archive, &extracted)?;
     let java = find_java(&extracted, 4).ok_or("Downloaded runtime has no Java executable")?;
+    harden_runtime(&java)?;
     if !probe(&java, app, log) {
         return Err("Downloaded Java failed the compatibility check".into());
     }
@@ -506,6 +533,7 @@ fn adopt_runtime(
         }
     }
     let candidate = runtime.join("bin").join(java_name());
+    harden_runtime(&candidate)?;
     if !probe(&candidate, app, log) {
         return Err(
             "Copied Java failed validation; the source may have changed during setup".into(),
@@ -712,6 +740,35 @@ mod tests {
         assert!(args.contains(&std::ffi::OsStr::new("-Xdock:name=Modtale Launcher")));
     }
     #[test]
+    fn runtime_blocklist_preserves_existing_entries_and_is_idempotent() {
+        let dir = tempfile::tempdir().unwrap();
+        fs::create_dir_all(dir.path().join("lib/security")).unwrap();
+        let path = dir.path().join("lib/security/blocked.certs");
+        fs::write(&path, "Algorithm=SHA-256\nEXISTING=").unwrap();
+        let java = dir.path().join("bin").join(java_name());
+        harden_runtime(&java).unwrap();
+        let first = fs::read_to_string(&path).unwrap();
+        assert!(first.contains("EXISTING=\n"));
+        assert!(
+            first.contains("42C4ACCD12C4F59597925E1A08A7A90102608543809308D50EC427E118BA1493=")
+        );
+        harden_runtime(&java).unwrap();
+        assert_eq!(first, fs::read_to_string(&path).unwrap());
+    }
+    #[test]
+    fn runtime_blocklist_rejects_missing_or_incompatible_blocklists() {
+        let dir = tempfile::tempdir().unwrap();
+        let java = dir.path().join("bin").join(java_name());
+        assert!(harden_runtime(&java).is_err());
+        fs::create_dir_all(dir.path().join("lib/security")).unwrap();
+        fs::write(
+            dir.path().join("lib/security/blocked.certs"),
+            "Algorithm=SHA-1\n",
+        )
+        .unwrap();
+        assert!(harden_runtime(&java).is_err());
+    }
+    #[test]
     fn verifies_download_before_use() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("download");
@@ -777,7 +834,12 @@ mod tests {
         fs::create_dir_all(original.join("bin")).unwrap();
         fs::write(original.join("bin/java"), "#!/bin/sh\nexit 0\n").unwrap();
         fs::set_permissions(original.join("bin/java"), fs::Permissions::from_mode(0o755)).unwrap();
-        fs::create_dir(original.join("lib")).unwrap();
+        fs::create_dir_all(original.join("lib/security")).unwrap();
+        fs::write(
+            original.join("lib/security/blocked.certs"),
+            "Algorithm=SHA-256\n",
+        )
+        .unwrap();
         fs::write(original.join("lib/data"), "runtime bytes").unwrap();
         symlink("data", original.join("lib/link")).unwrap();
         let cache = dir.path().join("cache");
