@@ -23,8 +23,8 @@ import {
 import { BACKEND_URL, SERVER_BACKEND_URL } from '@/utils/api.ts';
 import { HTML_CACHE, PUBLIC_SHELL_PATHS, isPrivateHtmlRequest, setPublicHtmlCache, setNoStore } from '@/utils/htmlCache';
 import { isWikiMetadata, isWikiPage } from '@/utils/wikiPayload';
-import { buildHomeBootstrap, isProjectData, isProjectPage, isPublicProject } from '@/utils/publicSsr';
 import { fetchPublicJson } from '@/utils/publicSsr.server';
+import { buildHomeBootstrap, isProjectData, isProjectPage, isPublicProject, isPublicJamList } from '@/utils/publicSsr';
 
 const url = Astro.url;
 const path = url.pathname;
@@ -153,6 +153,7 @@ const isComplex =
 
 const isBrowseRoute = !!classification && !isHome;
 const isStaticBrowseRequest = isBrowseRoute && !isComplex;
+const isJamsRoute = cleanPath === '/jams' && !isComplex;
 
 if (classification) {
     if (isHome) {
@@ -219,6 +220,15 @@ if (classification) {
     } else {
         jsonLd = baseSchemas;
     }
+} else if (isJamsRoute) {
+    const result = await fetchPublicJson(`${SERVER_BACKEND_URL}/api/v1/modjams`, 1500);
+    const jamsDataReady = isPublicJamList(result.data);
+    initialData = {
+        jamsData: jamsDataReady ? result.data : [],
+        jamsDataReady,
+    };
+    jsonLd = baseSchemas;
+    ssrSuccessfullyCompleted = jamsDataReady;
 } else if (projectLookupKey && isPublicProjectRoute && wikiSegmentIndex < 0) {
     try {
         const result = await fetchPublicJson(`${SERVER_BACKEND_URL}/api/v1/projects/${encodeURIComponent(projectLookupKey)}`, 2500);
@@ -325,7 +335,7 @@ if (projectUnavailableStatus && !initialData) {
 
 if (privateRequest) {
     setNoStore(Astro.response.headers);
-} else if (ssrSuccessfullyCompleted && (isHome || isStaticBrowseRequest)) {
+} else if (ssrSuccessfullyCompleted && (isHome || isStaticBrowseRequest || isJamsRoute)) {
     setPublicHtmlCache(Astro.response.headers, HTML_CACHE.listings);
 } else if (ssrSuccessfullyCompleted && isPublicProjectRoute) {
     setPublicHtmlCache(Astro.response.headers, HTML_CACHE.content);

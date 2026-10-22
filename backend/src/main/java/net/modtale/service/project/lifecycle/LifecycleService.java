@@ -36,6 +36,14 @@ public class LifecycleService {
         projectDraftWorkflowService.submitProject(id, user);
     }
 
+    public void submitProjectForModjam(String id, User user, String jamId) {
+        projectDraftWorkflowService.submitProjectForModjam(id, user, jamId);
+    }
+
+    public void releaseModjamEmbargo(Project project) {
+        projectPublicationService.releaseModjamEmbargo(project);
+    }
+
     public void revertProjectToDraft(String id, User user) {
         projectPublicationService.revertProjectToDraft(id, user);
     }

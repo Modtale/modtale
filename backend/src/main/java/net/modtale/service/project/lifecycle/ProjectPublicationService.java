@@ -14,6 +14,8 @@ import net.modtale.service.analytics.ScoringService;
 import net.modtale.service.analytics.TrackingService;
 import net.modtale.service.communication.ProjectNotificationService;
 import net.modtale.service.communication.WebhookService;
+import net.modtale.service.jam.ModjamEmbargoService;
+import net.modtale.service.jam.ModjamProjectReleasePersistence;
 import net.modtale.service.project.access.ProjectAccessService;
 import net.modtale.service.project.query.ProjectService;
 import net.modtale.service.security.access.AccessControlService;
@@ -32,6 +34,8 @@ public class ProjectPublicationService {
     private final AccessControlService accessControlService;
     private final ProjectAccessService projectAccessService;
     private final SecurityIssueAnalysisService securityIssueAnalysisService;
+    private final ModjamEmbargoService modjamEmbargoService;
+    private final ModjamProjectReleasePersistence modjamProjectReleasePersistence;
 
     public ProjectPublicationService(
             ProjectRepository projectRepository,
@@ -42,7 +46,9 @@ public class ProjectPublicationService {
             ScoringService scoringService,
             AccessControlService accessControlService,
             ProjectAccessService projectAccessService,
-            SecurityIssueAnalysisService securityIssueAnalysisService
+            SecurityIssueAnalysisService securityIssueAnalysisService,
+            ModjamEmbargoService modjamEmbargoService,
+            ModjamProjectReleasePersistence modjamProjectReleasePersistence
     ) {
         this.projectRepository = projectRepository;
         this.projectService = projectService;
@@ -53,6 +59,8 @@ public class ProjectPublicationService {
         this.accessControlService = accessControlService;
         this.projectAccessService = projectAccessService;
         this.securityIssueAnalysisService = securityIssueAnalysisService;
+        this.modjamEmbargoService = modjamEmbargoService;
+        this.modjamProjectReleasePersistence = modjamProjectReleasePersistence;
     }
 
     public void revertProjectToDraft(String id, User user) {
@@ -71,12 +79,14 @@ public class ProjectPublicationService {
     public void archiveProject(String id, User user) {
         Project project = projectAccessService.requireProjectPermission(id, user, "PROJECT_STATUS_ARCHIVE",
                 "You do not have permission to archive this project.");
+        requireNoActiveEmbargo(project);
         if (project.getStatus() != ProjectStatus.PUBLISHED
                 && project.getStatus() != ProjectStatus.UNLISTED
                 && project.getStatus() != ProjectStatus.PRIVATE) {
             throw new InvalidProjectRequestException("Only published, unlisted, or private projects can be archived.");
         }
         project.setStatus(ProjectStatus.ARCHIVED);
+        project.setModjamPublicationPending(false);
         project.setExpiresAt(null);
         scoringService.markProjectRankingDirty(project);
         projectRepository.save(project);
@@ -86,10 +96,12 @@ public class ProjectPublicationService {
     public void unlistProject(String id, User user) {
         Project project = projectAccessService.requireProjectPermission(id, user, "PROJECT_STATUS_UNLIST",
                 "You do not have permission to unlist this project.");
+        requireNoActiveEmbargo(project);
         if (project.getStatus() != ProjectStatus.PUBLISHED && project.getStatus() != ProjectStatus.ARCHIVED) {
             throw new InvalidProjectRequestException("Only published or archived projects can be unlisted.");
         }
         project.setStatus(ProjectStatus.UNLISTED);
+        project.setModjamPublicationPending(false);
         project.setExpiresAt(null);
         scoringService.markProjectRankingDirty(project);
         projectRepository.save(project);
@@ -103,6 +115,8 @@ public class ProjectPublicationService {
             throw new InvalidProjectRequestException("Pending or deleted projects cannot be made private.");
         }
         project.setStatus(ProjectStatus.PRIVATE);
+        // An explicit privacy choice cancels automatic jam publication.
+        project.setModjamPublicationPending(false);
         project.setExpiresAt(null);
         scoringService.markProjectRankingDirty(project);
         projectRepository.save(project);
@@ -128,7 +142,9 @@ public class ProjectPublicationService {
                 version.getScanResult() != null && version.getScanResult().getStatus() == ScanStatus.SCANNING)) {
             throw new VersionStateConflictException("Wait for the project scan to finish before publishing.");
         }
-        project.setStatus(ProjectStatus.PUBLISHED);
+        boolean embargoed = modjamEmbargoService.hasActiveEmbargo(project);
+        project.setStatus(embargoed ? ProjectStatus.PRIVATE : ProjectStatus.PUBLISHED);
+        project.setModjamPublicationPending(embargoed);
         project.setExpiresAt(null);
         project.setUpdatedAt(LocalDateTime.now().toString());
         scoringService.markProjectRankingDirty(project);
@@ -157,7 +173,7 @@ public class ProjectPublicationService {
         Project saved = projectRepository.save(project);
         projectService.evictProjectCache(saved);
 
-        if (isNew) {
+        if (isNew && !embargoed) {
             projectNotificationService.notifyNewProject(saved);
             webhookService.triggerWebhook(saved);
             webhookService.triggerDiscordWebhook(saved);
@@ -165,13 +181,41 @@ public class ProjectPublicationService {
         }
     }
 
+    public void releaseModjamEmbargo(Project project) {
+        if (!project.isModjamPublicationPending() || project.getStatus() != ProjectStatus.PRIVATE
+                || project.getDeletedAt() != null || modjamEmbargoService.hasActiveEmbargo(project)) return;
+        if (project.getClassification() != net.modtale.model.project.ProjectClassification.MODPACK
+                && (project.getVersions() == null || project.getVersions().stream().noneMatch(version ->
+                version != null && version.getReviewStatus() == ProjectVersion.ReviewStatus.APPROVED))) return;
+        if (project.getVersions() != null && project.getVersions().stream().anyMatch(version ->
+                version != null && version.getScanResult() != null
+                        && version.getScanResult().getStatus() == ScanStatus.SCANNING)) return;
+        Project saved = modjamProjectReleasePersistence.claimRelease(project);
+        if (saved == null) return;
+        projectService.evictProjectCache(saved);
+        projectNotificationService.notifyNewProject(saved);
+        webhookService.triggerWebhook(saved);
+        webhookService.triggerDiscordWebhook(saved);
+        trackingService.logNewProject(saved.getId());
+    }
+
     public void updateProjectStatus(String id, ProjectStatus status, User user, String permissionRequired) {
         Project project = projectAccessService.requireProjectPermission(id, user, permissionRequired,
                 "You do not have permission to update this project.");
+        if (status == ProjectStatus.PUBLISHED || status == ProjectStatus.UNLISTED || status == ProjectStatus.ARCHIVED) {
+            requireNoActiveEmbargo(project);
+        }
         project.setStatus(status);
+        project.setModjamPublicationPending(false);
         project.setExpiresAt(null);
         scoringService.markProjectRankingDirty(project);
         projectRepository.save(project);
         projectService.evictProjectCache(project);
+    }
+
+    private void requireNoActiveEmbargo(Project project) {
+        if (modjamEmbargoService.hasActiveEmbargo(project)) {
+            throw new InvalidProjectRequestException("This jam hides its entries until voting opens.");
+        }
     }
 }

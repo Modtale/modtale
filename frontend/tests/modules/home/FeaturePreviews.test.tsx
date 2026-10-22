@@ -48,7 +48,7 @@ describe('FeaturePreviews ProjectAnalyticsSection', () => {
         expect(container.textContent).toContain('Conversion Rate');
         expect(container.textContent).toContain('Downloads');
         expect(container.textContent).toContain('Views');
-        
+
         const gridContainer = container.querySelector('.grid');
         expect(gridContainer?.className).toContain('md:grid-cols-3');
     });

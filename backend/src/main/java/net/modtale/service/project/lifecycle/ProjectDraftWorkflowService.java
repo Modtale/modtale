@@ -152,6 +152,10 @@ public class ProjectDraftWorkflowService {
     }
 
     public void submitProject(String id, User user) {
+        submitProjectForModjam(id, user, null);
+    }
+
+    public void submitProjectForModjam(String id, User user, String jamId) {
         Project project = projectAccessService.requireProjectPermission(id, user, "PROJECT_STATUS_SUBMIT",
                 "You do not have permission to submit this project.");
         requireVerifiedEmail(user, "submit a project for review");
@@ -176,6 +180,10 @@ public class ProjectDraftWorkflowService {
             throw new InvalidProjectRequestException("Select a license before submitting this project.");
         }
 
+        if (jamId != null) {
+            if (project.getModjamIds() == null) project.setModjamIds(new ArrayList<>());
+            if (!project.getModjamIds().contains(jamId)) project.getModjamIds().add(jamId);
+        }
         project.setStatus(ProjectStatus.PENDING);
         project.setExpiresAt(null);
         List<ProjectVersion> scansQueuedForSubmission = new ArrayList<>();

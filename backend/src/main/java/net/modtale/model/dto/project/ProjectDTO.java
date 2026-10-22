@@ -35,6 +35,7 @@ public class ProjectDTO {
     private Map<String, String> links;
     private List<String> types;
     private List<String> childProjectIds;
+    private List<String> modjamIds;
     private boolean allowModpacks;
     private boolean allowComments;
     private boolean hmWikiEnabled;
@@ -106,6 +107,8 @@ public class ProjectDTO {
     public void setTypes(List<String> types) { this.types = types; }
     public List<String> getChildProjectIds() { return childProjectIds; }
     public void setChildProjectIds(List<String> childProjectIds) { this.childProjectIds = childProjectIds; }
+    public List<String> getModjamIds() { return modjamIds; }
+    public void setModjamIds(List<String> modjamIds) { this.modjamIds = modjamIds; }
     public boolean isAllowModpacks() { return allowModpacks; }
     public void setAllowModpacks(boolean allowModpacks) { this.allowModpacks = allowModpacks; }
     public boolean isAllowComments() { return allowComments; }
