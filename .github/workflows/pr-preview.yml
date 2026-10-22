@@ -38,6 +38,11 @@ jobs:
       head_repo: ${{ steps.resolve.outputs.head_repo }}
       head_sha: ${{ steps.resolve.outputs.head_sha }}
     steps:
+      - name: Set up patched Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.23.4
+
       - id: resolve
         name: Validate maintainer command
         env:
@@ -139,6 +144,11 @@ jobs:
       PR_HEAD_SHA: ${{ needs.command.outputs.head_sha }}
 
     steps:
+      - name: Set up patched Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.23.4
+
       - name: Validate preview isolation config
         run: |
           : "${PROJECT_ID:?Set repository variable GCP_PREVIEW_PROJECT_ID to a dedicated preview GCP project.}"
@@ -493,6 +503,11 @@ jobs:
       CLOUDFLARE_R2_JURISDICTION: ${{ vars.CLOUDFLARE_R2_JURISDICTION }}
 
     steps:
+      - name: Set up patched Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.23.4
+
       - name: Check out trusted cleanup scripts
         uses: actions/checkout@v4
         with:
