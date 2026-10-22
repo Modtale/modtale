@@ -31,8 +31,8 @@ class EmbeddedTomcatCompatibilityTest {
     String version = Tomcat.class.getPackage().getImplementationVersion();
     assertNotNull(version);
     assertTrue(
-        Runtime.Version.parse(version).compareTo(Runtime.Version.parse("11.0.26")) >= 0,
-        "Embedded Tomcat must include the fixes released in 11.0.26");
+        Runtime.Version.parse(version).compareTo(Runtime.Version.parse("11.0.27")) >= 0,
+        "Embedded Tomcat must include the fixes released in 11.0.27");
     assertEquals(version, ExpressionFactoryImpl.class.getPackage().getImplementationVersion());
     assertEquals(version, WsServerContainer.class.getPackage().getImplementationVersion());
   }
