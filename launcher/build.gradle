@@ -344,7 +344,7 @@ def bootstrapExecutable = bootstrapTarget.map {
 }
 tasks.register('buildBootstrap', Exec) {
     inputs.dir('bootstrap/src')
-    inputs.files('bootstrap/Cargo.toml', 'bootstrap/Cargo.lock', 'bootstrap/build.rs')
+    inputs.files('bootstrap/Cargo.toml', 'bootstrap/Cargo.lock', 'bootstrap/build.rs', 'security/blocked-certificates.properties')
     if (currentOs.isWindows()) {
         inputs.file(appIconIco)
     }
