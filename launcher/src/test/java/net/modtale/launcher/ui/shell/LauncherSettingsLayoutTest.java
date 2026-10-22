@@ -130,6 +130,10 @@ class LauncherSettingsLayoutTest {
                             && button.getText().equals("Clear Cache"))
                     .findFirst().orElseThrow();
             var cacheBounds = cache.localToScene(cache.getLayoutBounds());
+            var detail = view.lookup(".settings-detail");
+            var detailBounds = detail.localToScene(detail.getLayoutBounds());
+            assertTrue(cacheBounds.getMaxY() <= detailBounds.getMaxY() - 20,
+                    "Cache card should stay inside the padded settings detail panel");
             var viewport = scroll.lookup(".viewport");
             var viewportBounds = viewport.localToScene(viewport.getLayoutBounds());
             assertTrue(cacheBounds.getMaxY() <= viewportBounds.getMaxY() + 1,

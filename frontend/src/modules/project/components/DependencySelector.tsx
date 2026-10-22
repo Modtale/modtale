@@ -663,14 +663,11 @@ export const DependencySelector: React.FC<DependencySelectorProps> = ({
                 <div className={theme.components.modalOverlay}>
                     <div role="dialog" aria-modal="true" aria-label="Select mod version" className={`${modpackDialog.content}`} onKeyDown={event => { if (event.key === 'Escape') setSelectedProject(null); }}>
                         <div className={modpackDialog.header}>
-                            <div>
-                                <h3 className={modpackDialog.title}><PackagePlus className={`w-5 h-5 shrink-0 ${theme.colors.accent}`} />Select Version</h3>
-                                <p className={`text-xs ${theme.colors.textMuted} mt-1 truncate max-w-[20rem]`}>{selectedProject.title}</p>
-                            </div>
+                            <h3 className={modpackDialog.title}><PackagePlus className={`w-5 h-5 shrink-0 ${theme.colors.accent}`} />Select Version</h3>
                             <button type="button" onClick={() => setSelectedProject(null)} aria-label="Close version picker" className={modpackDialog.close}><X className="w-5 h-5" /></button>
                         </div>
 
-                        <div className="px-6 py-2 space-y-3">
+                        <div className="px-6 pt-2 pb-0 space-y-3">
                             <div className="flex items-center justify-between">
                                 <span className={`text-xs ${theme.colors.textMuted}`}>Show Alpha/Beta</span>
                                 <button type="button" onClick={() => setShowAlphaBeta(!showAlphaBeta)} className={`transition-colors ${showAlphaBeta ? theme.colors.accent : theme.colors.textMuted}`}>
@@ -684,7 +681,7 @@ export const DependencySelector: React.FC<DependencySelectorProps> = ({
                             </label>
                         </div>
 
-                        <div className={`${modpackDialog.body} !pt-2 !pb-4 !space-y-2`}>
+                        <div className={`${modpackDialog.body} !pt-1 !pb-4 !space-y-2`}>
                             {loadingProjectVersions ? (
                                 <div className={`p-4 text-center text-xs ${theme.colors.textMuted} flex items-center justify-center gap-2`}>
                                     <Loader2 className="w-4 h-4 animate-spin" /> Loading versions...

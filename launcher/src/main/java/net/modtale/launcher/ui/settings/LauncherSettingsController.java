@@ -18,6 +18,7 @@ import javafx.scene.control.ToggleGroup;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
+import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
@@ -176,6 +177,7 @@ public final class LauncherSettingsController {
         navigation.getChildren().add(heading);
         VBox detail = new VBox(24);
         detail.setMinWidth(0);
+        detail.setMinHeight(Region.USE_PREF_SIZE);
         detail.getStyleClass().addAll("library-detail-pane", "settings-detail");
         HBox.setHgrow(detail, Priority.ALWAYS);
         ToggleGroup categories = new ToggleGroup();
