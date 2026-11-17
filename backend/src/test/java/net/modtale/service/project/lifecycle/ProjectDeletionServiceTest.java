@@ -25,6 +25,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -42,6 +44,7 @@ class ProjectDeletionServiceTest {
     private ScoringService scoringService;
     private StorageService storageService;
     private MongoTemplate mongoTemplate;
+    private net.modtale.service.jam.ModjamEmbargoService embargo;
 
     @BeforeEach
     void setUp() {
@@ -51,6 +54,7 @@ class ProjectDeletionServiceTest {
         scoringService = mock(ScoringService.class);
         storageService = mock(StorageService.class);
         mongoTemplate = mock(MongoTemplate.class);
+        embargo = mock(net.modtale.service.jam.ModjamEmbargoService.class);
         ProjectArtifactDeletionService projectArtifactDeletionService = new ProjectArtifactDeletionService(storageService);
         service = new ProjectDeletionService(
                 projectRepository,
@@ -58,8 +62,28 @@ class ProjectDeletionServiceTest {
                 trackingService,
                 scoringService,
                 projectArtifactDeletionService,
-                mongoTemplate
+                mongoTemplate,
+                embargo
         );
+    }
+
+    @Test
+    void cannotRestoreSecretEntryIntoAnyPubliclyReadableState() {
+        Project project = editableProject("project-1", ProjectClassification.DATA, ProjectStatus.DELETED);
+        when(embargo.hasActiveEmbargo(project)).thenReturn(true);
+        for (ProjectStatus target : List.of(ProjectStatus.PUBLISHED, ProjectStatus.UNLISTED, ProjectStatus.ARCHIVED)) {
+            assertThrows(net.modtale.exception.InvalidProjectRequestException.class, () -> service.restore(project, target));
+        }
+        assertEquals(ProjectStatus.DELETED, project.getStatus());
+        verify(projectRepository, never()).save(any());
+    }
+
+    @Test
+    void explicitDeleteCancelsAutomaticJamPublication() {
+        Project project = editableProject("project-1", ProjectClassification.DATA, ProjectStatus.PRIVATE);
+        project.setModjamPublicationPending(true);
+        service.softDelete(project);
+        assertFalse(project.isModjamPublicationPending());
     }
 
     @Test

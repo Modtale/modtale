@@ -42,6 +42,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.context.SecurityContextRepository;
+import org.springframework.security.web.csrf.CsrfTokenRepository;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -57,6 +58,7 @@ public class AuthController {
     private final net.modtale.service.auth.MfaEnrollmentService mfaEnrollmentService;
     private final LauncherAuthService launcherAuthService;
     private final SecurityContextRepository securityContextRepository;
+    private final CsrfTokenRepository csrfTokenRepository;
 
     public AuthController(
             AuthenticationService authenticationService,
@@ -65,7 +67,8 @@ public class AuthController {
             TwoFactorService twoFactorService,
             LauncherAuthService launcherAuthService,
             SecurityContextRepository securityContextRepository,
-            net.modtale.service.auth.MfaEnrollmentService mfaEnrollmentService
+            net.modtale.service.auth.MfaEnrollmentService mfaEnrollmentService,
+            CsrfTokenRepository csrfTokenRepository
     ) {
         this.authenticationService = authenticationService;
         this.mfaEnrollmentService = mfaEnrollmentService;
@@ -74,6 +77,7 @@ public class AuthController {
         this.twoFactorService = twoFactorService;
         this.launcherAuthService = launcherAuthService;
         this.securityContextRepository = securityContextRepository;
+        this.csrfTokenRepository = csrfTokenRepository;
     }
 
     @PostMapping("/register")
@@ -118,7 +122,8 @@ public class AuthController {
 
         expireCookie(response, "SESSION");
         expireCookie(response, "JSESSIONID");
-        expireCookie(response, "XSRF-TOKEN");
+        // Delete the same domain/partition as the issued CSRF cookie.
+        csrfTokenRepository.saveToken(null, request, response);
 
         return ResponseEntity.ok(new StatusResponse("success"));
     }

@@ -133,10 +133,11 @@ api.interceptors.response.use(
                 }
                 setCsrfHeader(config, token);
             }
-            return await api.request(config);
         } catch {
             return Promise.reject(error);
         }
+        // Preserve validation/session errors returned by the retried request.
+        return api.request(config);
     }
 );
 

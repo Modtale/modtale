@@ -48,6 +48,7 @@ import org.springframework.security.web.authentication.www.BasicAuthenticationFi
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.security.web.context.SecurityContextRepository;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
+import org.springframework.security.web.csrf.CsrfTokenRepository;
 import org.springframework.session.web.http.CookieSerializer;
 import org.springframework.session.web.http.DefaultCookieSerializer;
 import org.springframework.web.cors.CorsConfigurationSource;
@@ -119,7 +120,12 @@ public class SecurityConfig {
         String cleanUrl = getCleanFrontendUrl();
         if (cleanUrl == null || cleanUrl.isBlank()) return false;
         String host = safeHostFromUrl(cleanUrl);
-        return (host != null && host.endsWith(".run.app")) || "dev.modtale.net".equalsIgnoreCase(host);
+        return isCloudRunPreviewEnvironment() || "dev.modtale.net".equalsIgnoreCase(host);
+    }
+
+    private boolean isCloudRunPreviewEnvironment() {
+        String host = safeHostFromUrl(getCleanFrontendUrl());
+        return host != null && host.toLowerCase(java.util.Locale.ROOT).endsWith(".run.app");
     }
 
     private boolean isLocalhost() {
@@ -182,6 +188,9 @@ public class SecurityConfig {
         DefaultCookieSerializer serializer = new DefaultCookieSerializer();
         serializer.setUseSecureCookie(!isLocalhost());
         serializer.setCookiePath("/");
+        // Cloud Run frontend and API hosts are cross-site. Keep their session scoped
+        // to the frontend's cookie partition when third-party cookies are blocked.
+        serializer.setPartitioned(isCloudRunPreviewEnvironment());
 
         boolean isPreview = isPreviewEnvironment();
         String cleanUrl = getCleanFrontendUrl();
@@ -206,10 +215,7 @@ public class SecurityConfig {
     }
 
     @Bean
-    public SecurityFilterChain securityFilterChain(
-            HttpSecurity http,
-            OAuth2AuthorizationRequestResolver authorizationRequestResolver
-    ) throws Exception {
+    public CsrfTokenRepository csrfTokenRepository() {
         CookieCsrfTokenRepository tokenRepository = CookieCsrfTokenRepository.withHttpOnlyFalse();
         tokenRepository.setCookiePath("/");
 
@@ -217,6 +223,7 @@ public class SecurityConfig {
             boolean isPreview = isPreviewEnvironment();
             String cleanUrl = getCleanFrontendUrl();
             cookie.secure(!isLocalhost());
+            cookie.partitioned(isCloudRunPreviewEnvironment());
 
             if (isPreview) {
                 cookie.sameSite("None");
@@ -235,6 +242,16 @@ public class SecurityConfig {
                 }
             }
         });
+
+        return isCloudRunPreviewEnvironment() ? new PartitionedCsrfTokenRepository(tokenRepository) : tokenRepository;
+    }
+
+    @Bean
+    public SecurityFilterChain securityFilterChain(
+            HttpSecurity http,
+            OAuth2AuthorizationRequestResolver authorizationRequestResolver
+    ) throws Exception {
+        CsrfTokenRepository tokenRepository = csrfTokenRepository();
 
         PublicReadCsrfTokenRequestHandler requestHandler = new PublicReadCsrfTokenRequestHandler();
 
@@ -289,7 +306,10 @@ public class SecurityConfig {
                         .requestMatchers("/sitemap.xml", "/actuator/health", "/actuator/health/**").permitAll()
                         .requestMatchers("/client-metadata.json").permitAll()
                         .requestMatchers(HttpMethod.GET,
+                                "/api/v1/projects",
                                 "/api/v1/projects/**",
+                                "/api/v1/modjams",
+                                "/api/v1/modjams/**",
                                 "/api/v1/news",
                                 "/api/v1/news/**",
                                 "/api/v1/tags",
@@ -359,9 +379,10 @@ public class SecurityConfig {
                                 "/api/v1/auth/change-password",
                                 "/api/v1/auth/credentials"
                         ).authenticated()
-                        .requestMatchers(HttpMethod.POST, "/api/v1/projects/**").authenticated()
-                        .requestMatchers(HttpMethod.PUT, "/api/v1/projects/**").authenticated()
-                        .requestMatchers(HttpMethod.DELETE, "/api/v1/projects/**").authenticated()
+                        .requestMatchers(HttpMethod.POST, "/api/v1/projects", "/api/v1/projects/**", "/api/v1/modjams", "/api/v1/modjams/**").authenticated()
+                        .requestMatchers(HttpMethod.PUT, "/api/v1/projects", "/api/v1/projects/**", "/api/v1/modjams", "/api/v1/modjams/**").authenticated()
+                        .requestMatchers(HttpMethod.DELETE, "/api/v1/projects", "/api/v1/projects/**", "/api/v1/modjams", "/api/v1/modjams/**").authenticated()
+                        .requestMatchers(HttpMethod.PATCH, "/api/v1/modjams", "/api/v1/modjams/**").authenticated()
                         .requestMatchers("/api/**").authenticated()
                         .anyRequest().permitAll()
                 )

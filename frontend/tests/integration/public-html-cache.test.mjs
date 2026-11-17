@@ -20,8 +20,15 @@ let buildDir;
 let origin;
 let homeMode = 'success';
 let newsMode = 'success';
+let jamsMode = 'success';
 let wikiOverrides = {};
 let upstreamRequests = [];
+const jam = {
+    id: 'jam-1', slug: 'sky-jam', title: 'Sky Jam', description: 'Build together', hostId: 'ada', hostName: 'Ada',
+    status: 'ACTIVE', participantIds: [], categories: [], startDate: '2026-09-01T00:00:00Z', endDate: '2026-10-01T00:00:00Z',
+    votingEndDate: '2026-10-08T00:00:00Z', createdAt: '2026-08-01T00:00:00Z', allowPublicVoting: true,
+    allowConcurrentVoting: false, showResultsBeforeVotingEnds: false,
+};
 const wikiMetadata = { index: { slug: 'home-1' }, pages: [{ slug: 'home-1', title: 'Welcome' }] };
 const wikiPage = { slug: 'home-1', title: 'Welcome', content: 'Public wiki' };
 
@@ -89,6 +96,15 @@ before(async () => {
             if (url.pathname.endsWith('/failure')) return json(res, {}, 503);
             return json(res, { project, metadata: Object.hasOwn(wikiOverrides, 'metadata') ? wikiOverrides.metadata : wikiMetadata, page: Object.hasOwn(wikiOverrides, 'page') ? wikiOverrides.page : wikiPage, pageSlug: 'home-1' });
         }
+        if (url.pathname === '/api/v1/modjams') {
+            if (jamsMode === 'failure') return json(res, {}, 503);
+            if (jamsMode === 'slow') return;
+            if (jamsMode === 'malformed') return json(res, { jams: [] });
+            if (jamsMode === 'malformed-entry') return json(res, [null]);
+            if (jamsMode === 'draft') return json(res, [{ ...jam, status: 'DRAFT' }]);
+            if (jamsMode === 'private-invites') return json(res, [{ ...jam, pendingJudgeInvites: ['private-name'] }]);
+            return json(res, jamsMode === 'empty' ? [] : [jam]);
+        }
         if (url.pathname === '/api/v1/news') {
             if (newsMode === 'failure') return json(res, {}, 503);
             if (newsMode === 'malformed') return json(res, { posts: [] });
@@ -118,7 +134,7 @@ before(async () => {
 }, { timeout: 120000 });
 
 after(async () => { await close(frontend); await close(backend); if (buildDir) await rm(buildDir, { recursive: true, force: true }); });
-beforeEach(() => { homeMode = 'success'; newsMode = 'success'; wikiOverrides = {}; upstreamRequests = []; });
+beforeEach(() => { homeMode = 'success'; newsMode = 'success'; jamsMode = 'success'; wikiOverrides = {}; upstreamRequests = []; });
 
 describe('production server-only SSR transport', () => {
     it('keeps Node HTTP transport out of browser assets', async () => {
@@ -208,6 +224,55 @@ describe('production SSR homepage caching', () => {
     });
 });
 
+describe('production public jam listing caching', () => {
+    it('preserves jam SSR bootstrap with the bounded listing CDN policy', async () => {
+        const { response, html } = await get('/jams');
+        assertPublic(response, 300);
+        assert.equal(bootstrap(html).jamsDataReady, true);
+        assert.deepEqual(bootstrap(html).jamsData, [jam]);
+        assert.match(html, /Sky Jam/);
+        assert.match(html, /href="\/jam\/sky-jam"/);
+    });
+    it('caches authoritative empty jam listings', async () => {
+        jamsMode = 'empty';
+        const { response, html } = await get('/jams');
+        assertPublic(response, 300);
+        assert.equal(bootstrap(html).jamsDataReady, true);
+        assert.deepEqual(bootstrap(html).jamsData, []);
+    });
+    for (const mode of ['failure', 'slow', 'malformed', 'malformed-entry', 'draft', 'private-invites']) {
+        it(`keeps ${mode} jam listings no-store and client-recoverable`, async () => {
+            jamsMode = mode;
+            const { response, html } = await get('/jams');
+            assert.equal(response.status, 200);
+            assertNoStore(response);
+            assert.equal(bootstrap(html).jamsDataReady, false);
+            assert.deepEqual(bootstrap(html).jamsData, []);
+            assert.doesNotMatch(html, /private-name/);
+        });
+    }
+    it('recovers on the next request after a failed jam listing', async () => {
+        jamsMode = 'failure';
+        assertNoStore((await get('/jams')).response);
+        jamsMode = 'success';
+        const { response, html } = await get('/jams');
+        assertPublic(response, 300);
+        assert.equal(bootstrap(html).jamsDataReady, true);
+    });
+    it('keeps credential-bearing jam requests no-store without forwarding credentials', async () => {
+        const { response } = await get('/jams', { Cookie: 'session=sentinel', Authorization: 'Bearer sentinel' });
+        assertNoStore(response);
+        assert.ok(upstreamRequests.some(request => request.path === '/api/v1/modjams'));
+        for (const request of upstreamRequests) {
+            assert.equal(request.cookie, undefined);
+            assert.equal(request.authorization, undefined);
+        }
+    });
+    for (const route of ['/jams?token=secret', '/jams?page=1', '/jams?q=sky', '/jam/sky-jam/edit']) {
+        it(`keeps private/filtered jam HTML ${route} no-store`, async () => { assertNoStore((await get(route)).response); });
+    }
+});
+
 describe('production public detail and SEO behavior', () => {
     for (const route of ['/mod/sky', '/modpack/pack', '/world/world', '/mod/sky/download', '/mod/sky/changelog', '/mod/sky/gallery', '/mod/sky/wiki', '/creator/ada']) {
         it(`returns identical bot/human HTML and bounded CDN policy for ${route}`, async () => {
@@ -274,14 +339,14 @@ describe('production public detail and SEO behavior', () => {
         assert.deepEqual(wikiBootstrap(html).metadataData, wikiMetadata);
         assert.deepEqual(wikiBootstrap(html).pageData, wikiPage);
     });
-    for (const route of ['/', '/mods', '/mod/sky', '/mod/sky/download', '/mod/sky/wiki', '/creator/ada', '/news', '/news/update', '/launcher']) {
+    for (const route of ['/', '/mods', '/jams', '/mod/sky', '/mod/sky/download', '/mod/sky/wiki', '/creator/ada', '/news', '/news/update', '/launcher']) {
         it(`returns exact anonymous/session-cookie HTML equality for ${route} without forwarding credentials`, async () => {
             // Keep lazy-module state constant while isolating request credentials.
             await get(route);
             const anonymous = await get(route);
             const withSession = await get(route, { Cookie: 'session=sentinel' });
-            assertPublic(anonymous.response, route === '/' || route === '/mods' ? 300 : 600);
-            assertPublic(withSession.response, route === '/' || route === '/mods' ? 300 : 600);
+            assertPublic(anonymous.response, route === '/' || route === '/mods' || route === '/jams' ? 300 : 600);
+            assertPublic(withSession.response, route === '/' || route === '/mods' || route === '/jams' ? 300 : 600);
             assert.equal(anonymous.html, withSession.html);
             for (const request of upstreamRequests) {
                 assert.equal(request.cookie, undefined);
@@ -349,6 +414,33 @@ describe('production public detail and SEO behavior', () => {
         assert.equal(response.status, 404);
         assertNoStore(response);
         assert.match(html, /name="robots" content="noindex,follow"/);
+    });
+});
+
+describe('Modjam populated review fixture preservation', () => {
+    it('serves all read-only populated fixtures only in the branch preview', async () => {
+        const original = process.env.LOG_ENVIRONMENT;
+        try {
+            process.env.LOG_ENVIRONMENT = 'prod';
+            assert.equal((await get('/jam-ui-review/organizers')).response.status, 404);
+            process.env.LOG_ENVIRONMENT = 'branch-preview';
+            for (const view of ['detail', 'builder', 'organizers', 'mobile']) {
+                const { response, html } = await get(`/jam-ui-review/${view}`);
+                assert.equal(response.status, 200);
+                assertNoStore(response);
+                assert.match(response.headers.get('Content-Security-Policy'), /script-src 'none'/);
+                assert.match(html, /Modjams/);
+            }
+            const { html } = await get('/jam-ui-review/organizers');
+            assert.match(html, /Organizer role name/);
+            assert.match(html, /Edit overview and images/);
+            assert.match(html, /Event editor/);
+            assert.match(html, /Judging lead/);
+            assert.equal((await get('/jam-ui-review/unknown')).response.status, 404);
+        } finally {
+            if (original === undefined) delete process.env.LOG_ENVIRONMENT;
+            else process.env.LOG_ENVIRONMENT = original;
+        }
     });
 });
 

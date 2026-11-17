@@ -106,7 +106,9 @@ class LifecycleServiceTest {
                 mock(ScoringService.class),
                 accessControlService,
                 projectAccessService,
-                securityIssueAnalysisService
+                securityIssueAnalysisService,
+                mock(net.modtale.service.jam.ModjamEmbargoService.class),
+                mock(net.modtale.service.jam.ModjamProjectReleasePersistence.class)
         );
         lifecycleService = new LifecycleService(
                 projectDraftWorkflowService,

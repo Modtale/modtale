@@ -9,6 +9,7 @@ import net.modtale.repository.project.ProjectRepository;
 import net.modtale.service.admin.audit.AdminAuditLogger;
 import net.modtale.service.analytics.ScoringService;
 import net.modtale.service.communication.NotificationService;
+import net.modtale.service.jam.ModjamEmbargoService;
 import net.modtale.service.project.access.ProjectVersionAccessService;
 import net.modtale.service.project.lifecycle.ProjectDeletionService;
 import net.modtale.service.project.lifecycle.ProjectRetentionService;
@@ -28,6 +29,7 @@ public class ProjectModerationService {
     private final ScanService scanService;
     private final ProjectVersionAccessService projectVersionAccessService;
     private final AdminAuditLogger adminAuditLogger;
+    private final ModjamEmbargoService modjamEmbargoService;
 
     public ProjectModerationService(
             ProjectRepository projectRepository,
@@ -38,7 +40,8 @@ public class ProjectModerationService {
             NotificationService notificationService,
             ScanService scanService,
             ProjectVersionAccessService projectVersionAccessService,
-            AdminAuditLogger adminAuditLogger
+            AdminAuditLogger adminAuditLogger,
+            ModjamEmbargoService modjamEmbargoService
     ) {
         this.projectRepository = projectRepository;
         this.projectService = projectService;
@@ -49,6 +52,7 @@ public class ProjectModerationService {
         this.scanService = scanService;
         this.projectVersionAccessService = projectVersionAccessService;
         this.adminAuditLogger = adminAuditLogger;
+        this.modjamEmbargoService = modjamEmbargoService;
     }
 
     public void deleteProject(net.modtale.model.user.User adminUser, String id, String reason) {
@@ -85,7 +89,11 @@ public class ProjectModerationService {
 
     public void unlistProject(net.modtale.model.user.User adminUser, String id, String reason) {
         Project targetProject = requireProject(id);
+        if (modjamEmbargoService.hasActiveEmbargo(targetProject)) {
+            throw new net.modtale.exception.InvalidProjectRequestException("This jam hides its entries until voting opens.");
+        }
         targetProject.setStatus(ProjectStatus.UNLISTED);
+        targetProject.setModjamPublicationPending(false);
         targetProject.setExpiresAt(null);
         scoringService.markProjectRankingDirty(targetProject);
         projectRepository.save(targetProject);

@@ -100,6 +100,15 @@ describe('api utils', () => {
         }
     });
 
+    it('preserves the actual validation failure after a CSRF refresh retry', async () => {
+        const handler = (api.interceptors.response as any).handlers[0].rejected;
+        const validationError = { response: { status: 400, data: { message: 'Invalid jam score' } } };
+        vi.spyOn(api, 'get').mockResolvedValueOnce({ data: { token: 'new-token' } });
+        vi.spyOn(api, 'request').mockRejectedValueOnce(validationError);
+        const originalError = { config: { headers: {}, method: 'post' }, response: { status: 403 } };
+        await expect(handler(originalError)).rejects.toBe(validationError);
+    });
+
     it('extracts the most useful api error message available', () => {
         expect(extractApiErrorMessage('Plain string', 'Fallback')).toBe('Plain string');
 

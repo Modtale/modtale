@@ -9,6 +9,7 @@ import net.modtale.model.project.ProjectStatus;
 import net.modtale.model.project.ProjectVersion;
 import net.modtale.repository.project.ProjectRepository;
 import net.modtale.service.analytics.ScoringService;
+import net.modtale.service.jam.ModjamEmbargoService;
 import net.modtale.service.analytics.TrackingService;
 import net.modtale.service.project.query.ProjectService;
 import org.springframework.data.mongodb.core.MongoTemplate;
@@ -26,6 +27,7 @@ public class ProjectDeletionService {
     private final ScoringService scoringService;
     private final ProjectArtifactDeletionService projectArtifactDeletionService;
     private final MongoTemplate mongoTemplate;
+    private final ModjamEmbargoService modjamEmbargoService;
 
     public ProjectDeletionService(
             ProjectRepository projectRepository,
@@ -33,7 +35,8 @@ public class ProjectDeletionService {
             TrackingService trackingService,
             ScoringService scoringService,
             ProjectArtifactDeletionService projectArtifactDeletionService,
-            MongoTemplate mongoTemplate
+            MongoTemplate mongoTemplate,
+            ModjamEmbargoService modjamEmbargoService
     ) {
         this.projectRepository = projectRepository;
         this.projectService = projectService;
@@ -41,11 +44,13 @@ public class ProjectDeletionService {
         this.scoringService = scoringService;
         this.projectArtifactDeletionService = projectArtifactDeletionService;
         this.mongoTemplate = mongoTemplate;
+        this.modjamEmbargoService = modjamEmbargoService;
     }
 
     public void softDelete(Project project) {
         ProjectStatus oldStatus = project.getStatus();
         project.setStatus(ProjectStatus.DELETED);
+        project.setModjamPublicationPending(false);
         project.setDeletedAt(LocalDateTime.now());
         scoringService.markProjectRankingDirty(project);
         projectRepository.save(project);
@@ -56,7 +61,12 @@ public class ProjectDeletionService {
     }
 
     public void restore(Project project, ProjectStatus targetStatus) {
+        if ((targetStatus == ProjectStatus.PUBLISHED || targetStatus == ProjectStatus.UNLISTED || targetStatus == ProjectStatus.ARCHIVED)
+                && modjamEmbargoService.hasActiveEmbargo(project)) {
+            throw new net.modtale.exception.InvalidProjectRequestException("Restore this secret jam entry as private until voting opens.");
+        }
         project.setStatus(targetStatus);
+        project.setModjamPublicationPending(false);
         project.setDeletedAt(null);
         scoringService.markProjectRankingDirty(project);
         projectRepository.save(project);
