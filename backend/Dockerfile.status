@@ -16,6 +16,9 @@ COPY . .
 RUN ./gradlew test statusServiceJar --no-daemon
 
 FROM docker.io/library/eclipse-temurin:26-jre-jammy
+# Stopgap for CVE-2026-114938 ("Java4Shell"): disable the vulnerable x86-64 Base64
+# decode intrinsic until a fixed Temurin build ships. Remove once patched.
+ENV JAVA_TOOL_OPTIONS=-XX:-UseBASE64Intrinsics
 WORKDIR /app
 COPY security/blocked-certificates.properties /tmp/blocked-certificates.properties
 RUN printf '\n' >> "$JAVA_HOME/lib/security/blocked.certs" \
