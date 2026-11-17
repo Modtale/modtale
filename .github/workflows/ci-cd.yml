@@ -541,6 +541,7 @@ jobs:
             "--update-env-vars" "R2_BUCKET_NAME=${{ env.R2_BUCKET_NAME }}"
             "--update-env-vars" "R2_ARTIFACT_BUCKET_NAME=${{ env.R2_ARTIFACT_BUCKET_NAME }}"
             "--update-env-vars" "R2_PUBLIC_DOMAIN=${{ env.R2_PUBLIC_DOMAIN }}"
+            "--update-env-vars" "JAVA_TOOL_OPTIONS=-XX:-UseBASE64Intrinsics"
           )
 
           if [ "${{ env.ENV_TYPE }}" != "preview" ] && [ -n "${{ env.R2_PUBLIC_DOMAIN }}" ]; then
