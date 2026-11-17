@@ -398,6 +398,7 @@ jobs:
             --update-env-vars "BACKEND_URL=placeholder"
             --update-env-vars "R2_BUCKET_NAME=$R2_BUCKET_NAME"
             --update-env-vars "R2_PUBLIC_DOMAIN=$R2_PUBLIC_DOMAIN"
+            --update-env-vars "JAVA_TOOL_OPTIONS=-XX:-UseBASE64Intrinsics"
             --labels "app=modtale,environment=pr-preview,component=backend,pr=$PR_NUMBER,commit-sha=$PR_HEAD_SHA"
           )
           if [ "$MODTALE_SECRET_BUNDLES_ENABLED" = "true" ]; then

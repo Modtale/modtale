@@ -537,6 +537,7 @@ jobs:
             "--update-env-vars" "BACKEND_URL=${BACKEND_DOMAIN:-placeholder}"
             "--update-env-vars" "R2_BUCKET_NAME=${{ env.R2_BUCKET_NAME }}"
             "--update-env-vars" "R2_PUBLIC_DOMAIN=${{ env.R2_PUBLIC_DOMAIN }}"
+            "--update-env-vars" "JAVA_TOOL_OPTIONS=-XX:-UseBASE64Intrinsics"
           )
 
           R2_ACCESS_KEY_SECRET_VERSION="${R2_ACCESS_KEY_SECRET_VERSION:-latest}"
