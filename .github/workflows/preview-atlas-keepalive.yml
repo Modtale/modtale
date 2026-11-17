@@ -1,0 +1,60 @@
+name: PR Preview Atlas Keepalive
+
+# Atlas pauses free-tier (M0) clusters after a stretch with no connections.
+# PR previews can go quiet for weeks, so touch the preview cluster twice a week.
+on:
+  schedule:
+    - cron: '17 9 * * 1,4'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: preview-atlas-keepalive
+  cancel-in-progress: false
+
+jobs:
+  keepalive:
+    name: Ping preview Atlas cluster
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      PROJECT_ID: ${{ vars.GCP_PREVIEW_PROJECT_ID }}
+      MONGODB_SECRET_NAME: ${{ vars.GCP_PREVIEW_MONGODB_SECRET_NAME }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: .github/scripts
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.23.4
+
+      - name: Validate configuration
+        run: |
+          set -euo pipefail
+          : "${PROJECT_ID:?Set repository variable GCP_PREVIEW_PROJECT_ID to the preview GCP project.}"
+          MONGODB_SECRET_NAME="${MONGODB_SECRET_NAME:-PREVIEW_MONGODB_URI}"
+          if [ "$PROJECT_ID" = "gen-lang-client-0244308719" ] || [ "$MONGODB_SECRET_NAME" = "MONGODB_URI" ]; then
+            echo "::error::Keepalive must only target the preview project and preview MongoDB secret."
+            exit 1
+          fi
+          echo "MONGODB_SECRET_NAME=$MONGODB_SECRET_NAME" >> "$GITHUB_ENV"
+
+      - name: Authenticate to preview GCP project
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_PREVIEW_CREDENTIALS }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Touch preview cluster
+        run: |
+          set -euo pipefail
+          MONGODB_URI="$(gcloud secrets versions access latest --project "$PROJECT_ID" --secret="$MONGODB_SECRET_NAME")"
+          echo "::add-mask::$MONGODB_URI"
+          export MONGODB_URI
+          npm install --silent --prefix "$RUNNER_TEMP/keepalive" mongodb@6
+          NODE_PATH="$RUNNER_TEMP/keepalive/node_modules" node .github/scripts/preview-atlas-keepalive.cjs
